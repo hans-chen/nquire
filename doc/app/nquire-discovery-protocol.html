@@ -1,0 +1,89 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML>
+<HEAD>
+	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8">
+	<TITLE></TITLE>
+	<META NAME="AUTHOR" CONTENT="van Dootingh">
+	<link rel="stylesheet" type="text/css" href="nquire_doc.css" /> 
+</HEAD>
+<BODY class="document">
+<H1>Nquire discovery protocol</H1>
+<p>Last update: dec 10 2009</p>
+<p>	The Nquire discovery protocol can be used to discover all Nquire
+	devices in a network.
+</p>
+<p>	Another function is the get information about the available Nquires.
+</p>
+<H2>Protocol description</H2>
+<p>	The protocol is fairly simplistic:
+</p>
+<p> The server has to send an UDP packet to the discovery port
+	(19200) of the Nquire (using broadcasting on 239.255.255.250 or the actual address of the nquire), containing the following text:
+</p>
+<p>	<code>
+		CIT-DISCOVER-REQUEST<br>
+		Version: 1
+	</code>
+</p>
+<p>
+	In which:
+	<ul>
+		<li>
+			Line breaks can be '\n' (0x0d) or '\n\r' (0x0d0a) or '\r\n'
+		</li>
+		<li>
+			The first line is a discovery packet identifier. It should
+			contain: <code>CIT-DISCOVER-REQUEST</code>
+			(cit stands for 'customer information terminal').<br>
+		</li>
+		<li>
+			The second line is the version of the discovery protocol 
+			(so this is not the version of the application!)
+			It begins with the "<code>Version:</code>" string (case sensitive, no space 
+			between "<code>Version</code>" and "<code>:</code>"), followed by exactly 1
+			space charracter and the version number "<cod>1</code>".
+			From application version 1.3 on, the protocol is somewhat relaxed: there can 
+			be a number of spaces and/or tabs between the ":" and the version number. 
+		</li>
+	</ul>
+</p>
+<p>	From application version 1.3, the discovery protocol is extended with
+	an optional line containing: <code>RESPONSE-TO-SENDER-PORT</code><br>
+	When this option is used, the response is not broadcasted using the 
+	discovery port but broadcasted using the port on which the 
+	<code>CIT-DISCOVER-REQUEST</code> packet was send.<br>
+	The protocol version is not increased because this addition is of no
+	consequence when not used.
+</p>
+<p>	All	Nquires receiving the packet and implementing the sent version will
+	respond by broadcasting an UDP packet to <code>239.255.255.250</code>
+	port <code>19200</code> or, when <code>RESPONSE-TO-SENDER-PORT</code> is 
+	used, to the sender port of the <code>CIT-DISCOVER-REQUEST</code> packet.
+	The packet will have the following format (BNF):<br>
+</p>
+<p>	<code>
+		file ::= "CIT-DISCOVER-RESPONSE" EOL &lt;idvalues&gt;<br>
+		idvalues ::= &lt;idvalue&gt; EOL &lt;idvalues&gt; | &lt;idvalue&gt; EOF<br>
+		idvalue ::= &lt;identifier&gt; ":" SPACE &lt;value&gt;<br>
+		SPACE ::= "" | " " SPACE | TAB SPACE
+		identifier ::= [printable asci not ':']
+	</code>
+</p>
+<p>
+Version 1 of the Nquire discovery protocol will send the following 
+packet header and identifier-value pairs (values are an example):
+</p>
+<p>	<code>
+		CIT-DISCOVER-RESPONSE<br>		Device name: Newland NQuire 200<br>		Application version: 1.2<br>		Application build nr: 456<br>		Serial number: EI0123456RW<br>		IP-Address: 192.168.1.226<br>		MAC-Address: 08:00:46:31:60:95<br>
+	</code>
+</p><p>	Note 1: The protocol for a certain version will not change. Any
+	change with a consequence for usage of the existing protocol version will
+	result in an increased version number in the
+	<code>CIT-DISCOVER-REQUEST</code> packet.
+</p>
+<p>	Note 2: The rational behind using broadcasting is to be able to discover 
+	Nquires configured for a different subnet as the server sending the 
+	discovery packet.
+</p>
+</BODY>
+</HTML>

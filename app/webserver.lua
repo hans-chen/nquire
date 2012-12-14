@@ -30,7 +30,10 @@ module("Webserver", package.seeall)
 -- end)
 --
 
+-- return: remaining next_buf
 local function handle_request(client, method, uri, headers, next_buf)
+
+	logf(LG_DMP,"webserver","handle_request(client.address=%s, method='%s',uri='%s')", client.address, method or "nil", uri or "nil")
 
 	local request = {
 		method = method,
@@ -41,7 +44,7 @@ local function handle_request(client, method, uri, headers, next_buf)
 	local response = {
 		result = nil,
 		header = {},
-		data = {}
+		data = {},
 	}
 
 	-- split request uri into path and CGI parameters
@@ -57,7 +60,7 @@ local function handle_request(client, method, uri, headers, next_buf)
 		)
 	end
 
-	logf(LG_DBG, "webserver", "%s: %s %s", client.address, method, uri)
+	logf(LG_DBG, "webserver", "path=%s, query=%s", path, query)
 
 	-- Parse request headers
 
@@ -81,6 +84,13 @@ local function handle_request(client, method, uri, headers, next_buf)
 		request.auth_ok = true
 	end
 
+	if method == "POST" then
+		request.post_data = next_buf:sub(1, request.header["Content-Length"])
+		next_buf = next_buf:sub( request.header["Content-Length"]+1 )
+		--print("DEBUG:89 post_data=" .. request.post_data)
+		--print("DEBUG:90 next_buf=" .. next_buf)
+	end
+	
 	-- Find handler for request
 
 	if request.auth_ok then
@@ -146,9 +156,9 @@ local function handle_request(client, method, uri, headers, next_buf)
 	if response.header["Connection"] == "Close" then
 		client:close()
 		logf(LG_DBG, "webserver", "Client closed, no keepalive")
-		return
 	end
 
+	return next_buf
 end
 
 
@@ -185,9 +195,28 @@ local function on_fd_client(event, client)
 		if offset then
 			local buf = client.buf:sub(1, offset)
 			local next_buf = client.buf:sub(offset+4)
-			local method, uri, headers = buf:match("(%S+) (%S+).-[\r\n]+(%S.+)")
-			if method then
-				handle_request(client, method, uri, headers, next_buf)
+
+			--print("DEBUG: buf='" .. buf .. "'")
+
+			local method, uri, headers = buf:match("^(%S+) (%S+).-[\r\n]+(%S.+)")
+			--print("DEBUG: method=" .. (method or "null"))
+			--print("DEBUG: uri=" .. (uri or "null"))
+			--print("DEBUG: headers=\n" .. dump(headers or "null"))
+
+			if method=="GET" then
+				next_buf = handle_request(client, method, uri, headers, next_buf)
+			elseif method=="POST" then
+				local content_length = headers:match("Content[-]Length:%s+(%d+)")+0
+				logf(LG_DMP, "webserver", "Content-Length=%d", content_length)
+				logf(LG_DMP, "webserver", "#next_buf=%d", #next_buf)
+				if content_length and content_length>#next_buf then
+					-- TODO: test this exception from normal operation
+					logf(LG_DMP, "webserver", "Not all data received. Next time better")
+					break
+				end
+				next_buf = handle_request(client, method, uri, headers, next_buf)
+			else
+				logf(LG_WRN,"webserver", "Could not handle http request [[%s]]", buf)
 			end
 			client.buf = next_buf
 		else

@@ -29,18 +29,20 @@
 		rootfs
 		kernel
 		application
+		hardware
 	Serial Number:
 		SN
 		
 	cit.ini example:
 
 	[version]
-        rootfs = 1.0		; rootfs 
-        app   = 1.0		; cit200 application version, need application to modify
-        usb_scan  =  1.0	; read from /proc/driver/scanner  
-        kernel = 2.6.26		; read from /proc/version
+        rootfs = 1.0				; rootfs,changed when cramfs changed
+        app   = 1.2.0 build 463 Nov 13 2009	; read from /cit200/sys.so
+        usb_scan  =  1.0			; read from /proc/driver/scanner, The version changed when usb datapipe driver upgrade
+        kernel = 2.6.27.2 (#V257)		; read from /proc/version, The version changed when kernel upgrade
+        hardware = NL				; Hardware version which set in factory
 	[serial number]
-        sn = 			; read from /dev/mtdblock/5
+        sn = 					; read from /dev/mtdblock/6
 	</pre></div> </div>
 <br><p align="center"><font color="#0080ff">CHINA. FuJian Newland Computer CO., Ltd</font></p>
 <p align="center"><font color="#0080ff">Resource management platform - technology r&d center - software development</font></p>

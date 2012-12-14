@@ -12,7 +12,7 @@
 
 module("Beeper", package.seeall)
 
-
+local lgid = "beeper"
 
 --
 --- Initialize beeper device.
@@ -24,10 +24,10 @@ module("Beeper", package.seeall)
 
 local function init(beeper)
 	local device = config:get("/dev/beeper/device")
-	logf(LG_DBG, "beeper", "Opening beeper on device %s", device)
+	logf(LG_DBG, lgid, "Opening beeper on device %s", device)
 	beeper.beepthread, err = beepthread.new(device)
 	if not beeper.beepthread then
-		logf(LG_WRN, "beeper", "Can't open beeper %s: %s", device, err)
+		logf(LG_WRN, lgid, "Can't open beeper %s: %s", device, err)
 	end
 end
 
@@ -50,7 +50,7 @@ local function play(beeper, song)
 	local tempo = 120
 	local volume = config:get("/dev/beeper/volume") / 5
 
-	logf(LG_DMP, "beeper", "Playing %s", song)
+	logf(LG_DMP, lgid, "Playing %s", song)
 
 	for char, mod, num, dot in string.gmatch(song, "([cdefgabpotdl><])([#\-]?)(%d*)(%.?)") do
 
@@ -78,6 +78,27 @@ local function play(beeper, song)
 	end
 end
 
+--
+-- play the ok sound
+--
+local function beep_ok( beeper, always )
+	if config:get("/cit/disable_scan_beep") == "false" or always then
+		local tune_nr = config:get("/dev/beeper/beeptype") or "1"
+		local tune = config:get("/dev/beeper/tune_" .. tune_nr)
+		beeper:play(tune)
+	end
+end
+
+
+--
+-- play the error sound
+-- This is played always
+--
+local function beep_error( beeper )
+	local tune = config:get("/dev/beeper/tune_error")
+	beeper:play(config:get("/dev/beeper/tune_error"))
+end
+
 
 --
 --- constructor.
@@ -95,6 +116,8 @@ function new()
 		-- methods
 		init = init,
 		play = play,
+		beep_ok = beep_ok,
+		beep_error = beep_error,
 	}
 
 	beeper:init()

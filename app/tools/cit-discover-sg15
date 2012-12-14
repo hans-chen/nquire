@@ -1,0 +1,84 @@
+#!/usr/local/bin/lua
+
+require "net"
+require "sys"
+require "misc"
+
+local discovery_bc_address = "239.255.255.250"
+--local discovery_bc_address = "255.255.255.255"
+local discovery_port = 10004
+local discovery_host_port = 12345
+
+local magic_number = 0x53544944
+local protocol_version = 0x0002
+
+local MAGIC_IDX = 1
+local PROTOCOL_VERSION_IDX = 5
+local PACKET_TYPE_IDX = 7
+
+local MAC_IDX = 9
+local INET_IP_IDX = 25
+local INET_MASK_IDX = 33
+local INET_GATEWAY_IDX = 37
+local FIRMWARE_VERSION_IDX = 42
+
+
+local fd = net.socket("udp")
+net.setsockopt(fd, "IP_ADD_MEMBERSHIP", discovery_bc_address)
+net.bind(fd, '0.0.0.0', discovery_host_port)
+
+
+local discovery_packet=string.rep("\0",7);
+
+-- packet header
+discovery_packet = poke_big_endian_long( discovery_packet, 1, magic_number )
+discovery_packet = poke_big_endian_short( discovery_packet, 5, protocol_version )
+discovery_packet = ssub( discovery_packet, 7, string.char( 0x00 ) )
+
+print("Discovery_packet=\n" .. dump( discovery_packet ) .. "\n")
+
+local ok, err = net.sendto(fd, discovery_packet, discovery_bc_address, discovery_port)
+if not ok then
+	print("Error sending: ", err)
+end
+
+
+while true do
+
+	local fds_in = {r={[fd]=true},w={},e={}}
+	local fds_out = sys.select(fds_in, 1)
+
+	if not fds_out then
+		os.exit(0)
+	end
+
+	-- print the discover response
+	local buf, saddr, sport = net.recvfrom(fd, 1024)
+	if buf and peek_big_endian_long(buf, 1) == magic_number and peek_big_endian_short(buf, 5) == protocol_version and string.byte(buf, 7) == 1 then
+
+		print("Response packet = \n" ..  dump( buf ) .. "\n" )
+
+		-- create the default configuration packet from the received response packet
+		local configuration_packet = ssub( buf, 7, string.char( 0x02 ) )
+		
+		-- change the ip adres for testing reconfiguration
+		configuration_packet = ssub( configuration_packet, INET_IP_IDX, string.char( 192,168,1,200 ) )
+
+		-- change the netmask adres for testing reconfiguration
+		configuration_packet = ssub( configuration_packet, INET_MASK_IDX, string.char( 255,255,255,0 ) )
+
+		-- change the gateway adres for testing reconfiguration
+		configuration_packet = ssub( configuration_packet, INET_GATEWAY_IDX, string.char( 192,168,1,1 ) )
+
+		local ok, err = net.sendto(fd, configuration_packet, discovery_bc_address, discovery_port)
+		if not ok then
+			print("Error sending: ", err)
+		end
+	end
+end
+
+print("\n");
+--net.bind(fd, "0.0.0.0", discovery_port)
+
+
+-- vi: ft=lua ts=3 sw=3

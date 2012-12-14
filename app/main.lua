@@ -22,6 +22,7 @@ require "beeper"
 require "scanner"
 require "scanner_1d"
 require "scanner_2d"
+require "scanner_rf"
 require "scanner_hid"
 require "cit"
 require "display"
@@ -40,6 +41,8 @@ require "watchdog"
 
 local running = true
 
+local lgid = "main"
+
 --
 -- 'signal' event hander
 -- 
@@ -47,11 +50,11 @@ local running = true
 local function on_signal(event)
 	local signal = event.data.signal
 	if signal == "SIGINT" or signal == "SIGTERM" then
-		logf(LG_INF, "main", "Received signal %s, exiting", signal)
+		logf(LG_INF, lgid, "Received signal %s, exiting", signal)
 		running = false
 	end
 	if signal == "SIGPIPE" then
-		logf(LG_DBG, "main", "SIGPIPE recieved, ignoring")
+		logf(LG_DBG, lgid, "SIGPIPE recieved, ignoring")
 	end
 end
 
@@ -64,10 +67,10 @@ local function usage()
 	print("usage: validator [options]")
 	print("")
 	print("   -d          Daemonize")
-	print("   -f          Lists all available fonts and exits")
 	print("   -h          Show this help")
 	print("   -l LEVEL    Set log level to LEVEL")
-	print("   -n          Don't (re)configure the network")
+	print("   -n          Don't (re)configure the ethernet network")
+	print("   -w          Don't start the watchdog")
 	print("   -v          Show version and exit")
 end
 
@@ -75,9 +78,12 @@ end
 -- Main code starts here
 ---------------------------------------------------------------------------
 
+-- workaround for image bug (required for gprs lock option and peers/gprs file)
+os.execute( "mkdir -p /var/lock /etc/ppp/peers" )
+
 -- Parse cmdline arguments
 
-local opt = getopt( {...} , "dfhl:np:v") 
+opt = getopt( {...} , "wdhl:np:v") 
 
 if not opt then
 	usage()
@@ -91,7 +97,7 @@ end
 
 if opt.v then
 	local build = sys.version()
-	print("Validator build %s" % build )
+	print("NQuire build %s" % build )
 	os.exit(0)
 end
 
@@ -123,16 +129,22 @@ end
 logf_init(opt.l, true, true)
 
 do
-	local serial = sys.get_macaddr("eth0")
-	local build, date = sys.version()
-	logf(LG_INF, "main", "Validator serial %s build %s %s", serial, build, date)
+	local mac = sys.get_macaddr("eth0")
+	local f_serial = io.popen("cit_sn -r | grep Serial | cut -d: -f2")
+	local serial = f_serial:read()
+	f_serial:close()
+	local version, build, date = sys.version()
+	logf(LG_INF, lgid, "Using mac %s, serial %s, version %s, build %s, %s", (mac or "nil"), (serial or "nil"), (version or "nil"), (build or "nil"), (date or "nil"))
 end
 
--- Create watchdog interface 
-
-local watchdog = Watchdog:new()
+local mac = sys.get_macaddr("eth0")
+if mac == "00:05:f4:11:22:33" then
+	logf(LG_WRN,lgid, "Problematical mac-address detected (00:05:f4:11:22:33). Contact the heldpdesk.")
+end
 
 -- Open all peripherals
+
+logf(LG_INF,lgid,"Open all periferals")
 
 led = Led:new()
 led:set("blue", "off")
@@ -140,25 +152,27 @@ led:set("yellow", "off")
 
 display = Display.new()
 
-if opt.f then
-	for _, family in ipairs(display:list_fonts()) do
-		print(family.name)
-	end
-	os.exit(0)
+-- turn on periferal power:
+logf(LG_INF,lgid,"Turn on periferal power")
+local ok, err = sys.gpio_set(18, 1)
+sys.sleep(1)
+if not ok then
+	logf(LG_WRN,lgid,"Error turning on periferal power. Scanner possibly not operational")
 end
 
--- Open scanner. Detect if the 2D USB scanner on /dev/scanner is available, fall back
--- to 1D scanner on RS232 if not
-
-local fd = io.open("/dev/scanner")
-if fd then
-	fd:close()
+if Scanner_1d:is_available() then
+	scanner = Scanner_1d:new()
+elseif Scanner_2d:is_available() then
 	scanner = Scanner_2d:new()
 else
-	scanner = Scanner_1d:new()
+	logf(LG_ERR,lgid,"Unknown barcode scanner type.")
 end
 
 Scanner_hid:new()
+
+if Scanner_rf:is_available() then
+	scanner_rf = Scanner_rf:new()
+end
 
 -- Create web server 
 
@@ -171,12 +185,7 @@ webui = Webui:new( )
 
 beeper = Beeper.new()
 
--- Setup network unless user requested not to
-
-if opt.n then
-	config:set("/network/interface", "off")
-end
-
+-- Setup network
 network = Network:new()
 
 -- Play startup sound
@@ -184,23 +193,23 @@ network = Network:new()
 beeper:play(config:get("/dev/beeper/tune_startup"))
 
 -- Start discovery service as soon as network is up
-	
 discovery = Discovery:new()
 discovery_sg15 = Discovery_sg15:new()
 
 evq:register("network_up", function()
-	logf(LG_INF, "main", "Network is up, starting discovery service")
+	logf(LG_INF, lgid, "Starting discovery service")
 	discovery:start()
 	discovery_sg15:start()
 end)
 
 evq:register("network_down", function()
-	logf(LG_INF, "main", "Network is down, stopping discovery service")
+	logf(LG_INF, lgid, "Stopping discovery service")
 	discovery:stop()
 	discovery_sg15:stop()
 end)
 
 -- Start upgrade process
+logf(LG_INF,lgid,"Start upgrade service")
 
 Upgrade:new()
 Versioninfo:new()
@@ -229,10 +238,15 @@ evq:register("signal", on_signal)
 
 -- Initialisation finished, go into main loop.
 
-logf(LG_INF, "main", "Starting main event loop")
+logf(LG_INF, lgid, "Starting main event loop")
 
--- comment next line to disable the watchdog
-watchdog:start()
+-- option -w: don't start watchdog
+if not opt.w then
+	-- Create watchdog interface
+	logf(LG_INF,lgid,"Start watchdog")
+	watchdog = Watchdog:new()
+	watchdog:start()
+end
 
 while running do
 	evq:pop(true)
@@ -242,13 +256,16 @@ end
 
 beeper:play(config:get("/dev/beeper/tune_shutdown"))
 scanner:close()
-display:clear("txtimg")
+if Scanner_rf.is_available() and scanner_rf then
+	scanner_rf:close()
+end
+display:clear()
 display:update()
 display:close()
 led:set("blue", "off")
 led:set("yellow", "off")
 
-logf(LG_INF, "main", "Done, bye bye")
+logf(LG_INF, lgid, "Done, bye bye")
 
 -- vi: ft=lua ts=3 sw=3
 --

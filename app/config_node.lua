@@ -1,6 +1,8 @@
 
 module("Config_node", package.seeall)
 
+local lgid="config_n"
+
 --
 -- Get value from node, calling get-watches if needed
 --
@@ -214,12 +216,12 @@ local function is_visible(node)
 		if chunk then
 			local ok, result = pcall(chunk, node)
 			if not ok then
-				logf(LG_WRN, "config", "Error in depend-expression %s: %s", exp, result)
+				logf(LG_WRN, lgid, "Error in depend-expression %s: %s", exp, result)
 			end
-			logf(LG_DMP, "config", "Depend-expression: %s = %s", exp, tostring(result))
+			logf(LG_DMP, lgid, "Depend-expression: %s = %s", exp, tostring(result))
 			return result
 		else
-			logf(LG_WRN, "config", "Error in depend-expression: %s", err)
+			logf(LG_WRN, lgid, "Error in depend-expression: %s", err)
 		end
 	else
 		result = true

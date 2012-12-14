@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# tool for faking the cit_sn on the NQuire, 
+# so running on a pc will also give a SN
+
+echo "Serial number:EI0123456RW"

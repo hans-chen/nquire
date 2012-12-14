@@ -4,6 +4,8 @@
 
 module("Scanner_2d", package.seeall)
 
+local lgid = "scanner"
+
 --  scanner programminc codes as defined in "HR200 User Guide 090720"
 local SCANNER_CMD_SET_DEFAULTS      = "0001000"
 local SCANNER_CMD_TERMINATOR_CR     = "0310000=0x0D00"
@@ -28,6 +30,9 @@ local SCANNER_CMD_SENSITIVITY_LOW   = "0312000"
 local SCANNER_CMD_SENSITIVITY_NORMAL= "0312010"
 local SCANNER_CMD_SENSITIVITY_HIGH  = "0312020"
 
+local SCANNER_CMD_CONSTRAIN_MULTI_ON   = "0313010"
+local SCANNER_CMD_CONSTRAIN_MULTI_SEMI = "0313030"
+local SCANNER_CMD_CONSTRAIN_MULTI_ALL  = "0313020"
 --
 -- Scanner fd callback, used for both internal and external scanner
 --
@@ -49,17 +54,21 @@ end
 
 local busy=false;
 local function on_fd_scanner(event, scanner)
+
 	if event.data.fd ~= scanner.fd then
 		return
 	end
 
 	if busy then 
-		logf(LG_DBG, "scanner", "multi threading bug: Busy" )
+		logf(LG_DBG, lgid, "multi threading bug: Busy" )
 		return
 	end
 	busy=true;
 
-	logf(LG_DBG, "scanner", "Start retrieving data from scanner.")
+	-- tryout for faster beep (this is followed by an error beep when the barcode is invalid)
+	beeper:beep_ok()
+	
+	logf(LG_DBG, lgid, "Start retrieving data from scanner.")
 	local t_start = sys.hirestime()
 	local err_count = 0;
 	local data = sys.read(scanner.fd, 5003)
@@ -67,7 +76,7 @@ local function on_fd_scanner(event, scanner)
 		err_count = err_count+1
 		data = sys.read(scanner.fd, 5003)
 	end
-	logf(LG_DBG, "scanner", "#Futile reads=" .. err_count)
+	logf(LG_DBG, lgid, "#Futile reads=" .. err_count)
 
 	if data and data ~= "" then
 		scanner.scanbuf = data
@@ -77,7 +86,7 @@ local function on_fd_scanner(event, scanner)
 			local barcode = t1
 			scanner.scanbuf = "" -- t2 or ""
 		
-			logf(LG_DBG, "scanner", "Barcode: '%s'", barcode)
+			logf(LG_DBG, lgid, "Barcode: '%s'", barcode)
 
 			-- Barcode is complete. Fixup the barcode type prefix to be the
 			-- compatible format
@@ -87,32 +96,33 @@ local function on_fd_scanner(event, scanner)
 
 			for _, i in ipairs(prefixes) do
 				if prefix_in == i.prefix_2d then
-					logf(LG_DBG, "scanner", "Barcode type = %q", i.name)
+					logf(LG_DBG, lgid, "Barcode type = %q", i.name)
 					prefix_out = i.prefix_out
 					break
 				end
 			end
-		
+
 			if not prefix_out then
-				logf(LG_WRN, "scanner", "Barcode type = Unknown")
+				logf(LG_WRN, lgid, "Barcode type = Unknown")
 				prefix_out = "?"
 			end
 
 			evq:push("scanner", { result = "ok", barcode = barcode, prefix=prefix_out })
 		else
-			logf(LG_WRN, "scanner", 
+			logf(LG_WRN, lgid, 
 					"Scanned barcode data is not processed \n" ..
 					"because it is not terminated.\n" ..
 					"Possible cause: message too long (>= 5003 chars)")
-			beeper:play( "o3g16c16" )
+			beeper:beep_error()
 		end
 		if t2 then
-			logf(LG_WRN, "scanner", "More data is scanned than is processed.\n" ..
+			logf(LG_WRN, lgid, "More data is scanned than is processed.\n" ..
 											"The following data is ignored:")
-			logf(LG_WRN, "scanner", "'%s'", t2)
+			logf(LG_WRN, lgid, "'%s'", t2)
 		end
 	else
-		logf(LG_WRN, "scanner", "Scanner data-timeout.")
+		logf(LG_WRN, lgid, "Scanner data-timeout.")
+		beeper:beep_error()
 	end
 	busy=false
 end
@@ -135,7 +145,7 @@ local function ping(scanner)
 		end
 	until sys.hirestime() - tstart > 1.0
 		
-	logf(LG_WRN, "scanner", "Scanner does not reply to ping")
+	logf(LG_WRN, lgid, "Scanner does not reply to ping")
 	return false
 end
 
@@ -153,7 +163,7 @@ local function flush(scanner)
 			sys.sleep(0.1)
 		end
 	until not buf or #buf == 0
-	logf(LG_DMP, "scanner", "< " .. data)
+	logf(LG_DMP, lgid, "< " .. data)
 	return data
 end
 
@@ -170,16 +180,16 @@ local function wait_ack(scanner, time)
 		if data and #data > 0 then
 			buf = buf .. data
 			if data:find("\006") then
-				logf(LG_DMP, "scanner", "ACK")
+				logf(LG_DMP, lgid, "ACK")
 				if #buf > 1 then
-					logf(LG_DMP, "scanner", "< " .. buf)
+					logf(LG_DMP, lgid, "< " .. buf)
 				end
 				return buf
 			end
 			sys.sleep(0.1)
 		end
 	until sys.hirestime() - tstart > 4.0
-	logf(LG_WRN, "scanner", "Timeout waiting for ACK")
+	logf(LG_WRN, lgid, "Timeout waiting for ACK")
 	return nil
 end
 
@@ -189,7 +199,7 @@ local function cmd_noack(scanner, command)
 
 	local buf = "!NLS" .. command .. ";"
 	sys.write(scanner.fd, buf)
-	logf(LG_DMP, "scanner", "> %s", buf)
+	logf(LG_DMP, lgid, "> %s", buf)
 
 end
 
@@ -223,6 +233,31 @@ function get_illumination_mode_code( mode )
 	end
 end
 
+-- enable/disable barcodes.
+local function barcode_on_off( scanner, name, on_off, wait_for_ack )
+	local programmed=false
+	logf(LG_DMP, lgid, "barcode_on_off(" .. name .. "," .. on_off .. ")")
+	for _,code in ipairs( enable_disable_HR200 ) do
+		--logf(LG_DMP, lgid, "code=" .. code.name)
+		if code.name == name then
+			if on_off == "on" and code.on then
+				logf(LG_DBG, lgid, "enabling barcode " .. name)
+				scanner:cmd_noack(code.on)
+				programmed=true
+			elseif on_off == "off" and code.off then
+				logf(LG_DBG, lgid, "disabling barcode " .. name)
+				scanner:cmd_noack(code.off)
+				programmed=true
+			end
+		end
+	end
+	if wait_for_ack and programmed then
+		if not scanner:wait_ack() then
+			logf( LG_WRN, lgid, "Error disabling/enabling barcode " .. name .. "." )
+		end
+	end
+end
+
 --
 -- Open and configure scanner device
 --
@@ -230,13 +265,13 @@ end
 local function open(scanner)
 
 	scanner:close()
-			
+
 	scanner.device = "/dev/scanner"
 
-	logf(LG_DBG, "scanner", "Opening scanner on device %s", scanner.device)
+	logf(LG_DBG, lgid, "Opening scanner on device %s", scanner.device)
 	local fd, err = sys.open(scanner.device, "rw")
 	if not fd then
-		logf(LG_WRN, "scanner", "Could not open scanner device %s: %s", scanner.device, err)
+		logf(LG_WRN, lgid, "Could not open scanner device %s: %s", scanner.device, err)
 		return
 	end
 
@@ -250,13 +285,13 @@ local function open(scanner)
 
 	-- Basic scanner configuration
 
-	logf(LG_INF, "scanner", "Configuring scanner")
+	logf(LG_INF, lgid, "Configuring scanner")
 	local ok = scanner:ping()
 
 	local errors = false
 
 	if not ok then
-		logf(LG_WRN, "scanner", "Scanner does not ping, can not configure")
+		logf(LG_WRN, lgid, "Scanner does not ping, can not configure")
 		return
 	end
 
@@ -267,7 +302,7 @@ local function open(scanner)
 				SCANNER_CMD_AUTO_SCAN,
 				SCANNER_CMD_CODE_ID_ON
 			) then
-		logf( LG_WRN, "scanner", "Error setting scanner defaults." )
+		logf( LG_WRN, lgid, "Error setting scanner defaults." )
 		errors = true
 	end
 	
@@ -285,8 +320,17 @@ local function open(scanner)
 		if tmp then version = version .. "/ fw:" .. tmp .. " " end
 		config:lookup("/dev/scanner/version"):setraw(version)
 	else
-		logf(LG_WRN, "scanner", "Could not acquire scanner version information")
+		logf(LG_WRN, lgid, "Could not acquire scanner version information")
 		errors = true
+	end
+
+	-- prohibit multi reading:
+	if config:get("/dev/scanner/multi_reading_constraint") == "On" then
+		scanner:cmd(SCANNER_CMD_CONSTRAIN_MULTI_ON,
+						SCANNER_CMD_CONSTRAIN_MULTI_ALL)
+	elseif config:get("/dev/scanner/multi_reading_constraint") == "Semi" then
+		scanner:cmd(SCANNER_CMD_CONSTRAIN_MULTI_ON,
+						SCANNER_CMD_CONSTRAIN_MULTI_SEMI)
 	end
 
 	-- Disable 2D codes if configured
@@ -299,22 +343,20 @@ local function open(scanner)
 		scanner:cmd_noack(SCANNER_CMD_2D_ENABLE)
 	end
 
-	-- disable barcodes when this is configured)
+	-- enable/disable barcodes when this is configured
 	for _,code in ipairs(enable_disable_HR200) do
 		local id = code.name
-		local node = config:get("/dev/scanner/enable-disable/" .. id )
-		if node then
-			if node=="false" and code.off then
-				logf(LG_DBG, "scanner", "disabling barcode " .. id)
-				scanner:cmd_noack(code.off)
-			elseif node=="true" and code.on then
-				logf(LG_DBG, "scanner", "enabling barcode " .. id)
-				scanner:cmd_noack(code.on)
+		local node = config:lookup("/dev/scanner/enable-disable/" .. id )
+		if node and node:get()=="false" then
+			scanner:barcode_on_off( id, "off" )
+		elseif node and node:get()=="true" then
+			if not is_2d_code(id) or config:get("/dev/scanner/barcodes") == "1D and 2D" then
+				scanner:barcode_on_off( id, "on" )
 			end
 		end
 	end
 	if not scanner:wait_ack() then
-		logf( LG_WRN, "scanner", "Error disabling/enabling barcodes." )
+		logf( LG_WRN, lgid, "Error disabling/enabling barcodes." )
 		errors = true
 	end
 
@@ -351,15 +393,17 @@ local function open(scanner)
 		scanner:cmd_noack( SCANNER_CMD_SENSITIVITY_NORMAL )
 	end
 	if not scanner:wait_ack() then
-		logf( LG_WRN, "scanner", "Error setting illumination, aiming mode or sensitivity." )
+		logf( LG_WRN, lgid, "Error setting illumination, aiming mode or sensitivity." )
 		errors = true
 	end
 	scanner:flush()
 
 	if errors then
-		logf(LG_WRN, "scanner", "Finnished configuring scanner, but there were errors.")
+		logf(LG_WRN, lgid, "Finnished configuring scanner, but there were errors.")
+		led:set("yellow","blink")
 	else
-		logf(LG_DBG, "scanner", "Successfully detected and configured scanner, enabled %s" % barcodes)
+		logf(LG_DBG, lgid, "Successfully detected and configured scanner, enabled %s" % barcodes)
+		led:set("yellow","on")
 	end
 end
 
@@ -385,7 +429,7 @@ end
 --
 
 local function enable(scanner)
-	logf(LG_DBG, "scanner", "Enabling scanner")
+	logf(LG_DBG, lgid, "Enabling scanner")
 	if scanner.fd then
 		sys.write(scanner.fd, "\0272")
 		scanner:wait_ack()
@@ -400,13 +444,28 @@ end
 --
 
 local function disable(scanner)
-	logf(LG_DBG, "scanner", "Disabling scanner")
+	logf(LG_DBG, lgid, "Disabling scanner")
 	if scanner.fd then
 		sys.write(scanner.fd, "\0270")
 		scanner:wait_ack()
 		scanner:cmd( get_illumination_mode_code("Always OFF") )
 		led:set("yellow","off")
 	end
+end
+
+-- watch out: Scanner_1d:is_available() depends on this
+local has_2d_hw = nil
+function is_available()
+	if has_2d_hw == nil then
+		local fd = io.open("/dev/scanner")
+		if fd then
+			fd:close()
+			has_2d_hw = true
+		else
+			has_2d_hw = false
+		end
+	end
+	return has_2d_hw
 end
 
 
@@ -426,20 +485,26 @@ function new()
 		device = nil,
 		scanbuf = "",
 		type = "2d",
+		enable_disable = enable_disable_HR200,
 
-		-- methods
+		-- scanner independent methods
 		open = open,
 		close = close,
-		ping = ping,
-		flush = flush,
-		wait_ack = wait_ack,
-		cmd = cmd,
-		cmd_noack = cmd_noack,
 		enable = enable,
 		disable = disable,
+
+		cmd = cmd,
+		flush = flush,
+		
+		-- other methods:
+		cmd_noack = cmd_noack,
+		wait_ack = wait_ack,
+		ping = ping,
+		barcode_on_off = barcode_on_off,
 	}
 
 	config:add_watch("/dev/scanner", "set", function() scanner:open() end, scanner)
+	evq:register("reinit_scanner", function() scanner:open() end, scanner)
 	scanner:open()
 
 	return scanner

@@ -2,10 +2,9 @@
 # Copyright © 2007 All Rights Reserved.
 #
 
-NAME    := cit
-VERSION	:= 1.1
+NAME    := cit-app
 BUILD   := $(shell svnversion . | cut -d : -f 2)
-DIST	:= /tmp/$(NAME)-$(BUILD).tgz
+VERSION	:= 1.3
 
 ###########################################################################
 # Modules 
@@ -23,6 +22,14 @@ MODULES 		+= dpydrv.so
 LDFLAGS_dpydrv.so	+= -lrt -lungif -lSDL_image -lfreetype
 
 MODULES			+= beepthread.so
+
+MODULES			+= mifare.so
+CFLAGS_mifare.so += -I../lib/rfid
+LDFLAGS_mifare.so += ../lib/rfid/libnlrf.a
+
+LUA_FILES       = $(shell ls *.lua)
+
+INSTALL=../app-binary
 
 ###########################################################################
 # Global 
@@ -93,21 +100,29 @@ $(SUBDIRS):
 
 .PHONY: dist install
 
-dist:
-	git-archive --prefix=$(NAME)-$(BUILD)/ --format=tar HEAD | gzip > $(DIST)
+DIST=/tmp/$(NAME)-$(VERSION).$(BUILD).tar
+$(DIST): Makefile install
+	cd $(INSTALL) && tar cf $@ --exclude=.svn *
+
+dist: MD5=$(shell md5sum $(DIST) | cut -d\  -f1 )
+dist: $(DIST)
+	cp $(DIST) $(NAME)-$(VERSION).$(BUILD)-$(MD5).image
 
 clean:	
 	$(P) " [CLEAN]"
 	$(E) rm -rf $(OBJS) $(MODULES) core binary dist doc
 	$(E) for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
 
+clobber: clean
+	-rm -f *.image *~
+	
 install: $(MODULES)
-	rm -f ../app-binary/*lua ../app-binary/*.so ../app-binary/*.ttf ../app-binary/schema/*
-	cp *so ../app-binary
-	cp arial.ttf ../app-binary
-	cp schema/* ../app-binary/schema
-	cp img/* ../app-binary/img
-	for f in *lua; do luac -o ../app-binary/$$f $$f; done
+	rm -f $(INSTALL)/*lua $(INSTALL)/*.so $(INSTALL)/*.ttf $(INSTALL)/schema/*
+	cp *so $(INSTALL)
+	cp arial.ttf $(INSTALL)
+	cp schema/* $(INSTALL)/schema
+	cp img/* $(INSTALL)/img
+	for f in $(LUA_FILES); do luac -o $(INSTALL)/$$f $$f; done
 
 -include ../Debrules.inc
 

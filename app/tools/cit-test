@@ -1,73 +1,93 @@
 #!/bin/bash
 
-ADDRESS=$1
+#set -x 
+
+# turn on utf-8 for test execution
+
 UDP_PORT=9000
 TCP_PORT=9101
 
 test_1()
 {
 	echo -en "\e\x42\x30"				# Font size 0
-	echo -en "\e\x24"				# Clear screen
+	echo -en "\e\x24"					# Clear screen
 	echo -en "Mineral water"			# Text
-	echo -en "\x0d"					# Carriage return
-	echo -en "1 Ltr"				# Text
+	echo -en "\n"						# Carriage return
+	echo -en "1 Ltr"					# Text
 	echo -en "\e\x42\x31"				# Font size 1
-	echo -en "\e\x2e\x38\x80 0.98\x03"		# Align text right bottom
+	echo -en "\e\x2e\x38€ 0.98\x03"		# Align text right bottom
 }
 
 test_2()
 {
-	echo -en "\e\x42\x30"				# Font size 0
-	echo -en "\e\x24"				# Clear the screen
+	echo -en "\e\x42\x30"						# Font size 0
+	echo -en "\e\x24"							# Clear the screen
 	echo -en "\e\x2e\x31Coca Cola 0.33Ltr\x03" 	# Text center - top
-	echo -en "\e\x2c\x30\x45"			# Set pixel position (0,21)
+	echo -en "\e\x2c\x30\x45"					# Set pixel position (0,21)
 	echo -en "\e\x2e\x3a\x802.69 (Crate)\x03"	# Align text to horizontal center
-	echo -en "\e\x42\x31"				# Font size 1
+	echo -en "\e\x42\x31"						# Font size 1
 	echo -en "\e\x2e\x37Special Offer !\x03"	# Text bottom center
 }
 
 test_3()
 {
 	echo -en "\e\x42\x30"				# Set font
-	echo -en "\e\x25"				# Clear display
-	echo -en "\e\x2e\x30Winner\x03" 		# Left top
-	echo -en "\e\x2e\x32Winner\x03" 		# Right top
-	echo -en "\e\x2e\x36Winner\x03" 		# Left bottom
-	echo -en "\e\x2e\x38Winner\x03" 		# Right bottom
-	echo -en "\e\x42\x31"				# Set font
-	echo -en "\e\x2e\x34You Win!\x03" 		# Center
+	echo -en "\e\x25"					# Clear display
+	echo -en "\e\x2e\x30lt\x03" 		# Left top
+	echo -en "\e\x2e\x31ct\x03" 		# Centre top
+	echo -en "\e\x2e\x32rt\x03" 		# Right top
+	echo -en "\e\x2e\x33lm\x03" 		# left middle
+	echo -en "\e\x2e\x34cm\x03" 		# Centre middle
+	echo -en "\e\x2e\x35rm\x03" 		# Right middle
+	echo -en "\e\x2e\x36lb\x03" 		# Left bottom
+	echo -en "\e\x2e\x37cb\x03" 		# Centre bottom
+	echo -en "\e\x2e\x38rb\x03" 		# Right bottom
+	
+	echo -en "\e\x2c\xd0\x84X\x03"		# Write x at (
+	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2e\x3cxt\x03" 		# Left keep x
+	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2e\x3dxm\x03" 		# Centre keep x
+	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2e\x3exb\x03" 		# right keep x
+
+	echo -en "\e\x2c\x44\x44Y\x03"		# Write Y at (20,20)
+	echo -en "\e\x2c\x44\x44"			# Set pixel position (20,20)
+	echo -en "\e\x2e\x39ly\x03" 		# Left keep y
+	echo -en "\e\x2e\x3Acy\x03" 		# Centre keep y
+	echo -en "\e\x2e\x3Bry\x03" 		# right keep y
 }
 
 test_4()
 {
-	echo -en "\e\x42\x30"				# Set font
-	echo -en "\e\x25"				# Clear display
-	echo -en "\e\x2e\x30\xe2\x82\xac\x03"	 		# Left top
+	echo -en "\e\x42\x30"					# Set font
+	echo -en "\e\x25"						# Clear display
+	echo -en "\e\x2e\x30\xe2\x82\xac\x03"	# Left top € sign = \xe2\x82\xac
 }
 
 test_5()
 {
-	echo -en "\e\xff\x01"				# Fake barcode scan
+	echo -en "\e\xffA1234\x03"					# Fake barcode scan
 }
 
 test_6()
 {
 
 	echo -en "\e\x42\x31"				# Set font
-	echo -en "\e\x25"				# Clear display
+	echo -en "\e\x25"					# Clear display
 
 	echo -en "\e\x2e\x30"
-	echo -en "礦泉水"				# Mineral water
+	echo -en "礦泉水"						# Mineral water
 	echo -en "\x03"
 	
 	echo -en "\e\x2e\x33"
-	echo -en "Mineral water"				# Mineral water
+	echo -en "Mineral water"			# Mineral water
 	echo -en "\x03"
 	
 	echo -en "\e\x42\x30"				# Set font
 	
 	echo -en "\e\x2e\x32"
-	echo -en "公升"				# Liter
+	echo -en "公升"						# Liter
 	echo -en "\x03"
 	
 	echo -en "\e\x2e\x36"
@@ -79,7 +99,7 @@ test_7()
 {
 
 	echo -en "\e\x42\x31"				# Set font
-	echo -en "\e\x25"				# Clear display
+	echo -en "\e\x25"					# Clear display
 	echo -en "\e\x2e\x30"
   	echo -en "применению"
 	echo -en "\x03"
@@ -87,68 +107,186 @@ test_7()
 
 test_8()
 {
-	echo -en "\e\x5b\x30"			# Scanner disable
+	echo -en "\e\x5b\x30"				# Scanner disable
 }
 
 test_9()
 {
-	echo -en "\e\x5b\x31"			# Scanner enable
+	echo -en "\e\x5b\x31"				# Scanner enable
 }
 
 test_10()
 {
-	echo -en "\e\xfe"			# Show config
+	echo -en "\e\xfe"					# Show config
 }
 
 test_11()
 {
+	# test sloppy formatting without end of string (=\x03) chars
 	echo -en "\e\x42\x30"				# Font size 0
-	echo -en "\e\x24"				# Clear screen
-	echo -en "\e\x27\x40\x32"			# set cursor position
-	echo -en "One"					# Text
+	echo -en "\e\x24"					# Clear screen
+	echo -en "\e\x27\x35\x32"			# set cursor (not pixel!) position
+	echo -en "One of 2"
+	echo -en "\e\x27\x35\x33"			# set cursor position
+	echo -en "Two of 2"					# Text
 }
 
 test_12()
 {
-	echo -en "\e\x5e"				# Beep
+	echo -en "\e\x5e"					# Beep
 }
 
 
 test_13 ()
 {
-	echo -en "\e\x7e\x30\x31"			# GPIO 0 high
+	# Eddy GPIO 1/Output		GPIO1-->PC16 (offset:1)
+	# Eddy GPIO 3/Output		GPIO3-->PC18 (offset:3)
+	# Eddy GPIO 5/Input			GPIO5-->PC20 (offset:5)
+	# Eddy GPIO 7/Input			GPIO7-->PC22 (offset:7)
+	# NQ201 whitelight(only for nQuire 201)		GPIO11 --> PC26(offset:11)
+	#											High level disable ;	Low level enable	
+	# Peripheral power(usb,wifi,2027,GPRS,lcd-backlight)	PID1  --> PC7 (offset:18)
+	#											High level enable ;	Low level disable
+
+	echo -en "\e\x7e00"			# GPIO 0 low
 }
 
 
 test_14 ()
 {
-	echo -en "\e\x7e\x30\x30"			# GPIO 0 low
+	echo -en "\e\x7e01"			# GPIO 0 high
 }
 
 test_15 ()
 {
-	echo -en "\e\x7e\x31\x31"			# GPIO 1 high
+	echo -en "\e\x7e10"			# GPIO 1 low
 }
 
 test_16 ()
 {
-	echo -en "\e\x7e\x31\x30"			# GPIO 1 low
+	echo -en "\e\x7e11"			# GPIO 1 high
 }
 
 test_17 ()
 {
-	echo -en "\e\x53\x30"               # scanner sleep
+	echo -en "\e\x5d\x30"               # scanner sleep
 }
 
 test_18 ()
 {
-	echo -en "\e\x53\x31"               # scanner wake up
+	echo -en "\e\x5d\x31"               # scanner wake up
 }
 
-if test -z $1;
+test_19 ()
+{
+	echo -en "\e\x60"                   # SG15 firmware version
+}
+
+test_20 ()
+{
+	echo -en "\e\x42\x30"
+	echo -en "\e\x25"
+	echo -en "Cheese\n"
+	echo -en "500 gr"
+	echo -en "\e\x42\x31"
+	echo -en "\e\x2e\x38"
+	echo -en "€ 5.69\x03"
+}
+
+test_21 ()
+{
+	echo -en "\e\x25"
+	echo -en "\e\x2e\x38" # right bottom
+	echo -en "欢迎光临\x03"
+}
+
+test_22 ()
+{
+	echo -en "\e\x42\x30" # font size small
+	echo -en "\e\x25"     # clear screen
+	echo -en "汽水\n500ml"
+	echo -en "\e\x42\x31" # font size big
+	echo -en "\e\x2e\x38" # align rb
+	echo -en "2.5元\x03"
+}
+
+test_23 ()
+{
+	echo -en "\e\x25"     # clear screen
+	echo -en "\e\x42\x30" # font size small
+	echo -en "\e\x2e\x30Line1 part 1,cr\nline1 part 2\x03" 		# Left top
+}
+
+test_24 ()
+{
+	echo -en "\e\x25" 				# clear screen
+	echo -en "\e\x27\x30\x31"		# set cursor position 0 , line 1
+	echo -en "Pos=3,1\x03"			# some text 
+	echo -en "\e\x2e\x3bRight\x03"	# Align text to horizontal right, keep line
+}
+
+test_25 ()
+{
+	echo -en "\e\x25" 				# clear screen
+	echo -en "\e\x42\x32custom 32H\n\x03" # 6pt
+	echo -en "\e\x42\x4040H\x03" # 96pt
+}
+
+
+if test -z "$1" -o "$1" = "-h" -o "$1" = "--help";
 then
-	echo "cit-test [<TCP addres> <testnr>]"
+
+	echo "cit-test -h|{<ip adres> <test id>+}"
 	echo "Send a certain string to the cit"
+	echo "Output is done to port 9000 for TCP"
+	echo "Test id's:"
+	echo " 1           Mineral water"
+	echo " 2           Coca Cola"
+	echo " 3           All alignments"
+	echo " 5           fake barcode scan"
+	echo " 8           scanner disable"
+	echo " 9           scanner enable"
+	echo "10           show config"
+	echo "11           test sloppy formatting without end of string (=\x03) chars"
+	echo "12           beep"
+	echo "13           GPIO 0 high"
+	echo "14           GPIO 0 low"
+	echo "15           GPIO 1 high"
+	echo "16           GPIO 1 low"
+	echo "17           scanner sleep"
+	echo "18           scanner wakeup"
+	echo "19           SG15 firmware version"
+	echo "20           utf8 font"
+	echo "21           chinese"
+	echo "22           small and big chinese"
+	echo "23           newline in line"
+	echo "24           right align with same y"
+	echo "25           alternative font sizes"
+
+	exit
+
 else
-	test_$2 | nc -n -w1 ${ADDRESS} ${TCP_PORT}
+
+	if test "$1" = "-u"; then
+		PORT=$UDP_PORT
+		UDP=$1
+		shift
+	else
+		PORT=$TCP_PORT
+	fi
+
+	ADDRESS=$1
+	shift
+
+	while test -n "$1"; do
+		test_$1 | nc -w1 $UDP ${ADDRESS} ${PORT}
+		shift
+		if test -n "$1"; then
+			echo ------------------------------------------------------------------
+			echo "test $1"
+			sleep 1
+		fi
+	done
 fi
+
+#-- vi: ft=sh ts=4 sw=4

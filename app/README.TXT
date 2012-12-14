@@ -78,7 +78,7 @@ It is possible to run the application on a PC. This requires installing extra pa
 -rw-r--r-- 1 root root     321 2009-09-30 10:20 liblua5.1-curl0.list
 -rw-r--r-- 1 root root     311 2009-09-30 13:19 lua5.1.list
 
-Note that al lot pf packages are just installed as dependency
+Note that al lot of packages are just installed as dependency
 
 Release
 =============
@@ -135,6 +135,16 @@ The configuration file cit.conf is read on startup, and re-written when the
 application initialized or when changes are made to the configuration from the
 web-interface. If the file does not exist at startup, it is automatically
 generated.
+
+
+Development
+===========
+
+When deveopping the cit-software, it is easy to mount you development directory using nfs:
+
+mount --nolock 192.168.1.129:/home/maarten/workspace/NQuire/trunk/app /cit200/
+
+Watch out deleting stuff on the cit, because it will actually be deleted in your workbrach.
 
 
 Running 

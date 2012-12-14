@@ -30,6 +30,9 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+//#define TRACE(msg...) { fprintf(stderr,"%s:%d - %s ", __FILE__, __LINE__, __FUNCTION__);fprintf(stderr,msg);fprintf(stderr,"\n"); }
+#define TRACE(msg...) {}
+
 
 /**************************************************************************
 * Generic handler catching all signals
@@ -94,9 +97,10 @@ static void signal_handler(int signo)
 
 static int l_version(lua_State *L)
 {
-	lua_pushstring(L, VERSION);
-	lua_pushstring(L, BUILD);
-	lua_pushstring(L, __DATE__);
+	// watch out: without cast to const char* it compiles but lua_pushstring does not work correct
+	lua_pushstring(L, (const char*)VERSION);
+	lua_pushstring(L, (const char*)BUILD );
+	lua_pushstring(L, (const char*)__DATE__);
 	return 3;
 }
 
@@ -311,26 +315,28 @@ static int l_pipe(lua_State *L)
 	return 2;
 }
 
-
+/* read charracters from file without actualy waiting for the answer
+ * 
+ * @param l[1]    filedescriptor prev opened with l_open()
+ * @param len     number of chars to be read
+ * @return <data>|nil, errorstr
+ */
 static int l_read(lua_State *L)
 {
-	int fd;
-	size_t len;
-	size_t len2;
-	char *buf;
+	int fd = luaL_checknumber(L, 1);
+	size_t len = luaL_checknumber(L, 2);
 
-	fd = luaL_checknumber(L, 1);
-	len = luaL_checknumber(L, 2);
-
-	buf = malloc(len);
+	char *buf = malloc(len);
+	memset(buf,0,len);
 	if(!buf) {
 		lua_pushnil(L);
 		lua_pushstring(L, strerror(errno));
 		return 2;
 	}
 
-	len2 = read(fd, buf, len);
+	size_t len2 = read(fd, buf, len);
 	if(len2 == -1) {
+		TRACE("fd=%d buflen=%d errno=%d", fd, len2, errno)
 		if(errno != EAGAIN) {
 			free(buf);
 			lua_pushnil(L);
@@ -343,10 +349,64 @@ static int l_read(lua_State *L)
 		}
 	}
 
+	if(len2>0)
+		TRACE("fd=%d buflen=%d", fd, len2)
 	lua_pushlstring(L, buf, len2);
 	free(buf);
 	return 1;
 }
+
+static int l_tcflush(lua_State *L)
+{
+	int fd = luaL_checknumber(L, 1);
+	tcflush(fd,TCIOFLUSH);
+	return 0;
+}
+
+// implement a sequential read with a timeout on received data
+static int l_readport(lua_State *L)
+{
+	int no=0;
+	int rc;
+	struct timeval tv;
+
+	int fd = luaL_checknumber(L, 1);
+	size_t len = luaL_checknumber(L, 2);
+	int maxwaittime = luaL_checknumber(L, 3);
+
+	fd_set readfd;
+	tv.tv_sec=maxwaittime/1000;    //SECOND
+	tv.tv_usec=maxwaittime%1000*1000; //USECOND
+	FD_ZERO(&readfd);
+	FD_SET(fd,&readfd);
+	char *buf = malloc(len+1);
+	memset(buf,0,len+1);
+	rc=select(fd+1,&readfd,NULL,NULL,&tv);
+
+	if(rc>0)
+	{
+		//tv.tv_sec=0;  // SECOND
+		//tv.tv_usec=50000; // USECOND
+		
+		do
+		{
+			rc = read(fd,&buf[no],1);
+			no += 1;
+			rc=select(fd+1,&readfd,NULL,NULL,&tv);
+		}
+		while(rc>0 && no<len);
+
+		if(no>0)
+		{
+			TRACE("fd=%d buflen=%d", fd, no)
+			lua_pushlstring(L, buf, no);
+			free(buf);
+			return 1;
+		}
+	}
+	return 0;	
+}
+
 
 
 static int l_write(lua_State *L)
@@ -358,6 +418,7 @@ static int l_write(lua_State *L)
 
 	fd = luaL_checknumber(L, 1);
 	buf = luaL_checklstring(L, 2, &len);
+	TRACE("len=%d, buff=%s", len,buf)
 	r = write(fd, buf, len);
 
 	if(r >= 0) {
@@ -709,9 +770,19 @@ static int l_gpio_set(lua_State *L)
 	struct gpio_param gp;
 	int r;
 
-	gp.pin_offset = (luaL_checknumber(L, 1) == 0) ? GPIO1 : GPIO3;
+	//gp.pin_offset = luaL_checknumber(L, 1) == 0 ? GPIO1 : GPIO3;
+	gp.pin_offset = luaL_checknumber(L, 1);
+	if (gp.pin_offset<1 || gp.pin_offset>24)
+	{
+		lua_pushboolean(L, 0);
+		lua_pushstring(L, "Incorrect gpio pin offset.");
+		return 2;
+	}
+	
 	gp.pin_mode = GPIO_OUT;
 	gp.pin_value = lua_tonumber(L, 2) ? GPIO_HIGH : GPIO_LOW;
+
+	//printf(__FILE__ "DEBUG: gpio pin offset = %d, setting to %d", gp.pin_offset, gp.pin_value);
 
 	fd = open("/dev/gpio", O_RDWR);
 	if(fd == -1) {
@@ -758,7 +829,9 @@ static struct luaL_Reg sys_table[] = {
 	{ "close",      	l_close },
 	{ "pipe",	      	l_pipe },
 	{ "dup2",	      	l_dup2 },
+	{ "tcflush",		l_tcflush },
 	{ "read",       	l_read },
+	{ "readport",		l_readport },
 	{ "write",       	l_write },
 	{ "fork",       	l_fork },
 	{ "set_noncanonical",	l_set_noncanonical },

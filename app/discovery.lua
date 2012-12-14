@@ -2,6 +2,7 @@
 
 module("Discovery", package.seeall)
 
+local lgid = "discovery"
 
 local discovery_address = "239.255.255.250"
 local discovery_port = 19200
@@ -43,7 +44,7 @@ local function gen_reply_v1(self)
 	end
 
 	local reply = table.concat(reply, "\n")
-	logf(LG_DMP,"discovery", "Discover Reply=%s", reply)
+	logf(LG_DMP,lgid, "Discover Reply=%s", reply)
 
 	return reply
 end
@@ -58,11 +59,16 @@ local function on_fd_read(event, self)
 	local data, saddr, sport = net.recvfrom(self.fd, 4096)
 
 	if data and data:match("CIT%-DISCOVER%-REQUEST") then
-		local version = data:match("Version: (%d+)")
+		logf(LG_DBG, lgid, "Received CIT-DISCOVER request from %s, version not checked yet", saddr)
+		local version = data:match("Version:%s*(%d+)")
 		if version == "1" then
-			logf(LG_INF, "discovery", "Received CIT-DISCOVER request from %s", saddr)
+			logf(LG_INF, lgid, "Received CIT-DISCOVER request from %s %s", saddr, sport)
 			local reply = gen_reply_v1()
-			net.sendto(self.fd, reply, discovery_address, discovery_port)
+			if data:find("RESPONSE%-TO%-SENDER%-PORT") then
+				net.sendto(self.fd, reply, discovery_address, sport)
+			else
+				net.sendto(self.fd, reply, discovery_address, discovery_port)
+			end
 		end
 	end
 end

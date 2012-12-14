@@ -1,0 +1,46 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML>
+<HEAD>
+	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8">
+	<TITLE></TITLE>
+	<META NAME="AUTHOR" CONTENT="van Dootingh">
+	<link rel="stylesheet" type="text/css" href="nquire_doc.css" /> 
+</HEAD>
+<BODY LANG="en-US" DIR="LTR">
+<H1>Server communication</H1>
+<p>	The nquire server communication is 3 fold (as seen from the server):
+<lu>
+	<li><a href="nquire-discovery-protocol.html">Discovery</a> of available Nquires on a network</li>
+	<li>Receiving scanned barcodes or mifare data</li>
+	<li>Showing information on an Nquire.</li>
+</lu>
+Note that discovery can also be done using the SG15 compatebility.
+</p>
+<p>
+The server communication is done by UDP and/or TCP.
+The TCP connection can be in server mode or in client mode.
+In server mode the Nquire will listen to connections on the configured TCP port,
+whereas in client mode the quire will try to make the connection using the 
+configured "remote ip address" and "tcp port".
+When there are multiple connections (server mode only), scanned barcode data will
+be sent to all connected servers.
+</p>
+<p>
+Putting text on the nquire is done by a (downwards) SG15 compatible protocol: 
+the Nquire is able to do more, so the protocol is extended:
+<lu>
+	<li>The screen is bigger so "set pixel position" allows bigger values.</li>
+	<li>"select font set" is extended: values 0x32 to 0x40 represent fonts from
+	6px to 96px with steps of 6px.</li>
+	<li>For testing purposes there is a 'fake scan' escape code.</li>
+</lu>
+</p>
+<p>
+
+</p>
+<p>
+</p>
+<p>
+</p>
+</BODY>
+</HTML>

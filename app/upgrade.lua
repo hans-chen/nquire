@@ -27,7 +27,7 @@ local component_list = {
 	firmware = { option = "-f" },
 }
 
-local upgrade_busy = false
+upgrade_busy = false
 
 local function on_upgrade_timer()
 
@@ -85,11 +85,13 @@ local function on_upgrade_timer()
 
 					if md5sum == real_md5sum then
 						logf(LG_INF, "upgrade", "MD5 sum verified and correct, initiating upgrade")
+						scanner:disable()
 				
 						local cmd = "/bin/target_unpack_tar.sh %s %s" % { component_list[component].option, file } 
 						logf(LG_DBG, "upgrade", "Running command %q", cmd);
 	
-						cit:show_message("Upgrading", "firmware")
+						display:set_font( nil, 18, nil )
+						display:show_message("Upgrading", "firmware", "", "DON'T", "DISCONNECT", "THE POWER")
 						logf(LG_INF, "upgrade", "Starting upgrade")
 
 						upgrade_busy = true
@@ -99,14 +101,15 @@ local function on_upgrade_timer()
 								os.execute("sync")
 								sys.sleep(2)
 								logf(LG_INF, "upgrade", "Upgrade successfull")
-								cit:show_message("Upgrade ok", "rebooting")
+								display:set_font( nil, 18, nil )
+								display:show_message("", "Upgrade ok", "", "rebooting")
 								os.remove(file)
 								os.execute("reboot")
 							else
 								logf(LG_WRN, "upgrade", "Upgrade failed")
+								upgrade_busy = false
 							end
 
-							upgrade_busy = false
 						end)
 
 					else

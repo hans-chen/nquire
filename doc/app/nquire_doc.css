@@ -1,0 +1,154 @@
+code
+{
+font-family:"Courier 10 Pitch";
+}
+
+
+* { font-family: Arial, sans-serif; }
+a img { border: 0; }
+a { text-decoration: none; color: #004366; }
+body { margin: 0px; padding: 0px; }
+form { display: inline; }
+input { border: solid 1px #aaaaaa; }
+select { border: solid 1px #aaaaaa; }
+
+ul.menu {
+	font-weight: bold;
+	list-style: none; 
+	font-size: .9em;
+	padding-left: 2px;
+	margin-left: 5px;
+	padding-top: 5px;
+	margin-top: 10px;
+	margin-bottom: 0px;
+}
+
+li.menu {
+	font-weight: normal;
+	font-size: .8em;
+	margin-left: 10px;
+	margin-top: 0px;
+}
+
+.document { 
+	margin: 10px; 
+	padding: 10px; 
+}
+
+.log {
+	border-collapse: collapse;
+	margin: 20px;
+}
+
+.log-dmp {
+	vertical-align: top;
+	font-family: mono;
+	font-size: 0.8em;
+	color: grey;
+	border: solid 1px #dddddd;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+.log-dbg {
+	vertical-align: top;
+	font-family: mono;
+	font-size: 0.8em;
+	color: grey;
+	border: solid 1px #dddddd;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+.log-inf {
+	vertical-align: top;
+	font-family: mono;
+	font-size: 0.8em;
+	color: black;
+	border: solid 1px #dddddd;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+.log-wrn {
+	vertical-align: top;
+	font-family: mono;
+	font-size: 0.8em;
+	color: red;
+	border: solid 1px #dddddd;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+legend {
+	background-color: #004336;
+	color: white;
+	font-weight: bold;
+	-moz-border-radius: 3px;
+}
+
+.error { background: #ff8888; border: solid 1px #aaaaaa; padding: 5px; }
+.label { 
+	white-space: nowrap; 
+	color: #004366; 
+	margin-right: 30px; 
+	font-weight: bold;
+}
+.node { }
+.node-error { border: solid 2px red; }
+.submit { margin: 10px; border: solid 1px outset; }
+.title { 
+	font-size: 2.2em; 
+	font-weight: bold;
+	text-align:center;
+	padding-top:10;
+}
+
+table.top { 
+	width: 100%;
+	height: 70px;
+	margin: 0px;
+	padding: 0px;
+	background-image: url(top-gradient.png); 
+	border-collapse: collapse;
+}
+
+td.top-left {
+	background-image: url(top-left.png); 
+	background-repeat: no-repeat;
+	width: 608px;
+}
+
+td.top-right {
+	background-image: url(top-right.png); 
+	background-repeat: no-repeat;
+	background-position: top right;
+}
+
+table.bottom { 
+	width: 100%;
+	height: 70px;
+	margin: 0px;
+	padding: 0px;
+	background-image: url(bottom-gradient.png); 
+	border-collapse: collapse;
+}
+
+td.bottom-left {
+	background-image: url(bottom-left.png); 
+	background-repeat: no-repeat;
+	background-position: top left;
+}
+
+.progressbar-bg {
+	border: solid 2px #004366;
+	padding: 2px;
+}
+
+.progressbar-fg {
+	color: orange;
+	background-color: orange;
+}
+
+
+

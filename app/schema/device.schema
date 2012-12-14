@@ -53,6 +53,7 @@ return group {
 
 	group {
 		id = "auth",
+		label = "Authentication",
 		
 		object {
 			id = "enable",
@@ -74,6 +75,27 @@ return group {
 			type = "string",
 			default = "admin"
 		},
+
+	},
+
+	group {
+		id = "barcode_auth",
+		label = "Barcode authentication",
+
+		object {
+			id = "enable",
+			label = "Enable security code",
+			type = "boolean",
+			default = "false",
+		},
+
+		object {
+			id = "security_code",
+			label = "Barcode programming security code",
+			type = "string",
+			default = "",
+			range = "0:15"
+		}
 	},
 	
 	group {
@@ -84,14 +106,14 @@ return group {
 			id = "device",
 			label = "Device",
 			type = "string",
-			default = "/dev/ttyACM0"
+			default = "/dev/ttyS1"
 		},
 
 		object {
 			id = "baudrate",
 			label = "Baudrate",
 			type = "enum",
-			default = "115200", 
+			default = "9600", 
 			range = "300,1200,2400,4800,9600,19200,38400,57600,115200"
 		}
 
@@ -157,17 +179,26 @@ return group {
 			default = "Sensor mode",
 			range = "Blinking,Always ON,Sensor mode"
 		},
+
+		object {
+			-- hr200 only
+			id = "multi_reading_constraint",
+			label = "Constrain multi reading",
+			type = "enum",
+			default = "Semi",
+			range = "On,Semi,Off",
+		},
 		
 		group {
 			label = "Barcodes", 
 			id = "enable-disable",
 
-			object {
-				id = "Code128",
-				label = "Code 128",
-				type = "boolean",
-				default = "true",
-			},
+--			object {
+--				id = "Code128",
+--				label = "Code 128",
+--				type = "boolean",
+--				default = "true",
+--			},
 
 			object {
 				id = "UCC_EAN-128",
@@ -342,6 +373,80 @@ return group {
 
 	group {
 
+		label = "Mifare scanner",
+		id = "mifare",
+
+		object {
+			id = "has_hardware",
+			type = "string",
+			default = "auto" -- "yes","no","auto"  : use only via scanner_rf.is_available()
+		},
+
+		object {
+			id = "device",
+			label = "Device",
+			type = "string",
+			default = "/dev/ttyS2"
+		},
+
+		object {
+			id = "key",
+			label = "Access key",
+			type = "string",
+			default = "\15\15\15\15\15\15\15\15\15\15\15\15",
+			options = "b", -- binary string: show non printable chars as hex escape codes
+			range = "12:12"
+		},
+
+		object {
+			id = "relevant_sectors",
+			label = "Sectors to read",
+			type = "string",
+			default = "1,3,5,15",
+			range = "1:40"
+		},
+		
+		object {
+			id = "prevent_duplicate_scan_timeout",
+			label = "Duplicate scan timeout",
+			type = "enum",
+			default = "3",
+			range = "0.3,1,2,3,5,10,15",
+		},
+
+		group {
+			id = "msg",
+			
+			group {
+				id = "incomplete_scan",
+
+				object {
+					id = "text",
+					label = "Incomplete scan",
+					type = "string",
+					default = "Wait for beep when scanning",
+					range = "0:100",
+					size = 25,
+				},
+			},
+
+			group {
+				id = "access_violation",
+
+				object {
+					id = "text",
+					label = "Access violation",
+					type = "string",
+					default = "Card access denied",
+					range = "0:100",
+					size = 25,
+				},
+			},	
+		},
+	},
+
+	group {
+
 		id = "beeper",
 		label = "Beeper", 
 
@@ -380,6 +485,13 @@ return group {
 			label = "Shutdown tune",
 			type = "string",
 			default = "o3g16c16"
+		},
+
+		object {
+			id = "tune_error",
+			label = "Error tune",
+			type = "string",
+			default = "o3c16o2f8"
 		},
 
 		object {

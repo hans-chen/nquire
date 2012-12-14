@@ -4,6 +4,8 @@ module("Config", package.seeall)
 require "config_node"
 require "typecheck"
 
+local lgid="config"
+
 --
 -- Load schema from file. The lua parser itself is used for parsing the
 -- configuration file, using a environment with only a few functions for
@@ -54,14 +56,14 @@ local function load_schema(config, fname)
 
 	local chunk,err = loadfile(fname)
 	if not chunk then
-		logf(LG_FTL, "config", "Could not load schema from %s: %s", config.fname_schema, err)
+		logf(LG_FTL, lgid, "Could not load schema from %s: %s", config.fname_schema, err)
 	end
 
 	setfenv(chunk, env)
 
 	local ok, db = pcall(chunk)
 	if not ok then
-		logf(LG_FTL, "config", "Error loading schema %q: %s", config.fname_schema, db)
+		logf(LG_FTL, lgid, "Error loading schema %q: %s", config.fname_schema, db)
 	end
 
 	-- Traverse generated tree to force inheritance of some attributes
@@ -91,23 +93,12 @@ local function load_db(config, fname_db)
 
 	local fd, err = io.open(fname_db, "r")
 	if not fd then
-		logf(LG_WRN, "config", "Could not open config db %s: %s", config.fname_db, err)
+		logf(LG_WRN, lgid, "Could not open config db %s: %s", config.fname_db, err)
 		return
 	end
 
 	for l in fd:lines() do
-
-		if l:match("^#") then l = "" end
-
-		local fid, value = l:match("(%S+) = (.*)")
-		if fid and value then
-			local node = config:lookup(fid)
-			if node then
-				if type_check(node.type, node.range, value) then
-					node:set(value)
-				end
-			end
-		end
+		config:set_config_item( l:gsub("\r$","") )
 	end
 
 	fd:close()
@@ -116,7 +107,31 @@ local function load_db(config, fname_db)
 	config.mtime = s.mtime
 end
 
+--
+-- set a config item from a cit.conf formatted line
+--
+local function set_config_item( config, l )
 
+	if l:match("^#") then 
+		return 
+	end
+
+	local fid, value = l:match("(%S+)%s*=%s*(.*)")
+	if fid and value then
+		local node = config:lookup(fid)
+		if node then
+			local vvalue = node.options and node.options:find("b") and escapes_to_binstr( value ) or value
+			if type_check(node.type, node.range, vvalue) then
+				node:set(vvalue)
+			else
+				logf(LG_WRN,lgid,"Incorrect type for node " .. fid )
+			end
+		else
+			logf(LG_WRN,lgid,"Unrecognized code " .. fid )
+		end
+	end
+
+end
 
 --
 -- Save config database to file
@@ -124,7 +139,7 @@ end
 
 local function save_db(config, fname_db)
 
-	logf(LG_DBG, "config", "Saving configuration to %s", config.fname_db)
+	logf(LG_DBG, lgid, "Saving configuration to %s", config.fname_db)
 
 	local function s(fd, node, prefix)
 			
@@ -132,7 +147,11 @@ local function save_db(config, fname_db)
 
 			if node:has_data() then
 				local prefix2 = prefix:gsub("^%.", "")
-				fd:write(prefix2 .. "/" .. node.id .. " = " .. node.value .. "\n")
+				if node.options and node.options:find("b") then
+					fd:write(prefix2 .. "/" .. node.id .. " = " .. binstr_to_escapes(node.value) .. "\n")
+				else
+					fd:write(prefix2 .. "/" .. node.id .. " = " .. node.value .. "\n")
+				end
 			end
 
 			if node:has_children() then
@@ -162,11 +181,11 @@ local function save_db(config, fname_db)
 	fd:write("\n")
 	fd:close()
 
-	-- Rename temporaty file to new file name (atomic)
+	-- Rename temporary file to new file name (atomic)
 	
 	local ok, err = os.rename(fname_tmp, config.fname_db)
 	if not ok then
-		logf(LG_WRN, "config", "Could not rename %s to %s: %s", fname_tmp, config.fname_db, err)
+		logf(LG_WRN, lgid, "Could not rename %s to %s: %s", fname_tmp, config.fname_db, err)
 	end
 	
 	-- Create a copy of the configuration in /home/ftp to allow backup/restore
@@ -207,7 +226,7 @@ local function get(config, fid)
 	if node then
 		return node:get()
 	else
-		logf(LG_WRN, "config", "Trying to get unknown node %q", fid)
+		logf(LG_WRN, lgid, "Trying to get unknown node %q", fid)
 		return ""
 	end
 end
@@ -222,7 +241,7 @@ local function set(config, fid, value, now)
 	if node then
 		return node:set(value, now)
 	else
-		logf(LG_WRN, "config", "Trying to set unknown node %q", fid)
+		logf(LG_WRN, lgid, "Trying to set unknown node %q", fid)
 		return false
 	end
 end
@@ -237,7 +256,7 @@ local function add_watch(config, fid, action, fn, fndata)
 	if node then
 		return node:add_watch(action, fn, fndata)
 	else
-		logf(LG_WRN, "config", "Trying to register unknown node %q", fid)
+		logf(LG_WRN, lgid, "Trying to register unknown node %q", fid)
 		return false
 	end
 end
@@ -259,7 +278,7 @@ local function restore_defaults(config)
 		end
 	end
 
-	logf(LG_INF, "config", "Restoring factory defaults")
+	logf(LG_INF, lgid, "Restoring factory defaults")
 	setdef(config.db)
 	config:save_db(config.fname_db)
 end
@@ -276,7 +295,7 @@ local function on_config_timer(event, config)
 	local s = sys.lstat(config.fname_db)
 
 	if not s or s.mtime > config.mtime then
-		logf(LG_DBG, "config", "Config file was modified, rereading")
+		logf(LG_DBG, lgid, "Config file was modified, rereading")
 		config:load_db(config.fname_db)
 		config:save_db(config.fname_db)
 	end
@@ -286,7 +305,7 @@ local function on_config_timer(event, config)
 	local s = sys.lstat("/home/ftp/cit.conf")
 
 	if s and s.mtime > config.mtime then
-		logf(LG_DBG, "config", "FTP Config file was modified, rereading")
+		logf(LG_DBG, lgid, "FTP Config file was modified, rereading")
 		config:load_db("/home/ftp/cit.conf")
 		config:save_db(config.fname_db)
 	end
@@ -314,6 +333,8 @@ function new(fname_schema, fname_db)
 		load_schema = load_schema,
 		load_db = load_db,
 		save_db = save_db,
+		set_config_item = set_config_item,
+
 		lookup = lookup,
 		set = set,
 		get = get,

@@ -1,0 +1,69 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML>
+<HEAD>
+	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8">
+	<TITLE></TITLE>
+	<META NAME="AUTHOR" CONTENT="van Dootingh">
+	<link rel="stylesheet" type="text/css" href="nquire_doc.css" /> 
+</HEAD>
+<BODY class="document">
+<H1>Barcode programming</H1>
+<p>Last update: dec 11 2009</p>
+<H2>Introduction</h2>
+<p>	Barcode programming can be used for changing settings in the Nquire.<br>
+Simply put a line or multiple lines of cit.conf in a barcode and use
+the programming mode of the nquire to make those settings.<br> The barcode has
+to be a DataMatrix, QR Code or Code128 (of course it is not possible to put 
+much settings in a Code 128 barcode).
+For security reasons it is possible to enable a 'security' barcode that has to 
+be scanned when a barcode is used to change settings of the Nquire. This has to 
+be enabled in the webui, or by a programming barcode.<br>
+There is a configurable timeout on the programming mode. After this timeout the 
+scanner will resume normal scanning mode.
+</p>
+<p>
+Upon reading incorrect codes the nquire will sound the error beep and resume 
+normal programming mode.
+</p>
+<p>
+After successful programming the nquire will resume normal programming mode. <br>
+<bold>This however does not mean that execution of the settings were successfull!<bold>
+For instance: setting the Nquire to dhcp or grps takes some time and can fail,
+just like it can fail during power-on of the nquire.
+
+</p>
+<h2>Codes</h2>
+<p>	The following barcodes are used to control the programming state of the enquire:
+<p><img src="enter_programming_mode.png"/><br>
+Enter programming mode<br>
+The display will show:<br>
+<code>Programming</code></p>
+<p><img src="exit_programming_mode.png"/><br>
+Exit programming mode<br>
+The display will show the configured welcome text.</p>
+<p><img src="anounce_settings.png"/><br>
+Announce settings barcode<br>
+The display will show:<br>
+<code>programming<br>
+Scan settings</code></p>
+
+<H2>Some usefull examples<h2>
+<p><img src="set_dhcp_false.png" width="60%"/></p>
+<p><img src="set_dhcp_true.png" width="60%"/></p>
+<p><img src="set_interface_ethernet.png" width="60%"/></p>
+<p><img src="set_interface_wifi.png" width="60%"/></p>
+<p><img src="set_interface_gprs.png" width="60%"/></p>
+
+</p>
+<p>	
+
+</p>
+<p>	
+
+</p>
+<p>	
+
+</p>
+
+</BODY>
+</HTML>

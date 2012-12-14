@@ -50,6 +50,8 @@ prefixes = {
 	{ name = "Plessey",            prefix_2d = "?", prefix_1d = "p", prefix_out = "n"  },
 	{ name = "2_5-Standard",       prefix_2d = "?", prefix_1d = "s", prefix_out = "o"  },
 	{ name = "2_5-Industrial",     prefix_2d = "?", prefix_1d = "s", prefix_out = "o"  },
+
+	{ name = "mifare",             prefix_out = "MF" },
 }
 
 -- codes to turn on and off scanner codes
@@ -58,29 +60,29 @@ prefixes = {
 
 -- HR100 scanner codes
 enable_disable_HR100 = {
-   { name = "Code128",            default="on", off="99910001" },
+   { name = "Code128",            default="on" }, -- Code128 should never be disabled
    { name = "UCC_EAN-128",        default="on", off="99910101" },
    { name = "EAN-8",              default="on", off="99910401" },
    { name = "EAN-13",             default="on", off="99910501" },
    { name = "UPC-E",              default="on", off="99911001" },
    { name = "UPC-A",              default="on", off="99911101" },
    { name = "Interleaved-2_of_5", default="off", on="99911202" },
-   { name = "2_5-Matrix",         default="on", off="99912001" },
+   { name = "2_5-Matrix",         default="off", on="99912002" },
    { name = "Code39",             default="on", off="99912401" },
    { name = "Codabar",            default="on", off="99912501" },
    { name = "Code93",             default="on", off="99912601" },
    { name = "ISBN",               default="off", on="99910702" },
-   { name = "Code-11",            default="on", off="99912701" },
-   { name = "ITF14",              default="off", on="99911403" },
-   { name = "MSI-Plessey",        default="on", off="99913101" },
-	{ name = "Plessey",            default="on", off="99913001" },
+   { name = "Code-11",            default="on", off="99912701", on="99912702" },
+   { name = "ITF14",              default="off", off="99911401", on="99911403" },
+   { name = "MSI-Plessey",        default="on", off="99913101", on="99913102" },
+	{ name = "Plessey",            default="on", off="99913001", on="99913002" },
 	{ name = "2_5-Standard",       default="off", on="99912202" },
 	{ name = "2_5-Industrial",     default="off", on="99912102" },
 }
 
 -- HR 200 scanner codes:
 enable_disable_HR200 = {
-   { name = "Code128",            default="on",  off="0400010" },
+   { name = "Code128",            default="on" }, -- Code128 should never be disabled
    { name = "UCC_EAN-128",        default="on",  off="0412010" },
    { name = "EAN-8",              default="on",  off="0401010" },
    { name = "EAN-13",             default="on",  off="0402010" },
@@ -92,9 +94,9 @@ enable_disable_HR200 = {
    { name = "Codabar",            default="on",  off="0409010" },
    { name = "Code93",             default="on",  off="0410010" },
    { name = "PDF417",             default="on",  off="0501010" },
-   { name = "QR_Code",            default="on",  off="0502010" },
+   { name = "QR_Code",            default="on",  off="0502010", on="0502020" },
    { name = "Aztec",              default="on",  off="0503010" },
-   { name = "DataMatrix",         default="on",  off="0504010" },
+   { name = "DataMatrix",         default="on",  off="0504010", on="0504020" },
    { name = "Chinese-Sensible",   default="on",  off="0508010" },
 }
 
@@ -106,6 +108,19 @@ function is_2d_code(name)
 		end
 	end
 	return false;
+end
+
+--
+-- find the prefix definition for code type "name"
+-- return: prefix_def
+--         nil when not found
+function find_prefix_def( name )
+	for _,pd in ipairs( prefixes ) do
+		if pd.name==name then
+			return pd
+		end
+	end
+	return nil
 end
 
 -- vi: ft=lua ts=3 sw=3

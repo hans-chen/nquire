@@ -8,7 +8,7 @@ return group {
 		label = "Network interface",
 		type = "enum",
 		default = "ethernet", 
-		range = "ethernet,wifi",
+		range = "ethernet,wifi,gprs",
 	},
 		
 	object { 
@@ -33,6 +33,16 @@ return group {
 		type = "boolean",
 		default = "false", 
 		depends = "../interface == 'ethernet' or ../interface == 'wifi'"
+	},
+
+	group {
+		id = "discovery",
+		
+		object { 
+			id = "sg15_broadcast_addr",
+			type = "ip_address",
+			default = "255.255.255.255",
+		},
 	},
 
 	group {
@@ -127,7 +137,7 @@ return group {
 			id = "username",
 			label = "Username",
 			type = "string",
-			default = "joe", 
+			default = "", 
 			range = "0:16"
 		},
 
@@ -135,7 +145,7 @@ return group {
 			id = "password",
 			label = "Password",
 			type = "string",
-			default = "123", 
+			default = "", 
 			range = "0:16" 
 		},
 

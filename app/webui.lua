@@ -215,7 +215,7 @@ local function draw_node_value_data( client, node, ro, optarg )
 
 		if node:is_writable() and not ro then
 
-			client:add_data("<input type=hidden name='id' value=%q/>\n" % id)
+--			client:add_data("<input type='hidden' name='id' value=%q/>\n" % id)
 			if node.type == "boolean" and node.appearance=="checkbox" then
 				logf(LG_DBG,"webui","displaying checkbox " .. id .. " = " .. value)
 				local is_checked = (value == "true") and "checked" or ""
@@ -243,13 +243,20 @@ local function draw_node_value_data( client, node, ro, optarg )
 					local tmp = node.range:match(":(%d+)")
 					if tmp then 
 						if node.type == "number" then
-							size = math.floor(math.log(tmp) / math.log(10))
+							size = 1+math.floor(math.log(tmp) / math.log(10))
 						else
 							size = tmp
 						end
 					end
 				end
-				client:add_data("<input name='set-%s' size=%d value=%q %s/>\n" % {id, size, value, optarg })
+				local maxlength = size
+				if node.options and node.options:find("b") then
+					--print("DEBUG: node[= " .. id .. "]='" ..  value .. "'")
+					
+					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s/>\n" % {id, maxlength*4, (node.size or size*4), binstr_to_escapes(value), optarg })
+				else
+					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value=%q %s/>\n" % {id, maxlength, (node.size or size), value, optarg })
+				end
 			end
 
 		else
@@ -299,7 +306,7 @@ end
 function box_start(client, page, title, extra)
 	client:add_data("<fieldset " .. (extra or "") .. ">\n")
 	client:add_data("<legend>" .. title .. "</legend>\n")
-	client:add_data("<input type=hidden name='p' value='%s'/>\n" % page)
+--	client:add_data("<input type=hidden name='p' value='%s'/>\n" % page)
 	client:add_data("<table>\n")
 end
 
@@ -310,9 +317,9 @@ end
 
 local function form_start(client, extra)
 	if extra then
-		client:add_data("<form " .. extra .. ">\n")
+		client:add_data("<form method='post' " .. extra .. ">\n")
 	else
-		client:add_data("<form>\n")
+		client:add_data("<form method='post'>\n")
 	end
 end
 
@@ -396,57 +403,75 @@ local function page_home(client, request)
 	draw_node(client, config:lookup("/network/macaddress"))
 end
 
+local function display_by_default( yes_do )
+	return (yes_do and "" or "style='display:none'")
+end
 
 local function page_network(client, request)
 	
-	-- Find out if a wlan adapter is available. Dirty but this works:
-	local have_wlan = false
-
-	local fd = io.popen("iwconfig", "r")
-	if fd then
-		for l in fd:lines() do
-			if l:match("wlan0") then
-				have_wlan = true
-			end
-		end
-		fd:close()
-	end
-
 	draw_css(client)
 	body_begin(client);
 	form_start(client)
 
-	if have_wlan then
+	local itf_node = config:lookup("/network/interface")
+	local ift_value = itf_node:get()
+
+	if Network:wlan_is_available() or Network:gprs_is_available() then
+--print("DEBUG: itf_node:get()=" .. ift_value)
+--print("DEBUG: itf_node.range=" .. itf_node.range)
 		box_start(client, "network", "Network interface")
-		draw_node(client, config:lookup("/network/interface"), false,"onclick='set_visibility(this.value==\"wifi\",\"wifisettings\")'")
+			local extra = "onclick=\"set_visibility(this.value==" .. 
+				(Network:wlan_is_available() and "'wifi','wifisettings'" or "'gprs','gprssettings'") .. ");" ..
+											"set_visibility(this.value!='gprs', 'dhcp_settings')\""
+--print("DEBUG: extra=".. extra)
+			if Network:gprs_is_available() then
+				itf_node.range = "ethernet,gprs"
+			else
+				itf_node.range = "ethernet,wifi"
+			end
+			draw_node(client, itf_node, false, extra)
 		box_end(client)
-		
-		box_start(client, "wifi", "Wifi", "id='wifisettings' " .. 
-		     (config:lookup("/network/interface"):get()=="ethernet" and "style=\"display:none\"" or "" ))
-		draw_node(client, config:lookup("/network/wifi/essid"))
-		draw_node(client, config:lookup("/network/wifi/keytype"))
-		draw_node(client, config:lookup("/network/wifi/key"))
-		box_end(client)
+
+		if Network:wlan_is_available() then
+			box_start(client, "wifi", "Wifi", "id='wifisettings' " .. 
+					display_by_default(ift_value=="wifi") )
+				draw_node(client, config:lookup("/network/wifi/essid"))
+				draw_node(client, config:lookup("/network/wifi/keytype"))
+				draw_node(client, config:lookup("/network/wifi/key"))
+			box_end(client)
+		end
+
+		if Network:gprs_is_available() then
+			box_start(client, "gprs", "Gprs", "id='gprssettings' " ..  
+					display_by_default(ift_value=="gprs") )
+				draw_node(client, config:lookup("/network/gprs/pin"))
+				draw_node(client, config:lookup("/network/gprs/username"))
+				draw_node(client, config:lookup("/network/gprs/password"))
+				draw_node(client, config:lookup("/network/gprs/apn"))
+				draw_node(client, config:lookup("/network/gprs/number"))
+			box_end(client)
+		end
 	else
 		config:lookup("/network/interface"):set("ethernet")
 	end
 
 
-	box_start(client, "network", "IP Settings")
-	draw_node(client, config:lookup("/network/dhcp"),false,"onclick='set_visibility(this.value==\"false\",\"static_ip_settings\")'")
-	client:add_data("<table id='static_ip_settings' " .. 
-			(config:lookup("/network/dhcp"):get()=="true" and "style=\"display:none\"" or "") .. ">")
-		draw_node(client, config:lookup("/network/ip/address"))
-		draw_node(client, config:lookup("/network/ip/netmask"))
-		draw_node(client, config:lookup("/network/ip/gateway"))
-	client:add_data("</table>")
+	box_start(client, "network", "IP Settings", "id='dhcp_settings'")
+		draw_node(client, config:lookup("/network/dhcp"),false,"onclick='set_visibility(this.value==\"false\",\"static_ip_settings\")'")
+		client:add_data("<table id='static_ip_settings' " .. 
+				display_by_default(config:lookup("/network/dhcp"):get()=="false" and 
+										ift_value~="gprs") .. ">")
+			draw_node(client, config:lookup("/network/ip/address"))
+			draw_node(client, config:lookup("/network/ip/netmask"))
+			draw_node(client, config:lookup("/network/ip/gateway"))
+		client:add_data("</table>")
 	box_end(client)
 
 	box_start(client, "network", "NQuire protocol settings")
-	draw_node(client, config:lookup("/cit/udp_port"))
-	draw_node(client, config:lookup("/cit/tcp_port"))
-	draw_node(client, config:lookup("/cit/mode"))
-	draw_node(client, config:lookup("/cit/remote_ip"))
+		draw_node(client, config:lookup("/cit/udp_port"))
+		draw_node(client, config:lookup("/cit/tcp_port"))
+		draw_node(client, config:lookup("/cit/mode"))
+		draw_node(client, config:lookup("/cit/remote_ip"))
 	box_end(client)
 	
 	form_end(client)
@@ -548,6 +573,8 @@ local function page_scanner( client, request )
 	if scanner.type == "2d" then
 		draw_node(client, config:lookup("/dev/scanner/barcodes"), false,
 				"onclick='set_visibility(this.value==\"1D and 2D\",\"2d_codes\")'" )
+		draw_node(client, config:lookup("/dev/scanner/multi_reading_constraint"))
+
 	end
 	draw_node(client, config:lookup("/dev/scanner/enable_barcode_id"))
 	box_end(client)
@@ -568,17 +595,16 @@ local function page_scanner( client, request )
 
 	-- enable/disbale scanning codes
 	box_start(client, "scanner", "Barcodes")
-	local enable_disable_code_list = scanner.type == "1d" and enable_disable_HR100 or enable_disable_HR200;
 
 	client:add_data("<table id='1d_codes'>")
-	for _,code in ipairs(enable_disable_code_list) do
+	for _,code in ipairs(scanner.enable_disable) do
 		if not is_2d_code(code.name) then
-			logf(LG_DMP, "webui", "showing code " .. code.name)
 			local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
-			if not node then
-				logf(LG_WRN, "webui", "Code '" .. code.name .. "' not found in the configuration")
-			else
+			if node then
+				logf(LG_DMP, "webui", "showing code " .. code.name)
 				draw_node(client, node)
+			else
+				logf(LG_DBG, "webui", "Code '" .. code.name .. "' is no configuration item.")
 			end
 		end
 	end
@@ -591,21 +617,31 @@ local function page_scanner( client, request )
 			client:add_data("<table id='2d_codes'>")
 		end
 
-		for _,code in ipairs(enable_disable_code_list) do
+		for _,code in ipairs(scanner.enable_disable) do
 			if is_2d_code(code.name) then
-				logf(LG_DMP, "webui", "showing code " .. code.name)
 				local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
-				if not node then
-					logf(LG_WRN, "webui", "Code '" .. code.name .. "' not found in the configuration")
-				else
+				if node then
+					logf(LG_DMP, "webui", "showing code " .. code.name)
 					draw_node(client, node)
+				else
+					logf(LG_WRN, "webui", "Code '" .. code.name .. "' not found in the configuration")
 				end
 			end
 		end
 		client:add_data("</table>")
 	end
-
 	box_end(client)
+
+	if Scanner_rf:is_available() then
+		box_start(client, "scanner", "Mifare scanner")
+			draw_node(client, config:lookup("/dev/mifare/key"))
+			draw_node(client, config:lookup("/dev/mifare/relevant_sectors"))
+			draw_node(client, config:lookup("/dev/mifare/prevent_duplicate_scan_timeout"))
+			draw_node(client, config:lookup("/dev/mifare/msg/access_violation/text"))
+			draw_node(client, config:lookup("/dev/mifare/msg/incomplete_scan/text"))
+		box_end(client)
+	end
+
 
 	form_end(client)
 
@@ -628,6 +664,13 @@ local function page_miscellaneous(client, request)
 	draw_node(client, config:lookup("/dev/auth/password"), false, " id='auth_password'" .. extra)
 	box_end(client)
 	
+	box_start(client, "miscellaneous", "Programming barcode security")
+	draw_node(client, config:lookup("/cit/programming_mode_timeout"))
+	draw_node(client, config:lookup("/dev/barcode_auth/enable"),false,"onclick=\"enable_disable(value=='true', 'security_code')\"")
+	local extra = config:lookup("/dev/barcode_auth/enable").value=="true" and "" or " disabled";
+	draw_node(client, config:lookup("/dev/barcode_auth/security_code"), false, " id='security_code'" .. extra)
+	box_end(client)
+
 	box_start(client, "miscellaneous", "Text and messages")
 	draw_node(client, config:lookup("/cit/messages/idle/timeout"))
 	draw_node(client, config:lookup("/cit/messages/error/timeout"))
@@ -638,6 +681,7 @@ local function page_miscellaneous(client, request)
 	draw_node(client, config:lookup("/dev/display/contrast"))
 	draw_node(client, config:lookup("/dev/beeper/volume"))
 	draw_node(client, config:lookup("/dev/beeper/beeptype"))
+	draw_node(client, config:lookup("/cit/disable_scan_beep"))
 	box_end(client)
 	
 	form_end(client)
@@ -680,13 +724,13 @@ local function page_reboot(client, request)
 	box_start(client, "miscellaneous", "Device")
 
 	client:add_data("Click the button below to reboot the device: <br><br>")
-	client:add_data("<form>")
+	client:add_data("<form method='post'>")
 	client:add_data("<input type=hidden name=p value=rebooting>")
 	client:add_data("<input type=submit value='Reboot'>")
 	client:add_data("</form>")
 
 	client:add_data("<br><br>Click the button below to reset factory default settings and reboot the device: <br><br>")
-	client:add_data("<form>")
+	client:add_data("<form method='post'>")
 	client:add_data("<input type=hidden name=p value=defaults>")
 	client:add_data("<input type=submit value='Defaults'>")
 	client:add_data("</form>")
@@ -694,46 +738,58 @@ local function page_reboot(client, request)
 
 end
 
+function show_page_rebooting( client, intro, delay )
+		client:add_data([[
+
+			<meta http-equiv='refresh' content="30; url=javascript:window.open('/','_top');">
+
+			<br><br><br> ]] .. intro .. [[<br><br>
+
+			If the connection attempt is unsuccessful, or if the IP address of the
+			device changes after the restart, the connection must be reopened
+			manually. Enter the IP address of the device in the URL field (address
+			bar) in your browser.<br><br>
+
+			<script language=javascript>
+				function progressbar(ticks, maxticks)
+				{
+					width = 100 * ticks / maxticks + 1;
+					var div = document.getElementById("progressbar")
+					div.innerHTML = "<center><table width=50%% class=progressbar-bg><tr><td class=progressbar-fg width=" + width + "%%>&nbsp;</td><td>&nbsp;</td></tr></table></center>";
+					if(ticks <= maxticks) {
+						setTimeout("progressbar(" + (ticks+1) + "," + maxticks + ")", 1000);
+					}
+				}
+			</script>
+
+			<div id=progressbar>
+				teller
+			</div>
+			
+			<script language=javascript>
+				progressbar(0, ]] .. delay .. [[ );
+			</script>
+		]])
+end
 
 local function page_rebooting(client, request)
 	
 	draw_css(client)
 
-	client:add_data([[
+	if Upgrade.upgrade_busy then
+		logf(LG_INF, "upgrade", "Upgrade in progress")
 
-		<meta http-equiv='refresh' content="30; url=javascript:window.open('/','_top');">
+		show_page_rebooting( client, [[
+			The NQuire is currently upgrading its software. A reboot will be
+			performed after the upgrade. This page will automatically attempt to
+			reconnect after 100 seconds. ]], 100 )
+	else
+		show_page_rebooting( client, [[
+			The NQuire is now rebooting. This page will automatically attempt to
+			reconnect after 40 seconds. ]], 40 )
 
-		<br><br><br>
-		The NQuire is now rebooting. This page will automatically attempt to
-		reconnect after 30 seconds.<br><br>
-
-		If the connection attempt is unsuccessful, or if the IP address of the
-		device changes after the restart, the connection must be reopened
-		manually. Enter the IP address of the device in the URL field (address
-		bar) in your browser.<br><br>
-
-		<script language=javascript>
-			function progressbar(ticks, maxticks)
-			{
-				width = 100 * ticks / maxticks + 1;
-				var div = document.getElementById("progressbar")
-				div.innerHTML = "<center><table width=50%% class=progressbar-bg><tr><td class=progressbar-fg width=" + width + "%%>&nbsp;</td><td>&nbsp;</td></tr></table></center>";
-				if(ticks < maxticks) {
-					setTimeout("progressbar(" + (ticks+1) + "," + maxticks + ")", 1000);
-				}
-			}
-		</script>
-
-		<div id=progressbar>
-			teller
-		</div>
-			
-		<script language=javascript>
-			progressbar(0, 30);
-		</script>
-	]])
-
-	os.execute("reboot")
+		os.execute("reboot")
+	end
 end
 
 
@@ -755,9 +811,19 @@ local function on_webserver(client, request)
 	
 	local applied_setting;
 
+	-- Watch out: this only works as long as the pages do not post binary data 
+	if request.method=="POST" and request.post_data then
+		string.gsub(request.post_data, "([^&=]+)=([^&;]*)[&;]?", 
+			function(name, attr) 
+				request.param[webserver.url_decode(name)] = webserver.url_decode(attr) 
+				--print("DEBUG: webui.lua:on_webserver()() request.param[" .. webserver.url_decode(name) .. "]=" .. webserver.url_decode(attr) )
+			end
+		)
+	end
+
 	errors = {}
 	-- since a checkbox is only received when it is checked, the false value 
-	-- is faked with a hidden value with a key starting with "default-" instead of "set-"
+	-- is faked with a hidden value of which the key starts with "default-" instead of "set-"
 	local keyvalues = {}
 	for key, val in pairs(request.param) do
 		--logf(LG_DBG,"webui","scanning request.param " .. key .. "=" .. val)
@@ -783,9 +849,16 @@ local function on_webserver(client, request)
 			end
 			if node:get() ~= value then
 				logf(LG_DBG,"webui","changing node " .. key .. " from '" .. node:get() .. "' to '" .. value .. "'")
-				local ok = node:set( value )
+				local ok
+				if node.options and node.options:find("b") then
+					local binvalue = escapes_to_binstr( value )
+					--print("DEBUG: value='" .. value .. "', od(escapes_to_binstr( value ))=" .. od(binvalue) )
+					ok = node:set( escapes_to_binstr( value ) )
+				else
+					ok = node:set( value )
+				end
 				if not ok then 
-					errors[id] = true
+					errors[key] = true
 				else
 					applied_setting = true
 				end
@@ -795,7 +868,8 @@ local function on_webserver(client, request)
 
 	-- TODO: should this also be done when there are errors?
 	if applied_setting then
-		cit:show_message("Applying", "settings")
+		display:set_font( nil, 18, nil )
+		display:show_message("Applying", "settings")
 		evq:push("cit_idle_msg", nil, 4.0)
 	end
 	

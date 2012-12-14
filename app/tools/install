@@ -1,6 +1,12 @@
+#!/bin/sh
+#
+# usage: install [install options] [main.lua options]
+# install options: -a    all (first remove current installation completely)
+# e.g:
+# ./install -a -n
+# Start main without ethernet network (re)configuration
 
 killall lua
-sleep 1
 
 if mount | grep workspace > /dev/null; then 
 
@@ -9,15 +15,23 @@ if mount | grep workspace > /dev/null; then
 
 else
 
-	cd /cit200 && rm -rf *
+	if test "$1" == "-a"; then
+		shift
+		cd /cit200 && rm -rf *
+		ifdown eth0
+		ifdown wlan0
+	fi
+
 	cp /home/ftp/*.lua /home/ftp/*so /home/ftp/*.ttf /home/ftp/install /cit200
 	chmod +x /cit200/install
-	mkdir -p /cit200/schema/ && cp /home/ftp/schema/*           /cit200/schema/
-	mkdir -p /cit200/img/    && cp /home/ftp/img/*              /cit200/img/
+	mkdir -p /cit200/schema/ && cp /home/ftp/schema/* /cit200/schema/
+	mkdir -p /cit200/img/    && cp /home/ftp/img/*    /cit200/img/
 
 	cd /cit200 && chown 1006:1006 -R *
 
 fi
 
-lua main.lua -l 5 &
+sleep 2
+set -x
+lua main.lua -w -l 5 $1 $2 $3 $4 $5 2>&1 &
 

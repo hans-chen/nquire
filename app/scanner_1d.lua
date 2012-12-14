@@ -4,6 +4,7 @@
 
 module("Scanner_1d", package.seeall)
 
+local lgid = "scanner"
 --
 -- Scanner fd callback, used for both internal and external scanner
 --
@@ -14,17 +15,21 @@ local function on_fd_scanner(event, scanner)
 		return
 	end
 
+	-- tryout for faster beep (this is followed by an error beep when the barcode is invalid)
+	beeper:beep_ok()
+	
 	local data = sys.read(scanner.fd, 256)
 
 	if data then
 		scanner.scanbuf = scanner.scanbuf .. data
 
 		local t1, t2 = scanner.scanbuf:match("(.-)[\r\n](.*)") 
+		logf(LG_DMP,lgid,"Scanbuf:\n%s", dump( scanner.scanbuf, 10 ) )
 		if t1 then
 			local barcode = t1
 			scanner.scanbuf = t2 or ""
 			
-			logf(LG_DBG, "scanner", "Scanned barcode '%s'", barcode)
+			logf(LG_DBG, lgid, "Scanned barcode '%s'", barcode)
 
 			-- Barcode is complete. Fixup the barcode type prefix to be the
 			-- compatible format
@@ -33,15 +38,15 @@ local function on_fd_scanner(event, scanner)
 			local prefix_out = nil
 
 			for _, i in ipairs(prefixes) do
-				if prefix_in == i.prefix_1d then
-					logf(LG_DBG, "scanner", "Scanned %q barcode type", i.name)
+				if prefix_in ~= nil and prefix_in == i.prefix_1d then
+					logf(LG_DBG, lgid, "Scanned %q barcode type", i.name)
 					prefix_out = i.prefix_out
 					break
 				end
 			end
 
 			if not prefix_out then
-				logf(LG_DBG, "scanner", "Scanned unknown barcode type")
+				logf(LG_DBG, lgid, "Scanned unknown barcode type")
 				prefix_out = "?"
 			end
 
@@ -65,7 +70,7 @@ local function flush( scanner, n )
 		end
 	until not buf or #buf == 0
 
-	logf(LG_DMP,  "scanner", "< " .. data)
+	logf(LG_DMP,  lgid, "< " .. data)
 	return data
 end
 
@@ -76,7 +81,7 @@ local function read( scanner )
 		buff = sys.read(scanner.fd, 1024)
 		delay = delay - 1
 		if delay == 0 then
-			logf(LG_DBG,"scanner", "Nothing received from scanner within timout of 1 second")
+			logf(LG_DBG,lgid, "Nothing received from scanner within timout of 1 second")
 			return "";
 		end
 		sys.sleep(0.1)
@@ -84,7 +89,7 @@ local function read( scanner )
 	
 	buff = buff .. scanner:flush( )
 	
-	logf(LG_DMP, "scanner", "Scanner returned " .. buff)
+	logf(LG_DMP, lgid, "Scanner returned " .. buff)
 	return buff
 end
 
@@ -98,10 +103,10 @@ end
 
 local function cmd( scanner, cmd, cmd_txt_label )
 	sys.write(scanner.fd, cmd )
-	logf(LG_DBG, "scanner", "Sent %s to scanner (%s)", cmd, cmd_txt_label )
+	logf(LG_DBG, lgid, "Sent %s to scanner (%s)", cmd, cmd_txt_label )
 	local answer = scanner:read();
-	if not string.match( answer, "!.+;" ) then
-		logf(LG_WRN, "scanner", "Error '%s' on scanner command #%s; during programming", answer, cmd )
+	if not string.find( answer, "^!.+;" ) then
+		logf(LG_WRN, lgid, "Error '%s' on scanner command %s during programming", answer, cmd )
 		return answer, false
 	end
 	return answer, true
@@ -109,23 +114,24 @@ end
 
 
 local function switch_to_programming_mode( scanner )
-	logf(LG_DMP, "scanner", "Switching to programming mode")
+	logf(LG_DMP, lgid, "Switching to programming mode")
 	sys.write(scanner.fd, "$$$$")			-- Switch to programming mode
 	local answer = scanner:read( )
 	if answer ~= "@@@@" then
-		logf(LG_WRN, "scanner", "Scanner %s might not work (Could not switch to programming mode)", scanner.device )
+		logf(LG_WRN, lgid, "Scanner %s might not work (Could not switch to programming mode)", scanner.device )
 		return false
 	end
-	return true
+	return scanner:cmd( "#99900031;", "Code programming on" )
 end
 
 
 local function switch_to_normal_mode( scanner )
-	logf(LG_DMP, "scanner", "Switching to normal mode")
+	logf(LG_DMP, lgid, "Switching to normal mode")
+	local answer1, result = scanner:cmd( "#99900032;", "Code programming off" )
 	sys.write(scanner.fd, "%%%%")			-- Switch back to normal mode
-	local answer = scanner:read( );
-	if answer ~= "^^^^" then
-		logf(LG_WRN, "scanner", "Scanner %s: Could not switch to normal mode", scanner.device )
+	local answer2 = scanner:read( );
+	if not string.find(answer2,"%^%^%^%^$") then
+		logf(LG_WRN, lgid, "Scanner %s: Could not switch to normal mode", scanner.device )
 		return false
 	end
 	return true
@@ -134,32 +140,30 @@ end
 
 local function activate_scanning_mode( scanner, mode )
 
+	local data = nil
+	local retval = false
 	if scanner.fd == nil then
-		logf(LG_WRN,"scanner","nill-file descriptor. Scanning mode %s not activated.", mode)
-		return
-	end
-	if mode=="Off" then
+		logf(LG_WRN,lgid,"nil-file descriptor. Scanning mode %s not activated.", mode)
+	elseif mode=="Off" then
 		-- TODO: this does not work: the scanner still scans! Also: Deep sleep does not recover!
-		data, good = scanner:cmd( "#99900102;", "Sleep" ) 
-		if not good then return; end
+		data, retval = scanner:cmd( "#99900102;", "Sleep" ) 
 	elseif mode=="Blinking" then
-		data, good = scanner:cmd( "#99900151;#99900000;#99900001", "Short Interval length" )
-		if not good then return; end
-		data, good = scanner:cmd( "#99900112;", mode )
-		if not good then return; end
+		data, retval = scanner:cmd( "#99900151;#99900000;#99900001", "Short Interval length" )
+		if retval then
+			data, retval = scanner:cmd( "#99900112;", mode )
+		end
 	elseif mode=="Sensor mode" then
-		data, good = scanner:cmd( "#99900113;", mode )	scanner:cmd( "#99900104;", "Restart" ) -- tryout
-
-		if not good then return; end
+		data, retval = scanner:cmd( "#99900113;", mode )
+		--	scanner:cmd( "#99900104;", "Restart" )
 -- TODO: verify this (99900152 is NOT fast sensor mode):
---		data, good = scanner:cmd( "#99900152;#99900000;", "Fast sensor mode" )
---		if not good then return; end
+		if retval then
+			data, retval = scanner:cmd( "#99900152;", "High sensitivity" )
+		end
 	else
-		data, good = scanner:cmd( "#99900114;", mode )
-		if not good then return; end
+		data, retval = scanner:cmd( "#99900114;", mode )
 	end
 
-	return true
+	return data, retval
 end
 
 --
@@ -168,14 +172,15 @@ end
 local function open(scanner)
 
 	scanner:close()
+	led:set("yellow","flash")
 
 	scanner.device = "/dev/ttyS1"
 
-	logf(LG_DBG, "scanner", "Opening scanner on device %s", scanner.device)
+	logf(LG_DBG, lgid, "Opening scanner on device %s", scanner.device)
 
 	local fd, err = sys.open(scanner.device, "rw")
 	if not fd then
-		logf(LG_WRN, "scanner", "Could not open scanner device %s: %s", scanner.device, err)
+		logf(LG_WRN, lgid, "Could not open scanner device %s: %s", scanner.device, err)
 		return
 	end
 
@@ -193,45 +198,52 @@ local function open(scanner)
 	end
 	
 	local data, good = scanner:cmd( "#99900301;", "Query the hardware version")
-	if not good then 
-		return; 
-	end
-
-	local version = data:match("{(.+);")
-	if version then
-		config:lookup("/dev/scanner/version"):setraw(version)
-	end
-
-	local data, good
-	data, good = scanner:cmd( "#99900030;", "All settings to factory default")
-	if not good then return; end
-
-	data, good = scanner:cmd( "#99904111;", "Enable Stop Suffix")
-	if not good then return; end
-
-	--Blinking,Always ON,Sensor mode
-	if not scanner:activate_scanning_mode( config:get("/dev/scanner/1d_scanning_mode") ) then return ; end
-
--- checking of the return code is not done properly
--- on this command, but it seems to work without exception
-	data, good = scanner:cmd( "#99904112;#99900000;#99900015;#99900020;", "Program Stop Suffix")
-	if not good then return; end
-
-	data, good = scanner:cmd( "#99904041;", "Allow Code ID Prefix")
-	if not good then return; end
-
-	-- disable barcodes when this is configured
-	for _,code in ipairs(enable_disable_HR100) do
-		logf(LG_DMP,"scanner", "Barcode %s (default=%s): %s=#%s;", code.name, code.default, (code.off and "off" or "on"), code.off or code.on)
-		local id = code.name
-		local node = config:get("/dev/scanner/enable-disable/" .. id )
-		if node then
-			if node=="false" and code.off then
-				scanner:cmd("#" .. code.off .. ";", "disable scanning code " .. id)
-			elseif node=="true" and code.on then
-				scanner:cmd("#" .. code.on .. ";", "enabling scanning code " .. id)
-			end	
+	if good then 
+		local version = data:match("{(.+);")
+		if version then
+			config:lookup("/dev/scanner/version"):setraw(version)
 		end
+	end
+	
+	if good then 
+		data, good = scanner:cmd( "#99900030;", "All settings to factory default")
+	end
+	
+	if good then 
+		data, good = scanner:cmd( "#99904020;", "Disable User Prefix")
+	end
+	
+	if good then 
+		data, good = scanner:cmd( "#99904111;", "Enable Stop Suffix")
+	end
+	
+	if good then 
+		data, good = scanner:cmd( "#99904112;#99900000;#99900015;#99900020;", "Program Stop Suffix 0x0d")
+	end
+	
+	if good then 
+		data, good = scanner:cmd( "#99904041;", "Allow Code ID Prefix")
+	end
+
+	if good then 
+		--Blinking,Always ON,Sensor mode
+		data, good = scanner:activate_scanning_mode( config:get("/dev/scanner/1d_scanning_mode") )
+	end
+	
+	-- disable/enable barcodes when this needed
+	for _,code in ipairs(enable_disable_HR100) do
+		local id = code.name
+		local node = config:lookup("/dev/scanner/enable-disable/" .. id )
+		if node and good then
+			if node:get()=="false" and code.off then
+				data, good = scanner:cmd("#" .. code.off .. ";", "disable scanning code " .. id)
+			elseif node:get()=="true" and code.on then
+				data, good = scanner:cmd("#" .. code.on .. ";", "enabling scanning code " .. id)
+			end
+		end
+	end
+	if good then 
+		led:set("yellow","on")
 	end
 
 	-- end programming
@@ -239,7 +251,11 @@ local function open(scanner)
 		return 
 	end
 
-	logf(LG_DBG, "scanner", "Successfully detected and configured 1D scanner")
+	if good then
+		logf(LG_INF, lgid, "Successfully detected and configured 1D scanner.")
+	else
+		logf(LG_WRN, lgid, "Errors during scanner configuration: Scanner might not work.")
+	end
 end
 
 
@@ -288,6 +304,13 @@ local function disable(scanner)
 	end
 end
 
+local function barcode_on_off( scanner, name, on_off, wait_for_ack )
+	-- not implemented (required for consystency with 2d scanner)
+end
+
+function is_available()
+	return not Scanner_2d.is_available()
+end
 
 --
 -- Constructor
@@ -305,25 +328,31 @@ function new()
 		device = nil,
 		scanbuf = "",
 		type = "1d",
+		enable_disable = enable_disable_HR100,
 
-		-- methods
+		-- scanner independent methods
 		open = open,
 		close = close,
 		enable = enable,
 		disable = disable,
 		
 		cmd = cmd,
-		read = read,
 		flush = flush,
+
+		-- other methods:
+		read = read,
 
 		activate_scanning_mode = activate_scanning_mode,
 		switch_to_programming_mode = switch_to_programming_mode,
 		switch_to_normal_mode = switch_to_normal_mode,
+
+		barcode_on_off = barcode_on_off,
 	}
 
 	scanner:open()
 
 	config:add_watch("/dev/scanner", "set", function() scanner:open() end, scanner)
+	evq:register("reinit_scanner", function() scanner:open() end, scanner)
 
 	return scanner
 

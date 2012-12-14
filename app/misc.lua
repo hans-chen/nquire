@@ -7,10 +7,10 @@
 --
 --- Run cmd in background
 --
--- @param cmd command to execute
--- @param cb_sigchld callback function called when child terminates
--- @param cb_data callback function called when data recevied from child
--- @param opaque object passed to callback functions
+-- @param cmd         command to execute
+-- @param cb_sigchld  callback function called when child terminates
+-- @param cb_data     callback function called when data recevied from child
+-- @param userdata    opaque object passed to callback functions
 -- @return pid of child process
 
 function runbg(cmd, cb_sigchld, cb_data, userdata)
@@ -189,6 +189,41 @@ function poke_little_endian_long( data, start_pos, value )
 	return ssub( data, start_pos, string.char( v0,v1,v2,v3 ) )
 end
 
+-- fetch 2 byte coded little endian number from a string starting at start_pos
+-- in: data
+--     start_pos
+-- return: the value of the fetched little endian coded number
+function peek_big_endian_short( data, start_pos )
+	local g1, g2 = string.byte( data, start_pos, start_pos+1 )
+	return	g2 + g1*0x100;
+end
+
+-- set a 2 byte coded little endian number from a byte-array starting at pos
+function poke_big_endian_short( data, start_pos, value )
+	local v0 = value % 0x100;
+	local v1 = (value-v0) / 0x100;
+	return ssub( data, start_pos, string.char( v1, v0 ) )
+end
+
+-- fetch 4 byte coded little endian number from a string starting at start_pos
+-- in: data
+--     start_pos
+-- return: the value of the fetched little endian coded number
+function peek_big_endian_long( data, start_pos )
+	local g3, g2, g1, g0 = string.byte( data, start_pos, start_pos+3 )
+	return	g0 + g1*0x100 + g2*0x10000 + g3 *0x1000000;
+end
+
+-- set a 4 byte coded little endian number from a byte-array starting at pos
+function poke_big_endian_long( data, start_pos, value )
+	local v0 = value % 0x100;
+	local v1 = ((value-v0) / 0x100) % 0x100;
+	local v2 = ((value-v0-v1) / 0x10000) % 0x100;
+	local v3 = ((value-v0-v1-v2) / 0x1000000) % 0x100;
+	return ssub( data, start_pos, string.char( v3,v2,v1,v0 ) )
+end
+
+
 function ifconfig(interface)
 
 	local fd;
@@ -207,7 +242,13 @@ function ifconfig(interface)
 		conf.inet = { conf.data:match("inet addr:(%d+)%.(%d+)%.(%d+)%.(%d+)") }
 		conf.mask = { conf.data:match("Mask:(%d+)%.(%d+)%.(%d+)%.(%d+)") }
 		local m1,m2,m3,m4,m5,m6 = conf.data:match("HWaddr (%x+):(%x+):(%x+):(%x+):(%x+):(%x+)")
-		conf.mac = { ("0x" .. m1)+0, ("0x" .. m2)+0, ("0x" .. m3)+0, ("0x" .. m4)+0, ("0x" .. m5)+0, ("0x" .. m6)+0 } 
+		conf.mac = { 
+				m1 and tonumber(m1, 16) or nil,
+				m2 and tonumber(m2, 16) or nil,
+				m3 and tonumber(m3, 16) or nil,
+				m4 and tonumber(m4, 16) or nil,
+				m5 and tonumber(m5, 16) or nil,
+				m6 and tonumber(m6, 16) or nil }
 		
 		fd:close()
 		return conf
@@ -218,20 +259,30 @@ end
 
 function dump( buf, maxlines )
 	local out = ""
+	local txt = ""
+	local cpl = 16
 	for i=1,#buf do
-		if i % 8 == 1 then out = out .. (i-1) .. "\t" end
-		out = out .. string.format( "0x%02x ", string.byte( buf, i ) )
-		if i % 8 == 0 then 
+		if i % cpl == 1 then out = out .. string.format("%05d  ",(i-1)) end
+		local c = buf:sub(i,i)
+		local b = c:byte()
+		out = out .. string.format( "%02x ", b )
+		txt = txt .. ((b<23 or b>=128) and "." or c)
+		if i % cpl == 0 or i==#buf then 
 			if maxlines ~= nil then
 				maxlines = maxlines - 1
 				if maxlines==0 then 
 					return out
 				end
 			end
-			out = out .. "\n"
+			out = out .. "    " .. txt .. "\n"
+			txt = ""
 		end
 	end
 	return out
+end
+
+function od( txt )
+	return txt:gsub( ".", function(c) return string.format("%02x ", c:byte()) end )
 end
 
 -- table comparion
@@ -248,6 +299,59 @@ function tablecmp( t1, t2 )
 	return 0
 end
 
+function string:split(delimiter)
+  local result = { }
+  local from  = 1
+  local delim_from, delim_to = string.find( self, delimiter, from  )
+  while delim_from do
+    table.insert( result, string.sub( self, from , delim_from-1 ) )
+    from  = delim_to + 1
+    delim_from, delim_to = string.find( self, delimiter, from  )
+  end
+  table.insert( result, string.sub( self, from  ) )
+  return result
+end
+
+-- change all non printable charracters in a string to hex escape codes
+-- and the \ ' " charracters as well.
+function binstr_to_escapes( txt )
+	return txt:gsub( ".", 
+		function(c) 
+			if c:byte()<32 or c:byte()>=128 or c=="'" or c=="\"" or c=="\\" then
+				return string.format("\\x%02x", c:byte())
+			end
+			return c
+		end)
+end
+
+function escapes_to_binstr( txt )
+	return txt:gsub( "\\x(%x%x)", 
+		function(c) 
+			return string.char(tonumber(c,16))
+		end)
+end
+
+--
+-- Translate string to given codepage
+--
+
+function to_utf8(text, page)
+
+	local xlat = codepage_to_utf8[page]
+
+	if xlat then
+		local out = {}
+		for _, c in ipairs( { string.byte(text, 1, #text) } ) do
+			if c ~= 0 then
+				out[#out+1] = xlat[c] or c
+			end
+		end
+		local out = table.concat(out, "")
+		return out
+	else
+		return text
+	end
+end
 
 -- vi: ft=lua ts=3 sw=3
 

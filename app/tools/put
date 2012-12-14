@@ -1,9 +1,39 @@
 #!/bin/bash
 
+#set -x
+
+CIT_IP_FILE=.cit.ip
+
+function help()
+{
+    echo "usage: put [<ip>]"
+	echo "When ip is omitted, the content of file ./$CIT_IP_FILE is used"
+}
+
+if test -z "$1"; then
+	if test -f $CIT_IP_FILE; then
+		IP=`cat $CIT_IP_FILE`
+	else
+		help
+	    exit -1
+	fi		
+else
+	IP=$1
+fi
+
+if ping -c 1 $IP; then
+    CIT=$IP
+	echo $IP > $CIT_IP_FILE
+else
+	help
+    exit -1
+fi
+
 make clean
 make
 
-ftp -i cit << EOF
+ftp -i $CIT << EOF
+anonymous
 mkdir img
 mkdir schema
 mput *.lua *.so arial.ttf schema/* img/* install

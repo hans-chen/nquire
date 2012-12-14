@@ -37,11 +37,25 @@ return group {
 
 	object {
 		id = "remote_ip",
-		label = "Remote IP address", 
+		label = "Remote IP address",
 		type = "ip_address",
 		default = "192.168.1.201"
 	},
 
+	object {
+		id = "disable_scan_beep",
+		label = "Disable beep after scan",
+		type = "boolean",
+		default = "false"
+	},
+	
+	object {
+		id = "programming_mode_timeout",
+		label = "Programming mode timeout",
+		type = "enum",
+		range = "10,15,20,30,45,60",
+		default = "15"
+	},
 
 	group {
 		id = "messages",
@@ -117,7 +131,8 @@ return group {
 					label = "Text",
 					type = "string",
 					default = "Welcome",
-					range = "0:25",
+					range = "0:100",
+					size = 25,
 				},
 
 				object {
@@ -170,7 +185,8 @@ return group {
 					label = "Text",
 					type = "string",
 					default = "Scan your product",
-					range = "0:25",
+					range = "0:100",
+					size = 25,
 				},
 
 				object {
@@ -223,7 +239,8 @@ return group {
 					label = "Text",
 					type = "string",
 					default = "↓ ↓ ↓ ↓",
-					range = "0:25",
+					range = "0:100",
+					size = 25,
 				},
 
 				object {
@@ -289,7 +306,8 @@ return group {
 					label = "Text",
 					type = "string",
 					default = "Please ask",
-					range = "0:20",
+					range = "0:100",
+					size = 25,
 				},
 
 				object {
@@ -342,7 +360,8 @@ return group {
 					label = "Text",
 					type = "string",
 					default = "for assistance",
-					range = "0:20",
+					range = "0:100",
+					size = 25,
 				},
 
 				object {

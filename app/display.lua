@@ -8,12 +8,16 @@
 
 module("Display", package.seeall)
 
+local lgid="display"
+
+local dpy_w = 240
+local dpy_h = 128
+
 --
 --- Open display
 --
 
 local function open(display)
-
 	local mode = config:get("/dev/display/mode")
 
 	require("dpydrv")
@@ -23,7 +27,7 @@ local function open(display)
 	local update_freq, err = display.drv:open(w, h, c == 'c')
 
 	if not update_freq then
-		logf(LG_FTL, "display", "Could not open display: %s", err)
+		logf(LG_FTL, lgid, "Could not open display: %s", err)
 	end
 
 	-- resolution specific display settings
@@ -71,7 +75,10 @@ local function open(display)
 
 	display:set_font("arial.ttf", display.native_font_size)
 
-	
+	-- sensible defaults:
+	display:set_color("white")
+	display:set_background_color("black")
+
 	return update_freq
 end
 
@@ -95,24 +102,24 @@ end
 
 local function draw_image(display, fname, xpos, ypos)
 	if not fname then
-		logf(LG_WRN, "display", "No image fname given")
+		logf(LG_WRN, lgid, "No image fname given")
 		return
 	end
 	local ok, err = display.drv:draw_image(fname, xpos, ypos)
 	if not ok then
-		logf(LG_WRN, "display", "draw_image: %s", err)
+		logf(LG_WRN, lgid, "draw_image: %s", err)
 	end
 end
 
 
 local function draw_video(display, fname, w, h)
 	if not fname then
-		logf(LG_WRN, "display", "No image fname given")
+		logf(LG_WRN, lgid, "No image fname given")
 		return
 	end
 	local ok, err = display.drv:draw_video(fname, w, h)
 	if not ok then
-		logf(LG_WRN, "display", "draw_video: %s", err)
+		logf(LG_WRN, lgid, "draw_video: %s", err)
 	end
 end
 
@@ -126,7 +133,7 @@ end
 local function draw_image_blob(display, blob)
 	local ok, err = display.drv:draw_image(nil, blob)
 	if not ok then
-		logf(LG_WRN, "display", "draw_image: %s", err)
+		logf(LG_WRN, lgid, "draw_image: %s", err)
 	end
 end
 
@@ -151,14 +158,14 @@ end
 --
 
 local function set_font(display, family, size, attr)
-
+	logf(LG_DMP, "display", "set_font( family=%s, size=%d )", family or "nil", size or 0 )
 	display.font_family = family or display.font_family
 	display.font_size = size or display.font_size
 	display.font_attr = attr or display.font_attr
 
 	local ok, err = display.drv:set_font(display.font_family, display.font_size, display.font_attr)
 	if not ok then
-		logf(LG_WRN, "display", "set_font: %s", err)
+		logf(LG_WRN, lgid, "set_font: %s", err)
 	end
 end
 
@@ -178,8 +185,9 @@ local function draw_text(display, fmt, ...)
 		buf = fmt
 	end
 
-	local w, h = display.drv:draw_text(buf)
-	return w, h
+	local w, h, x, y = display.drv:draw_text(buf)
+	logf(LG_DMP,lgid,"txt='%s':w=%d,h=%d,x=%d,y=%d", buf,w,h,x,y)
+	return w, h, x, y
 end
 
 
@@ -203,50 +211,71 @@ end
 
 local colorcache = {}
 
-local function set_color(display, v1, v2, v3, v4)
-	
+local function get_rgb( v1, v2, v3 )
 	if v1 and v2 and v3 then
-		return display.drv:set_color(v1, v2, v3, v4)
+		return v1, v2, v3
 	end
 	
-	if colorcache[v1] then
-		return display.drv:set_color(colorcache[v1].r, colorcache[v1].g, colorcache[v1].b)
-	end
+	if colorcache[v1] == nil then
 
-	local r, g, b = v1:match("#(%x%x)(%x%x)(%x%x)")
-	if r and g and b then
-		colorcache[v1] = {}
-		colorcache[v1].r = ("0x" .. r) / 256
-		colorcache[v1].g = ("0x" .. g) / 256
-		colorcache[v1].b = ("0x" .. b) / 256
-	else
-		local fd = io.open("/etc/X11/rgb.txt", "r")
-		if fd then
-			for l in fd:lines() do
-				local name = v1:gsub(".", function(c)
-					return "[" .. string.lower(c) .. string.upper(c) .. "]"
-				end)
-				local r, g, b = l:match("(%d+)%s+(%d+)%s+(%d+)%s+" .. name .. "$")
-				if r and g and b then
-					colorcache[v1] = {}
-					colorcache[v1].r = r / 256
-					colorcache[v1].g = g / 256
-					colorcache[v1].b = b / 256
-					break
+		local r, g, b = v1:match("#(%x%x)(%x%x)(%x%x)")
+		if r and g and b then
+			colorcache[v1] = {}
+			colorcache[v1].r = ("0x" .. r) / 256
+			colorcache[v1].g = ("0x" .. g) / 256
+			colorcache[v1].b = ("0x" .. b) / 256
+		else
+			local fd = io.open("/etc/X11/rgb.txt", "r")
+			if fd then
+				for l in fd:lines() do
+					local name = v1:gsub(".", function(c)
+						return "[" .. string.lower(c) .. string.upper(c) .. "]"
+					end)
+					local r, g, b = l:match("(%d+)%s+(%d+)%s+(%d+)%s+" .. name .. "$")
+					if r and g and b then
+						colorcache[v1] = {}
+						colorcache[v1].r = r / 256
+						colorcache[v1].g = g / 256
+						colorcache[v1].b = b / 256
+						break
+					end
 				end
+				fd:close()
 			end
-			fd:close()
 		end
+		
 	end
 	
 	if colorcache[v1] then
-		return display.drv:set_color(colorcache[v1].r, colorcache[v1].g, colorcache[v1].b)
+		return colorcache[v1].r, colorcache[v1].g, colorcache[v1].b
 	else
-		logf(LG_WRN, "display2", "Color %s not found", tostring(v1))
+		logf(LG_WRN, lgid, "Color %s not found", tostring(v1))
+		return nil,nil,nil
+	end
+	
+end
+
+
+-- set foreground color using rgb values or color string (eg "white")
+local function set_color(display, v1, v2, v3)
+	
+	local r,g,b = get_rgb( v1, v2, v3 )
+	if r ~= nil then
+		display.drv:set_color(r,g,b)
 	end
 
 end
 
+
+-- set background color using rgb values or color string (eg "black")
+local function set_background_color(display, v1, v2, v3)
+	
+	local r,g,b = get_rgb( v1, v2, v3 )
+	if r ~= nil then
+		display.drv:set_background_color(r,g,b)
+	end
+
+end
 
 
 local function draw_box(display, w, h, r)
@@ -262,11 +291,9 @@ end
 --
 --- Clear screen
 --
--- @param what What to clear: 't'=text layer, 'i'=image layer, 'ti'=all layers
---
-
-local function clear(display, what)
-	display.drv:clear(what)
+local function clear(display)
+	logf(LG_DMP, "display", "clear()")
+	display.drv:clear()
 end
 
 
@@ -279,13 +306,71 @@ local function update(display, force)
 end
 
 --
--- List available fonts
+-- Format ia line of text (used by show message)
 --
+local function format_text(display, text, xpos, ypos, align_h, align_v, size)
 
-local function list_fonts(display)
-	return display.drv:list_fonts()
+	logf(LG_DBG,lgid,"format_text( xpos=%d, ypos=%d, align_h=%s, align_v=%s, size=%d )",xpos, ypos, align_h, align_v, size or display.font_size )
+	if size then
+		display.font_size = size;
+		display.drv:set_font_size(display.font_size)
+	end
+
+	align_h = align_h:sub(1, 1)
+	align_v = align_v:sub(1, 1)
+
+	if align_h == "c" then xpos = dpy_w/2 end
+	if align_h == "r" then xpos = dpy_w end
+	if align_v == "m" then ypos = dpy_h / 2 end
+	if align_v == "b" then ypos = dpy_h end
+
+	local text_w, text_h = display:get_text_size(text)
+
+	if align_h == "c" then xpos = xpos - text_w / 2 end
+	if align_h == "r" then xpos = xpos - text_w end
+	if align_v == "m" then ypos = ypos - (text_h+2) / 2 end
+	if align_v == "b" then ypos = ypos - (text_h+2) end
+
+	logf(LG_DBG,"cit", "gotoxy(%d,%d)", xpos,ypos )
+	display:gotoxy(xpos, ypos)
+	return display:draw_text(text)
+
 end
 
+
+--
+-- display a message of (max) 6 lines (actual possible lines depends on the size of the font)
+-- All lines will be centered
+--
+local function show_message(display, msg1, msg2, msg3, msg4, msg5, msg6)
+	display:gotoxy(0, 0);
+	display:clear()
+	local y = 10
+	if msg1 then
+		display:format_text(msg1, 0, y, "c", "")
+		y = y + display.font_size
+	end
+	if msg2 then
+		display:format_text(msg2, 0, y, "c", "")
+		y = y + display.font_size
+	end
+	if msg3 then
+		display:format_text(msg3, 0, y, "c", "")
+		y = y + display.font_size
+	end
+	if msg4 then
+		display:format_text(msg4, 0, y, "c", "")
+		y = y + display.font_size
+	end
+	if msg5 then
+		display:format_text(msg5, 0, y, "c", "")
+		y = y + display.font_size
+	end
+	if msg6 then
+		display:format_text(msg6, 0, y, "c", "")
+		y = y + display.font_size
+	end
+end
 
 
 --
@@ -320,6 +405,7 @@ function new()
 		close = close,
 		gotoxy = gotoxy,
 		set_color = set_color,
+		set_background_color = set_background_color,
 		set_font = set_font,
 		draw_image = draw_image,
 		draw_video = draw_video,
@@ -330,11 +416,13 @@ function new()
 		draw_filled_box = draw_filled_box,
 		clear = clear,
 		update = update,
-		list_fonts = list_fonts,
+	
+		format_text = format_text,
+		show_message = show_message,
 	}
 
 	local update_freq = display:open()
-	logf(LG_DBG, "display", "Display update frequency is %.1f hz", update_freq)
+	logf(LG_DBG, lgid, "Display update frequency is %.1f hz", update_freq)
 
 	evq:register("display_timer", on_display_timer, display)
 	evq:push("display_timer", display, 1.0 / update_freq)
