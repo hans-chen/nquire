@@ -69,6 +69,10 @@ local type_checker = {
 	pattern = function(range, val)
 		return val:match(range) 
 	end,
+	
+	custom = function( range, val )
+		return range( val )
+	end,
 }
 
 
@@ -83,7 +87,7 @@ function type_check(type, range, value)
 		if ok then
 			return true
 		else
-			logf(LG_WRN, "config", "Value %q is not a valid %s %s", tostring(value), type, range and "in range " .. range or "")
+			logf(LG_WRN, "config", "Value %q is not a valid %s %s", tostring(value) or "nil", type or "nil", range and ("in range " .. (type ~= "custom" and range or "-")) or "nil")
 			return false
 		end
 	else

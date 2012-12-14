@@ -1,5 +1,11 @@
 module("Gpio", package.seeall)
 
+-- This module is able to write various gpio
+-- It also is able to read the external gpio in ports
+-- On change of gpio in (or just on a regular basis) it sends "gpio" events with:
+-- 	event.data.IN1=0 or 1
+-- 	event.data.IN2=0 or 1
+
 local lgid = "gpio"
 
 local function on_poll_gpio( event, self )
@@ -17,12 +23,12 @@ local function on_poll_gpio( event, self )
 
 		if send_timed or self.pin5 ~= pin5 then
 			logf( LG_DMP,lgid,"Send gpio pin5 = %d", pin5 )
-			cit:send_to_clients( config:get("/dev/gpio/prefix") .. "0" .. string.char(pin5+0x30) )
+			evq:push("gpio", { IN1 = pin5 } )
 			self.last_poll = now
 		end
 		if send_timed or self.pin7 ~= pin7 then
 			logf( LG_DMP,lgid,"Send gpio pin7 = %d", pin7 )
-			cit:send_to_clients( config:get("/dev/gpio/prefix") .. "1" .. string.char(pin7+0x30) )
+			evq:push("gpio", { IN2 = pin7 } )
 			self.last_poll = now
 		end
 
@@ -129,15 +135,6 @@ function new()
 		backlight = backlight,
 		scan_1d_led = scan_1d_led,
 	}
-
-	evq:register( "input", 	
-		function( event, gpio )
-			if event.data.msg == "disable" then
-				gpio:disable()
-			elseif event.data.msg == "enable" then
-				gpio:enable()
-			end
-		end, self )
 
 	return self
 end

@@ -1,0 +1,33 @@
+< dt=1 cmd hangup
+
+Wait for timeout shorter that original idle timeout
+> dt=1 TCP (n=63): "\e\x420\e\x24\e\x2e3This should:\n1: display for 3 seconds\n2: then idle msg\x03"
+> dt=0 TCP (n=20): "\e\xf4I11test-less-idle\x03"
+< dt=1 TCP cmd (n=17): "TTtest-less-idle\n"
+
+Wait for timeout longer that original idle timeout
+> dt=1 TCP (n=63): "\e\x420\e\x24\e\x2e3This should:\n1: display for 8 seconds\n2: then idle msg\x03"
+> dt=0 TCP (n=20): "\e\xf4I44test-less-idle\x03"
+< dt=4 TCP cmd (n=17): "TTtest-less-idle\n"
+
+Wait for idle timeout shorter than original, then error messege
+> dt=1 TCP (n=64): "\e\x420\e\x24\e\x2e3This should:\n1: display for 2 seconds\n2: then error msg\x03"
+> dt=0 TCP (n=21): "\e\xf4E11test-less-error\x03"
+< dt=1 TCP cmd (n=18): "TTtest-less-error\n"
+
+Wait for idle timeout longer than original, then error messege
+> dt=1 TCP (n=64): "\e\x420\e\x24\e\x2e3This should:\n1: display for 8 seconds\n2: then error msg\x03"
+> dt=0 TCP (n=21): "\e\xf4E44test-less-error\x03"
+< dt=4 TCP cmd (n=18): "TTtest-less-error\n"
+
+Cut off idle message timeout
+> dt=1 TCP (n=63): "\e\x420\e\x24\e\x2e3This should:\n1: display for 3 seconds\n2: then idle msg\x03"
+> dt=0 TCP (n=20): "\e\xf4I42test-less-idle\x03"
+> dt=3 TCP (n=2): "\e\xf3"
+< dt=0 TCP cmd (n=17): "TQtest-less-idle\n"
+
+Cut off idle message timeout before error message
+> dt=1 TCP (n=63): "\e\x420\e\x24\e\x2e3This should:\n1: display for 3 seconds\n2: then idle msg\x03"
+> dt=0 TCP (n=21): "\e\xf4E42test-less-error\x03"
+> dt=3 TCP (n=2): "\e\xf3"
+< dt=0 TCP cmd (n=18): "TQtest-less-error\n"

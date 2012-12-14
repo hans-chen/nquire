@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# test reading of a mifare card
+# 
+# this also involves writing and 'MF' event detection
+
+if test -f .cit.ip; then
+	CIT="`cat .cit.ip`"
+else
+	echo "ERROR: not .cit.ip found. Use 'make discover' to correct this (or do that manually)" 1>&2
+	exit 1
+fi
+
+PORT=9101
+KEY="FFFFFFFFFFFF"
+
+# ===========================================================================
+# functions
+
+function upload_conf( )
+{
+	cat > cit.conf
+	curl ftp://${CIT}/ -T cit.conf
+}
+
+function send( )
+{
+	echo -en $1 | nc localhost $PORT
+}
+
+function send_wait1( )
+{
+	nquire-cmd.exe -ip=127.0.0.1 -port=$PORT -answer=1 -msg="$1" > /dev/null
+}
+
+function send_wait_answer( )
+{
+	nquire-cmd.exe -ip=127.0.0.1 -port=$PORT -answer=1 -msg="$1"
+}
+
+# ===========================================================================
+# prepare
+
+cat << EOF | upload_conf
+/cit/mode = "TCP server"
+/cit/tcp_port = 9101
+/dev/mifare/key_A = "${KEY}"
+/dev/mifare/relevant_sectors = ""
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/send_cardnum_only = true
+/dev/mifare/sector_data_format = "hex"
+/dev/mifare/sector_data_seperator = "comma"
+/dev/mifare/suppress_beep = true
+EOF
+
+# wait for the settings to be effective
+sleep 2
+
+# start the testserver
+while killall testserver; do sleep .1; done 2> /dev/null
+testserver -d --ip=$CIT
+sleep 1
+
+# ===========================================================================
+# testing
+
+# turn on card detection (if it was not turned on yet)
+send '\x1b\xfb\x31'
+
+echo "Please present mifare card and keep at nquire"
+CARDNO=`send_wait_answer '\x1b\x24\x1b\x2e\x34Present card\nplease\x03' | cut -b3-10`
+echo "Received cardnumber: ${CARDNO}"
+
+# show message:
+send '\x1b\x24\x1b\x2e\x34Keep card close\nplease\x03'
+# and set a custom timeout
+send '\x1b\xf4E\xff\x31test took too long\x03'
+
+
+echo "Writing data for getting consistent read results"
+# write blocks for always reading the same data:
+send_wait1 '\x1b\xf9'${CARDNO}',deadbeef:KFFFFFFFFFFFFW\x310Bsector01-block0.W\x311Bsector01-block1.W\x312Bsector01-block2.W\x3f0Bsector0f-block0.W\x3f1Bsector0f-block1.W\x3f2Bsector0f-block2.\x03'
+
+echo "Reading data"
+# read blocks
+send '\x1b\xfb\x30' # turn off mifare detection
+send_wait1 '\x1b\xf8'${CARDNO}',FFFFFFFFFFFF:\x310B\x03'
+send_wait1 '\x1b\xf8'${CARDNO}',FFFFFFFFFFFF:\x310H\x03'
+send_wait1 '\x1b\xf8'${CARDNO}',FFFFFFFFFFFF:\x311B\x03'
+send_wait1 '\x1b\xf8'${CARDNO}',FFFFFFFFFFFF:\x311H\x03'
+send_wait1 '\x1b\xf8'${CARDNO}',FFFFFFFFFFFF:\x312B\x03'
+send_wait1 '\x1b\xf8'${CARDNO}',FFFFFFFFFFFF:\x312H\x03'
+send_wait1 '\x1b\xf8'${CARDNO}',FFFFFFFFFFFF:\x31-B\x03'
+send_wait1 '\x1b\xf8'${CARDNO}',FFFFFFFFFFFF:\x3f0B\x3f1B\x3f2B\x03'
+send '\x1b\xfb\x31' # turn on mifare detection
+
+# show end message
+send '\x1b\x24\x1b\x2e\x34Thank you\x03'
+sleep 1
+send '\x1b\xf3' # force idle message
+
+killall testserver
+

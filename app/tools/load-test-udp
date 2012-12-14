@@ -1,0 +1,34 @@
+#!/usr/bin/lua
+
+require "net"
+require "sys"
+
+local address = "192.168.1.100"
+local port = 9000
+
+local fd = net.socket("udp")
+
+local c=1
+local again = true
+while again do
+	local ok, err = net.sendto(fd, "Some data in this packet nr=" .. c, address, port)
+	if not ok then
+		print("Error sending packet #" .. c .. ": ", err)
+		local fd = io.popen("dmesg | grep 'Arrived at non-free entry in the non-full queue'")
+		if fd then
+			for l in fd:lines() do
+				print(l)
+				again = false
+			end
+			fd:close()
+		end
+		sys.sleep(2)
+	else
+		sys.sleep(0.001)
+	end
+	
+	c=c+1
+end
+	
+-- vi: ft=lua ts=3 sw=3
+

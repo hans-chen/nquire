@@ -3,9 +3,12 @@ Maarten van Dootingh <maarten@vdtai.nl>
 
 Revision history
 
-`-------`-----------------------`-------------------------------------------------------------
-v1.0 	December 21 2009	Conversion from hand-written html
-----------------------------------------------------------------------------------------------
+[cols="1^,4,10",options="header"]
+|===================================================
+|Version|Date            |Comment
+|v1.0 	|December 21 2009|Conversion from hand-written html
+|v1.0 	|October 21 2010 |Changed example barcode
+|===================================================
 
 == Barcode programming == 
 
@@ -37,7 +40,7 @@ The following barcodes are used to control the programming state of the enquire:
 
 === Enter programming mode ===
 
-image:img/enter_programming_mode.png["Enter programming mode",height=70]
+image:img/CODE128_enter_programming_mode.png["Enter programming mode",height=70]
 
 The display will show:
 
@@ -47,7 +50,7 @@ Programming
 
 === Exit programming mode ===
 
-image:img/exit_programming_mode.png["exit programming mode",height=70]
+image:img/CODE128_exit_programming_mode.png["exit programming mode",height=70]
 
 The display will show the configured welcome text.
 
@@ -55,16 +58,23 @@ The display will show the configured welcome text.
 
 ==== Reboot ====
 
-image:img/reboot.png["reboot: 020700",height=70]
+image:img/CODE128_reboot.png["reboot: 020700",height=70]
 
 
 ==== Restore defaults ====
 
-image:img/restore-defaults.png["restore defaults: 020701",height=70]
+image:img/CODE128_restore-defaults.png["restore defaults: 020701",height=70]
 
 ==== Show configuration ====
 
-image:img/show-config.png["Show configuration: 020702",height=70]
+image:img/CODE128_show-config.png["Show configuration: 020702",height=70]
+
+==== wlan diagnostic ====
+
+It is possible that some external problem exists when the wifi often gives connection problems.
+Scanning the following barcode starts a wlan environment analisys and shows the result on the display.
+
+image:img/CODE128_env_diagnostic.png["Environment diagnoses: 020706",height=70]
 
 ==== Set serial number ====
 
@@ -72,20 +82,19 @@ It is possible to scan a serial number.
 However the scanned serial number is volatile: after reboot the device will
 have it's original serial number.
 
-NOTE: this is meant for testing purposes only.
-
-
-image:img/set-serial.png["Set serial: 020704",height=70]
+image:img/CODE128_set-serial.png["Set serial: 020704",height=70]
 
 And 2 different serial numbers:
 
-image:img/serial-EI00000.png["Serial: EI00000",height=70]
+image:img/CODE128_serial-EI00000.png["Serial: EI00000",height=70]
 
-image:img/serial-EI4316002P.png["Serial: EI4316002P",height=70]
+image:img/CODE128_serial-EI4316002P.png["Serial: EI4316002P",height=70]
+
+NOTE: this is meant for testing purposes only.
 
 ==== Anounce settings ====
 
-image:img/anounce_settings.png["anounce settings barcode",height=70]
+image:img/CODE128_anounce_settings.png["anounce settings barcode",height=70]
 
 The display will show:
 ----
@@ -94,34 +103,34 @@ scan settings
 ----
 
 ===== Some usefull examples =====
-image:img/set_dhcp_false.png[height=70]
+image:img/CODE128_set_dhcp_false.png[height=70]
 
-image:img/set_dhcp_true.png[height=70]
+image:img/CODE128_set_dhcp_true.png[height=70]
 
-image:img/set_interface_ethernet.png[height=70]
+image:img/CODE128_set_interface_ethernet.png[height=70]
 
-image:img/set_interface_wifi.png[height=70]
+image:img/CODE128_set_interface_wifi.png[height=70]
 
-image:img/set_interface_gprs.png[height=70]
+image:img/CODE128_set_interface_gprs.png[height=70]
 
-image:img/network_interface_ethernet_2d.png[interface = ethernet]
+image:img/QR_CODE_network_interface_ethernet.png[interface = ethernet]
 /network/interface = ethernet
 
-image:img/set_interface_wifi_2d.png[interface = wifi]
+image:img/QR_CODE_set_interface_wifi.png[interface = wifi]
 /network/interface = wifi
 
-image:img/network_dhcp_false_2d.png[dhcp=false]
+image:img/QR_CODE_network_dhcp_false.png[dhcp=false]
 /network/dhcp = false
 
-image:img/network_dhcp_true_2d.png[dhcp_true_2d]
+image:img/QR_CODE_network_dhcp_true.png[dhcp_true_2d]
 /network/dhcp = true
 
-image:img/network_static_server_129.png[static_server_129]
+image:img/QR_CODE_network_static_server_129.png[static_server_129]
 static server 129
 
-image:img/network_static_client_129.png[static_client_129]
+image:img/QR_CODE_network_static_client_129.png[static_client_129]
 static client 129
 
-image:img/1d_and_2d.png[1d and 2d]
+image:img/QR_CODE_1d_and_2d.png[1d and 2d]
 1d and 2d
 

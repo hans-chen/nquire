@@ -18,8 +18,10 @@ NAME    := cit-app
 BUILD   := $(shell svnversion -c . | cut -d : -f 2)
 # only use a major and a minor verion number
 # patch level numbering is not SG15 compatible!
-VERSION	:= 1.4
+VERSION	:= 1.5
 LABEL := $(VERSION).$(BUILD)
+
+all:
 
 # Auto vars:
 
@@ -47,7 +49,7 @@ endif
 
 PKGS			+= lua5.1 sdl freetype2
 
-SUBDIRS			+= test
+SUBDIRS			+= test tools
 
 MODULES			+= sys.so
 LDFLAGS_sys.so	+= -lrt -lutil -lm -ldl 
@@ -63,6 +65,9 @@ MODULES			+= beepthread.so
 MODULES			+= mifare.so
 mifare.so : CFLAGS += -I../lib/rfid
 mifare.so : LDFLAGS += -Wl,-Bstatic ../lib/rfid/libnlrf.a -Wl,-Bdynamic
+
+EXE += gethostbyname
+gethostbyname: gethostbyname.c
 
 LUA_SRC             = $(shell ls -1 *lua)
 
@@ -113,7 +118,7 @@ STRIP 	= $(CROSS)strip
 
 .PRECIOUS: $(MODULES)
 
-all: $(SUBDIRS) $(MODULES) links
+all: $(SUBDIRS) $(MODULES) links $(EXE)
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS):
@@ -130,6 +135,11 @@ $(SUBDIRS):
 	$(STRIP) $@
 	chmod -x $@
 
+gethostbyname: gethostbyname.o
+	$(CC) $(CFLAGS) $< -o $@ -L../toolchain/usr/lib  
+	$(STRIP) $@
+	chmod -x $@
+	
 .PHONY: dist install links clean clobber
 
 # Note that this builds a release from app-binary!
@@ -145,30 +155,31 @@ links:
 	
 clean:	
 	@echo "[$@]"
-	-rm -rf $(OBJS) $(MODULES) core binary dist doc
+	-rm -rf binary dist doc
+	-rm -f $(OBJS) $(MODULES) core $(EXE) gethostbyname.o
 	for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
 
 clobber: clean
 	@echo "[$@]"
 	-rm -f *.image *~ cit-db cit-discover cit-discover-sg15 cit-discover.sh 
-	-rm -f install put cit-test app.tar
-	for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
+	-rm -f install put cit-test app.tar `find . -name '.cit.ip'`
+	for d in $(SUBDIRS); do $(MAKE) -C $$d clobber; done
 
 clobber_install:
 	@echo "[$@]"
 	-rm -f $(INSTALL)/*lua $(INSTALL)/*.so $(INSTALL)/*.ttf $(INSTALL)/schema/* 
 	-rm -f $(INSTALL)/img/*.gif $(INSTALL)/img/*.jpg $(INSTALL)/img/*.png $(INSTALL)/img/keypad/*
 
-install: $(MODULES) clobber_install
+install: $(MODULES) $(EXE) clobber_install
 	@echo "[$@]"
 	cp *so $(INSTALL)/
 	cp arial.ttf $(INSTALL)/
-	chmod 751 reload_wlan_driver.sh
-	cp -a reload_wlan_driver.sh $(INSTALL)/
+	chmod 751 gethostbyname
+	cp -a gethostbyname $(INSTALL)/
 	cp schema/*.schema $(INSTALL)/schema/
 	cp img/*.jpg img/*.png $(INSTALL)/img/
 	cp img/ftp/* $(INSTALL)/img/ftp/
-	for f in $(LUA_SRC); do luac -o $(INSTALL)/$$f $$f; done
+	for f in $(LUA_SRC); do if ! luac -o $(INSTALL)/$$f $$f; then exit -1; fi; done
 
 app.tar: Makefile
 	@echo "[$@]"

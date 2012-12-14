@@ -110,8 +110,16 @@ local function gen_reply_v1(self)
 	local device_name = config:lookup("/dev/serial"):get()
 	local firmware_major, firmware_minor = string.match( config:lookup("/dev/version"):get(), "(%d+).(%d+)" )
 
-	local rip1, rip2, rip3, rip4 = string.match( config:get("/cit/remote_ip"), "(%d+).(%d+).(%d+).(%d+)" )
-	reply = ssub( reply, SERVER_IP_IDX, string.char( rip1, rip2, rip3, rip4 ) )
+	local host = config:get("/cit/resolved_remote_ip")
+	local ips, errstr = net.gethostbyname( host )
+	if ips==nil then
+		logf(LG_WRN,lgid,"Could not resolve host %s: %s", host, errstr)
+	else
+		-- just use the first ips available 
+		-- (most times there will be only one)
+		local rip1, rip2, rip3, rip4 = string.match( ips[1], "(%d+).(%d+).(%d+).(%d+)" )
+		reply = ssub( reply, SERVER_IP_IDX, string.char( rip1, rip2, rip3, rip4 ) )
+	end
 	
 	-- firmware versions and date ##.##:
 	local firmware = string.format( "%02d.%02d", firmware_major+0, firmware_minor+0 )
@@ -237,14 +245,14 @@ local function cit_SG15_configure( data )
 
 	-- Misc. Flags #1
 	local misc_flags_1 = data:byte( MISC_FLAGS_1_IDX )
-	logf(LG_DMP,lgid, "misc_flags_1=0x%02x", misc_flags_1)
+	logf(LG_DBG,lgid, "misc_flags_1=0x%02x", misc_flags_1)
 	config:set( "/cit/disable_scan_beep", bittst( misc_flags_1, 4 )==1 and "true" or "false" )
 	local dhcp_flag = bittst( misc_flags_1, 0 )==1
 	config:set( "/network/dhcp", dhcp_flag and "true" or "false" )
 
 	-- Misc. Flags #2
 	local misc_flags_2 = data:byte( MISC_FLAGS_2_IDX )
-	logf(LG_DMP,lgid, "misc_flags_2=0x%02x", misc_flags_2)
+	logf(LG_DBG,lgid, "misc_flags_2=0x%02x", misc_flags_2)
 	local sg15_codepage = (misc_flags_2 - (misc_flags_2 % 0x20))/0x20
 	for code,i in ipairs( code_pages_translation ) do
 		if i == sg15_codepage then
@@ -255,7 +263,7 @@ local function cit_SG15_configure( data )
 
 	-- Misc. Flags #3
 	local misc_flags_3 = data:byte( MISC_FLAGS_3_IDX )
-	logf(LG_DMP,lgid, "misc_flags_3=0x%02x", misc_flags_3)
+	logf(LG_DBG,lgid, "misc_flags_3=0x%02x", misc_flags_3)
 	config:set("/cit/mode", bittst(misc_flags_3, 6 ) == 1 and "server" or "client" )
 	local wep128 = bittst(misc_flags_3, 2 )==1
 	config:set("/network/wifi/keytype", wep128 and "WEP" or "off")
@@ -299,15 +307,15 @@ local function on_fd_read(event, self)
 
 	local data, saddr, sport = net.recvfrom(self.fd, 4096)
 
-	logf(LG_DMP, lgid, "saddr=%s, sport=%d", saddr, sport)
+	logf(LG_DBG, lgid, "saddr=%s, sport=%d", saddr, sport)
 	if data then 
-		logf(LG_DMP, lgid, "Received packed (first 8 bytes): %s", dump( data, 1 ) ) 
+		logf(LG_DBG, lgid, "Received packed (first 8 bytes): %s", dump( data, 1 ) ) 
 	end
 
 	if data then
 		local my_magic_number = peek_big_endian_long(data, MAGIC_IDX)
 		local my_protocol_version = peek_big_endian_short(data, PROTOCOL_VERSION_IDX)
-		logf(LG_DMP, lgid, "my_magic_nr = %x, my_protocol_version=%x", my_magic_number, my_protocol_version )
+		logf(LG_DBG, lgid, "my_magic_nr = %x, my_protocol_version=%x", my_magic_number, my_protocol_version )
 
 		if my_magic_number == magic_number and my_protocol_version == protocol_version then
 			local packet_type = string.byte(data, PACKET_TYPE_IDX);
@@ -333,7 +341,7 @@ local function on_fd_read(event, self)
 			elseif packet_type == 0x01 then
 				-- don't handle response packet (could be from other SG15 shuttles)
 			else
-				logf(LG_DMP, lgid, "Received unknown SG15 packet type %d from %s", packet_type, saddr)
+				logf(LG_DBG, lgid, "Received unknown SG15 packet type %d from %s", packet_type, saddr)
 			end
 		end
 	end

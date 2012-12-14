@@ -21,7 +21,7 @@ local function on_fd_scanner(event, scanner)
 		scanner.scanbuf = scanner.scanbuf .. data
 
 		local t1, t2 = scanner.scanbuf:match("(.-)[\r\n](.*)")
-		logf(LG_DMP,lgid,"Scanbuf:\n%s", dump( scanner.scanbuf, 10 ) )
+		logf(LG_DBG,lgid,"Scanbuf:\n%s", dump( scanner.scanbuf, 10 ) )
 		if t1 and #t1==0 then
 			logf( LG_DBG,lgid, "Skipping empty scan data" )
 			scanner.scanbuf = t2 or ""
@@ -84,7 +84,7 @@ local function flush( scanner, n )
 		end
 	until not buf or #buf == 0
 
-	logf(LG_DMP,  lgid, "< %s", data)
+	logf(LG_DBG,  lgid, "< %s", data)
 	return data
 end
 
@@ -95,7 +95,7 @@ local function read( scanner )
 		buff = sys.read(scanner.fd, 1024)
 		delay = delay - 1
 		if delay == 0 then
-			logf(LG_DBG,lgid, "Nothing received from scanner within timout of 1 second")
+			logf(LG_DBG,lgid, "Nothing received from scanner within timeout of 1 second")
 			return "";
 		end
 		sys.sleep(0.1)
@@ -103,7 +103,7 @@ local function read( scanner )
 	
 	buff = buff .. scanner:flush( )
 	
-	logf(LG_DMP, lgid, "Scanner returned '%s'", buff)
+	logf(LG_DBG, lgid, "Scanner returned '%s'", buff)
 	return buff
 end
 
@@ -128,7 +128,7 @@ end
 
 
 local function switch_to_programming_mode( scanner )
-	logf(LG_DMP, lgid, "Switching to programming mode")
+	logf(LG_DBG, lgid, "Switching to programming mode")
 	sys.write(scanner.fd, "$$$$")			-- Switch to programming mode
 	local answer = scanner:read( )
 	if answer ~= "@@@@" then
@@ -140,7 +140,7 @@ end
 
 
 local function switch_to_normal_mode( scanner )
-	logf(LG_DMP, lgid, "Switching to normal mode")
+	logf(LG_DBG, lgid, "Switching to normal mode")
 	local answer1, result = scanner:cmd( "#99900032;", "Code programming off" )
 	sys.write(scanner.fd, "%%%%")			-- Switch back to normal mode
 	local answer2 = scanner:read( );
@@ -229,12 +229,20 @@ local function open(scanner)
 			config:lookup("/dev/scanner/version"):setraw(version)
 		end
 	end
-	
+
 	if good or scanner.retry_counter>=max_retry then 
 		data, lgood = scanner:cmd( "#99900030;", "All settings to factory default")
 		good = lgood and good
 	end
 	
+	-- apply pre_init
+	local pre_init = config:get("/dev/scanner/em1300_pre_init")
+	if pre_init ~= "" then
+		for i,c in ipairs(pre_init:split( ";" )) do
+			scanner:cmd("#" .. c .. ";", "em1300_pre_init #" .. i)
+		end
+	end
+
 	if good or scanner.retry_counter>=max_retry then 
 		data, lgood = scanner:cmd( "#99904020;", "Disable User Prefix")
 		good = lgood and good
@@ -273,6 +281,14 @@ local function open(scanner)
 				data, lgood = scanner:cmd("#" .. code.on .. ";", "enabling scanning code " .. id)
 				good = lgood and good
 			end
+		end
+	end
+
+	-- apply post_init
+	local post_init = config:get("/dev/scanner/em1300_post_init")
+	if post_init ~= "" then
+		for i,c in ipairs(post_init:split( ";" )) do
+			scanner:cmd("#" .. c .. ";", "em1300_post_init #" .. i)
 		end
 	end
 
@@ -418,16 +434,15 @@ function new()
 	}
 
 	config:add_watch("/dev/scanner", "set", function (e) evq:push( "reinit_scanner" ) end)
-	evq:register("reinit_scanner", function (e,s) s:close() s:open() end, scanner)
-
-	evq:register( "input", 
-		function( event, scanner )
-			if event.data.msg == "disable" then
-				scanner:close()
-			elseif event.data.msg == "enable" then
-				scanner:open()
+	evq:register("reinit_scanner", 
+		function (e,s) 
+			if Upgrade.busy() then
+				logf(LG_WRN,lgid,"Scanner not reinitialized because an upgrade is in progress")
+			else
+				s:close()
+				s:open()
 			end
-		end, scanner )
+		end, scanner)
 
 	return scanner
 

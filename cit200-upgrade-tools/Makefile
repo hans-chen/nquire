@@ -46,13 +46,13 @@ TOOLS_PACK			:=	$(PATH_TOOLS)/host_pack_tar.sh
 ##################################################################
 #	image version					    <------	config them
 ##################################################################
-VERSION_APP		:= 1.4
-VERSION_ROOTFS		:= 1.4.3
-VERSION_KERNEL		:= 2.6.27.2
-VERSION_FIRMWARE	:= 1.4.4
+VERSION_APP		:= 1.5
+VERSION_ROOTFS		:= 1.4.5
+VERSION_KERNEL		:= 2.6.35.7
+VERSION_FIRMWARE	:= 1.5.0
 VERSION_LOGO		:= 1.0
-VERSION_EM2027_KRL	:= 3.06.019
-VERSION_EM2027_APP	:= 1.01.001
+VERSION_EM2027_KRL	:= 3.06.024
+VERSION_EM2027_APP	:= 1.01.002
 VERSION_EM1300_KRL	:= 1.25.20
 
 LOGFILE				:= upgrade_log.txt

@@ -1,6 +1,0 @@
-The following tests should still be implemented:
-
-- try to display more than the maximum number of images.
-- try to display an image with more than the maximum number of frames.
-
-

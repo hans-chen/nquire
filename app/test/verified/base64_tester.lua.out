@@ -1,4 +1,4 @@
-# *** Running ./base64_tester.lua
+# *** Running module/base64_tester.lua
 
 
 # *** Start test 'test_encode_decode1'

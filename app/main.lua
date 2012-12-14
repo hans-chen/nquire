@@ -4,7 +4,9 @@
 -- Copyright © 2007 All Rights Reserved.
 --
 
-
+--
+-- main.lua   for the nquire application
+--
 
 require "strict"
 require "getopt"
@@ -83,21 +85,15 @@ end
 ---------------------------------------------------------------------------
 
 -- workaround for image bug (required for gprs lock option and peers/gprs file)
-os.execute( "mkdir -p /var/lock /etc/ppp/peers" )
+os.execute( "mkdir -p /etc/ppp/peers" )
 
--- copy images:
-os.execute( "cd /cit200/img/ftp && for f in `ls -1 *gif`; do if ! test -f /mnt/img/$f; then cp $f /mnt/img/; chmod 777 /mnt/img/$f; fi done" )
+-- logging dir for mifare logging and upgrade-fail-dumps
+os.execute( "mkdir -p /home/ftp/log /mnt/log; chown ftp:ftp /home/ftp/log" )
+os.execute( "mount --bind /mnt/log /home/ftp/log; chmod 777 /home/ftp/log" )
 
--- workaround for missing SOL_TCP defintions:
-
--- very quick failure for testing purposes
---os.execute( "echo 10 > /proc/sys/net/ipv4/tcp_keepalive_time" )
---os.execute( "echo 2 > /proc/sys/net/ipv4/tcp_keepalive_intvl" )
---os.execute( "echo 5 > /proc/sys/net/ipv4/tcp_keepalive_probes" )
-
-os.execute( "echo 60 > /proc/sys/net/ipv4/tcp_keepalive_time" )
-os.execute( "echo 20 > /proc/sys/net/ipv4/tcp_keepalive_intvl" )
-os.execute( "echo 6 > /proc/sys/net/ipv4/tcp_keepalive_probes" )
+-- make default images available:
+os.execute( "mkdir -p /home/ftp/img/default; mount --bind /cit200/img/ftp /home/ftp/img/default;" )
+os.execute( "chmod 644 /cit200/img/ftp/*; chmod 755 /home/ftp/img/default" )
 
 -- Parse cmdline arguments
 
@@ -210,7 +206,7 @@ if not scanner then
 	-- so we assume it is a 1d scanner
 	scanner = Scanner_1d.new()
 	if not scanner then
-		logf(LG_FTL,lgid,"No scanner device detected")
+		logf(LG_WRN,lgid,"No scanner device detected")
 	end
 end
 -- innitialisation in event queue

@@ -3,10 +3,12 @@ Maarten van Dootingh <maarten@vdtai.nl>
 
 Revision history
 
-`-------`-----------------------`-------------------------------------------------------------
-v1.0 	Januari 2010            New
-v1.1    April 2 2010            Documenting implicit exclusion of external scanner
-----------------------------------------------------------------------------------------------
+[cols="1^,4,10",options="header"]
+|===================================================
+|Version|Date            |Comment
+|v1.0 	|Januari 2010    |New
+|v1.1   |April 2 2010    |Documenting implicit exclusion of external scanner
+|===================================================
 
 This document describes the requirements and design for how the NQuire 
 application should handle the touchscreen functionality.

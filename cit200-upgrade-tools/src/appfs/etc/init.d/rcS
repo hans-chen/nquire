@@ -22,8 +22,11 @@ trap ":" INT QUIT TSTP
 /bin/mkdir -p /var/lock
 ln -s /tmp /var/run
 hostname NEWLAND_CIT
-# Input modules
-#insmod /driver/qt2160.ko
+
+insmod /driver/qt2160.ko
+insmod /driver/scsi_mod.ko
+insmod /driver/sd_mod.ko
+insmod /driver/scsi_wait_scan.ko 
 insmod /driver/usbcore.ko
 insmod /driver/ohci-hcd.ko
 insmod /driver/usb-storage.ko
@@ -31,15 +34,17 @@ insmod /driver/usbhid.ko
 insmod /driver/rt2x00lib.ko
 insmod /driver/rt2x00usb.ko
 insmod /driver/rt73usb.ko
-insmod /driver/rt3070sta.ko
+insmod /driver/rt2800lib.ko
+insmod /driver/rt2800usb.ko
 insmod /driver/usb-datapipe.ko
+
 # load wifi bin
-/sbin/ifconfig wlan0 up &                                                  
-sleep 1
-echo 1 > /sys/class/firmware/1-1.2\:1.0/loading                            
-cat  /lib/firmware/rt73.bin > /sys/class/firmware/1-1.2\:1.0/data           
-echo 0 > /sys/class/firmware/1-1.2\:1.0/loading  
-/sbin/ifconfig wlan0 down  
+#/sbin/ifconfig wlan0 up &                                                  
+#sleep 1
+#echo 1 > /sys/class/firmware/1-1.2\:1.0/loading                            
+#cat  /lib/firmware/rt73.bin > /sys/class/firmware/1-1.2\:1.0/data           
+#echo 0 > /sys/class/firmware/1-1.2\:1.0/loading  
+#/sbin/ifconfig wlan0 down  
 # mount sd
 #mount /dev/mmcblk0p1 /mnt/
 mount -o rw,umask=000,shortname=mixed /dev/mmcblk0p1 /mnt
@@ -78,12 +83,12 @@ cd /etc/ && ln -sf vsftpd.conf.anonymous vsftpd.conf
 # touch version file: /etc/cit.ini
 cat > /etc/cit.ini << EOF
 [version]
-rootfs      = 1.4.3
+rootfs      = 1.4.5
 app         = 1.0
 usb_scan    = 1.0
-kernel      = 2.6.27.2
+kernel      = 2.6.35.7
 hardware    = UNKNOW
-firmware		= 1.4.4
+firmware	= 1.5.0
 [serial number]
 sn          = UNKNOW
 EOF

@@ -20,40 +20,48 @@ local function on_fd_scanner(event, scanner)
 		return
 	end
 
-	local data = sys.read(scanner.fd, 256)
+	local read_data = sys.read(scanner.fd, 256)
 
-	if data then
-		logf(LG_DMP,lgid,"read: '%s'", data)
-		scanner.scanbuf = scanner.scanbuf .. data
+	if read_data then
+		logf(LG_DBG,lgid,"read: '%s'", read_data)
+		scanner.scanbuf = scanner.scanbuf .. read_data
 
-		local t1, t2 = scanner.scanbuf:match("(.-)[\r\n](.*)") 
-		if t1 then
-			local barcode = t1
-			scanner.scanbuf = t2 or ""
+		local data
+		repeat
+			local rest
+			data, rest = scanner.scanbuf:match("(.-)[\r\n](.*)") 
+			if data then
+				local event_data = { result = "ok" }
+				scanner.scanbuf = rest or ""
 			
-			logf(LG_DBG, lgid, "Scanned barcode '%s'", barcode)
+				logf(LG_DBG, lgid, "part data '%s'", data)
 
-			-- Barcode is complete. Fixup the barcode type prefix to be the
-			-- compatible format
+				-- Barcode is complete. 
 
-			local prefix_in, barcode = barcode:match("(.)(.+)")
-			local prefix_out = nil
+				if config:get("/dev/extscanner/raw") == "true" then
+					event_data.prefix = "U"
+					event_data.barcode = data
+				else
+					-- Fixup the barcode type prefix to be the compatible format
+					local prefix_in
+					prefix_in, event_data.barcode = data:match("(.)(.+)")
+					for _, i in ipairs(prefixes) do
+						if prefix_in == i.prefix_hid then
+							logf(LG_DBG, lgid, "Scanned %q barcode type", i.name)
+							event_data.prefix = i.prefix_out
+							break
+						end
+					end
 
-			for _, i in ipairs(prefixes) do
-				if prefix_in == i.prefix_hid then
-					logf(LG_DBG, lgid, "Scanned %q barcode type", i.name)
-					prefix_out = i.prefix_out
-					break
+					if not event_data.prefix then
+						logf(LG_DBG, lgid, "Scanned unknown barcode type")
+						event_data.prefix = "?"
+					end
 				end
+			
+				evq:push("scanner", event_data)
 			end
-
-			if not prefix_out then
-				logf(LG_DBG, lgid, "Scanned unknown barcode type")
-				prefix_out = "?"
-			end
-
-			evq:push("scanner", { result = "ok", barcode = barcode, prefix=prefix_out })
-		end
+		until data == nil
 	end
 end
 
@@ -119,16 +127,6 @@ function new(device, baudrate)
 		open = open,
 		close = close,
 	}
-
-	evq:register( "input", 
-		function (event, scanner_hid)
-			if event.data.msg == "disable" then
-				scanner_hid:close()
-			elseif event.data.msg == "enable" then
-				scanner_hid:open()
-			end
-		end,
-		scanner_hid)
 
 	return scanner_hid
 

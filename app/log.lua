@@ -8,6 +8,7 @@ LG_INF = 3
 LG_DBG = 4
 LG_DMP = 5
 
+
 local logf_level = LG_INF
 local logf_busy = false
 local logf_to_syslog = true
@@ -22,16 +23,17 @@ local level_info = {
  	[LG_DMP] = { "dmp", "\027[1;30m", 7 },
 }
 
+
 function set_loglevel( level )
 	logf_level = tonumber(level)
 end
+
 
 function logf_init(level, to_syslog, to_stderr)
 	logf_level = tonumber(level)
 	logf_to_syslog = to_syslog
 	logf_to_stderr = to_stderr
 end
-
 
 
 function _logf(level, class, file, line, msg)
@@ -99,7 +101,6 @@ function _logf(level, class, file, line, msg)
 	logf_busy = false
 
 end
-
 
 
 function logf(level, class, msg, ...)

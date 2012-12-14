@@ -71,11 +71,12 @@ void show_help()
 		<< "Options:" << endl
 		<< " -h      show this text" << endl
 		<< " -n=n    retry sending discovery packet n-times" << endl
+		<< " -1      exit immediately after 1str found nquire" << endl
 		<< " -s      let system decide which port to send from" << endl
 		<< "         and send RESPONSE-TO-SENDER-PORT discovery option" << endl
 		<< " -r      do not send RESPONSE-TO-SENDER-PORT discovery option" << endl
 		<< " +r      force use of RESPONSE-TO-SENDER-PORT discovery option" << endl
-		<< " -a      show all received protocol packets (trouble shooting)" << endl << endl
+		<< " -v=n    logging level 3=inf, 4=debug, 5=trace" << endl << endl
 		<< "E.g.:  nquire-discover -n=2 -s" << endl << endl
 		<< "Note: you won't receive the response packets when using " << endl
 		<< "option -s with -r because the response packet is sent to port 19200." << endl
@@ -99,8 +100,8 @@ int main(int argc, char * argv[]) {
 	bool response_to_sender_port = false;
 	bool no_response_to_sender_port = false;
 	int n = 3;
-	bool show_all = false;
 	unsigned short port = discovery_port;
+	bool exit_1rst = false;
 
 	int i;
 	for(i=1; i<argc; i++)
@@ -122,6 +123,16 @@ int main(int argc, char * argv[]) {
 			port = 0;
 			if( ! no_response_to_sender_port )
 				response_to_sender_port = true;
+		}
+		else if( opt=="-1" )
+		{
+			// exit after first found nquire
+			exit_1rst = true;
+		}
+		else if( strncmp(opt.c_str(),"-v=",3)==0 && (opt[3]=='3' || opt[3]=='4' || opt[3]=='5'))
+		{
+			// exit after first found nquire
+			set_log_level( opt[3] - '0' );
 		}
 		else if( opt=="-r" )
 		{
@@ -193,7 +204,7 @@ int main(int argc, char * argv[]) {
 	HANDLE_ERROR( r );
 
 #ifndef WIN32
-	{	if(show_all) cout << "Join multicast group" << endl;
+	{	LOG_DMP("Join multicast group");
 		struct ip_mreq mreq;
 		mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 		mreq.imr_multiaddr.s_addr = inet_addr(discovery_addr);
@@ -217,9 +228,7 @@ int main(int argc, char * argv[]) {
 	// When you want to receive the response on this port, specify discovery
 	// option "RESPONSE-TO-SENDER-PORT" in the discovery message (nquire version >= 1.3)
 	sa_recv.sin_port = htons(port);
-	if(show_all)
-		cout << "# Bind receiving socket to "
-			<< sa_recv.sin_addr.s_addr << "." << port << endl;
+	LOG_DMP("Bind receiving socket to "	<< sa_recv.sin_addr.s_addr << "." << port);
 
 	//cout << "# Bind socket" << endl;
 	int rr = bind(fd, (struct sockaddr *)&sa_recv, sizeof(sa_recv));
@@ -229,23 +238,21 @@ int main(int argc, char * argv[]) {
 		exit(-1);
 	}
 #ifdef WIN32
-	{	if(show_all) cout << "# Join multicast group" << endl;
+	{	LOG_DMP("Join multicast group")
 		struct ip_mreq mreq;
 		mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 		mreq.imr_multiaddr.s_addr = inet_addr(discovery_addr);
-		if(show_all) cout << "# IP_ADD_MEMBERSHIP=" << IP_ADD_MEMBERSHIP << endl;
+		LOG_DMP("IP_ADD_MEMBERSHIP=" << IP_ADD_MEMBERSHIP);
 		r = setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof mreq);
 		HANDLE_ERROR( r );
 	}
 #endif
 
-	if(show_all)
-		cout << "# Sending " << n << " discovery requests and wait 2 seconds for response packets...";
+	LOG_DMP("Sending " << n << " discovery requests and wait 2 seconds for response packets...");
 
 	while( n-- > 0 )
 	{
-		if(show_all)
-			cout << "# Send discover request" << endl;
+		LOG_DMP("Send discover request");
 
 		stringstream msg;
 		msg << "CIT-DISCOVER-REQUEST" << endl << "Version:\t1";
@@ -259,8 +266,7 @@ int main(int argc, char * argv[]) {
 		sa_dest.sin_family = AF_INET;
 		sa_dest.sin_addr.s_addr = inet_addr(discovery_addr);
 
-		if(show_all)
-			cout << "# Sending CIT-DISCOVER-REQUEST to " << discovery_addr << "." << discovery_port << endl;
+		LOG_DMP("Sending CIT-DISCOVER-REQUEST to " << discovery_addr << "." << discovery_port);
 		unsigned r = sendto(fd, msg.str().c_str(), msg.str().size(), 0, (struct sockaddr *)&sa_dest, sizeof(sa_dest));
 		if( r!=msg.str().size() )
 		{
@@ -295,11 +301,9 @@ int main(int argc, char * argv[]) {
 #endif
 				rc = recvfrom(fd,buf,sizeof(buf),0, (struct sockaddr*)(&from), &fromlen);
 				HANDLE_ERROR( rc );
-				if(show_all)
-					cout << sep
-						<< "# message from " << inet_ntoa(from.sin_addr) 
+				LOG_DBG("message from " << inet_ntoa(from.sin_addr) 
 						<< "." << ntohs(from.sin_port)
-						<< " (" <<  rc << "):'" << buf << "'" << endl;
+						<< " (" <<  rc << "):'" << buf << "'");
 
 				if(strncmp("CIT-DISCOVER-RESPONSE",buf,strlen("CIT-DISCOVER-RESPONSE"))==0)
 				{
@@ -307,28 +311,29 @@ int main(int argc, char * argv[]) {
 					if( discovered_nquires.find( ip ) == discovered_nquires.end() )
 					{
 						discovered_nquires.insert( make_pair(ip, buf) );
-						if(show_all) 
-							cout << sep << "# ip address of discovered nquire:" << endl;
 						cout << ip << endl;
+						if( exit_1rst )
+						{
+							n=0;
+							break;
+						}
 					}
 					else
 					{
-						if(show_all)
-							cout << "# Received packet from already discovered nquire with ip " << ip << endl;
+						LOG_DMP("Received packet from already discovered nquire with ip " << ip);
 					}
 				}
 				else
 				{
-					if(show_all)
-						cout << "# Ignoring unrecognized packet \"" << string(buf,rc) << "\"" << endl;
+					LOG_DMP("Ignoring unrecognized packet \"" << string(buf,rc) << "\"");
 				}
 			}
 			else if( rc == 0 )
 			{
-				if( show_all ) cout << "# timeout waiting for response packet" << endl;
+				LOG_DMP("# timeout waiting for response packet");
 			}
 			else
-				cerr << "# error = " << rc << endl;
+				LOG_WRN("# error = " << rc );
 		}
 	}
 

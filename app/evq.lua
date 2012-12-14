@@ -40,7 +40,7 @@ end
 --
 
 local function push(evq, type, data, delay)
-	--logf(LG_DMP,lgid, "Pushing event %s with delay %d" , type, delay or 0)
+	--logf(LG_DBG,lgid, "Pushing event %s with delay %d" , type, delay or 0)
 
 	-- Create new event
 	
@@ -54,7 +54,7 @@ local function push(evq, type, data, delay)
 	
 	if delay == -1 then
 		-- handle direct
-		--logf(LG_DMP,lgid, "Direct handling event %s" , type)
+		--logf(LG_DBG,lgid, "Direct handling event %s" , type)
 		evq:handle( event )
 	else
 		-- Insert the event in the event queue

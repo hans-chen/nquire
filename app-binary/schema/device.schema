@@ -124,8 +124,8 @@ return group {
 			id = "security_code",
 			label = "Barcode programming security code",
 			type = "string",
-			default = "",
-			range = "0:15"
+			default = "0000",
+			range = "1:15"
 		}
 	},
 	
@@ -161,7 +161,8 @@ return group {
 			label = "Barcodes",
 			type = "enum",
 			default = "1D only",
-			range="1D only,1D and 2D"
+			range="1D only,1D and 2D",
+			comment = "Specify if 2d barcodes are available.<br/>Note that it is still possible to disable them separately"
 		},
 
 		object {
@@ -178,6 +179,7 @@ return group {
 			config_type = "number",
 			default = "NOP",
 			range = "NOP,0.3,1,2,3,5,10,15",
+			comment = "The nquire will  not send a server event when a barcode is scanned again within this timeout value (sconds)."
 		},
 
 		object {
@@ -236,6 +238,34 @@ return group {
 			type = "enum",
 			default = "Semi",
 			range = "On,Semi,Off",
+		},
+		
+		object {
+			id = "em1300_pre_init",
+			type = "string",
+			default = "",
+			size = 40
+		},
+
+		object {
+			id = "em1300_post_init",
+			type = "string",
+			default = "",
+			size = 40
+		},
+
+		object {
+			id = "em2027_pre_init",
+			type = "string",
+			default = "",
+			size = 40
+		},
+
+		object {
+			id = "em2027_post_init",
+			type = "string",
+			default = "",
+			size = 40
 		},
 		
 		group {
@@ -416,7 +446,15 @@ return group {
 			id = "device",
 			label = "Device",
 			type = "string",
-			default = "/dev/tty0"
+			default = "/dev/tty0",
+		},
+		
+		object {
+			id = "raw",
+			label = "Raw data",
+			type = "boolean",
+			default = "false",
+			comment = "When <code>yes</code>, the data received from the external scanner is send to the server as received from the external scanner, prefixed with an <code>U</code>."
 		},
 	},
 
@@ -429,7 +467,7 @@ return group {
 			id = "device",
 			label = "Device",
 			type = "string",
-			default = "/dev/ttyS2"
+			default = "/dev/ttyS2",
 		},
 
 		object {
@@ -446,15 +484,35 @@ return group {
 			type = "string",
 			default = "FFFFFFFFFFFF",
 			match = "^%x*$",
-			range = "12"
+			range = "12",
+			comment = "Twelve hexadecimal nibbles representing key A for accessing a presented mifare card"
 		},
 
 		object {
 			id = "relevant_sectors",
 			label = "Sectors to read",
-			type = "string",
-			default = "1,15",
-			range = "1:40"
+			type = "custom",
+			default = "0:0,15:2",
+			size = 25,
+			-- "custom" function for validation (see config.lua : load_schema for available functions)
+			range = function (s)
+					--print("DEBUG: s = \"" .. (s or "nil") .. "\"")
+					if not s or #s==0 then return true end
+					local e=0
+					while e~=nil do 
+						local b=e+1
+						e=string.find(s,",",b)
+						--print("DEBUG: e = " .. (e or "nil"))
+						local g=string.sub(s,b,e and e-1 or b+4)
+						local sect,colon,block = string.match(g,"^(%d%d?)(:-)([012]-)$")
+						if sect==nil then return false end
+						local nsect = tonumber(sect)
+						if nsect>15 then return false end
+						if #colon == 0 and #block>0 then return false end
+					end
+					return true
+				end,
+			comment = "Specify a comma seperated list of blocks (or whole sectors) that should be read when a mifare card is presented to the reader.<br/>The supported mifare classic has 16 sectors [0..15] and 3 accessible blocks per sector [0,1,2]. <br/>The used format is: sector[:block],... E.g.: 1,5:2,15:0.<br/>Specifying an empty string would generate card-detection events without actually reading the mifare card"
 		},
 		
 		object {
@@ -464,6 +522,7 @@ return group {
 			config_type = "number",
 			default = "3",
 			range = "0.3,1,2,3,5,10,15",
+			comment = "The same card will not generate a server event within the specified delay time (seconds)"
 		},
 		
 		object {
@@ -479,6 +538,7 @@ return group {
 			label = "Send card number only",
 			type = "boolean",
 			default = "false",
+			comment = "When true, only the cardnumber will be send, even when sectors are read.<br/>Note that this is different from not reading card-data at all."
 		},
 		
 		object {
@@ -486,7 +546,25 @@ return group {
 			label = "Sector data format",
 			type = "enum",
 			default = "binary",
-			range = "binary,base 64,hex escapes",
+			range = "binary,base 64,hex escapes,hex",
+			comment = "The formatting of the read data.<br/><code>binary</code>: data is exactly send as read from the card.<br/>Most usefull are <code>base 64</code> and <code>hex</code>."
+		},
+
+		object {
+			id = "sector_data_seperator",
+			label = "Sector data seperator",
+			type = "enum",
+			default = "none",
+			range = "none,space,tab,comma,colon,semicolon",
+			comment = "In the server event the different read blocks of data are seperated according this value."
+		},
+
+		object {
+			id = "suppress_beep",
+			label = "Suppress scan beep",
+			type = "boolean",
+			default = "false",
+			comment = "Suppress beep after card detection. This is usefull when using escape commands to access the card instead of using the default event data."
 		},
 
 		group {
@@ -501,7 +579,7 @@ return group {
 					id = "text",
 					label = "Incomplete scan",
 					type = "string",
-					default = "Wait for beep when scanning",
+					default = "Wait for beep\nwhen scanning",
 					range = "0:100",
 					size = 25,
 				},
@@ -515,11 +593,21 @@ return group {
 					id = "text",
 					label = "Access violation",
 					type = "string",
-					default = "Card access denied",
+					default = "Card access\ndenied",
 					range = "0:100",
 					size = 25,
 				},
 			},	
+
+			object {
+				id = "transaction_error_message",
+				label = "Write error message",
+				type = "string",
+				default = "Transaction failed!\n\nThis is logged.",
+				range = "0:100",
+				size = 25,
+			},
+			
 		},
 	},
 
@@ -568,7 +656,7 @@ return group {
 			range = "beep1,beep2,beep3",
 			default = "beep1",
 		},
-		
+
 		object {
 			id = "beep1",
 			type = "string",
@@ -596,7 +684,13 @@ return group {
 			default = "1"
 		},
 		
-
+		object {
+			id = "invert",
+			label = "Invert button on click",
+			type = "boolean",
+			default = "false",
+		},
+		
 		object {
 			id = "send_active_keys_only",
 			label = "Only send active key events to server",

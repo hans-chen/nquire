@@ -1,0 +1,58 @@
+#!/bin/bash
+
+#set -x
+
+CIT=192.168.1.200
+PORT=9000
+
+#
+# duration_test - execute some actions on the nquire again and again
+#
+
+# request version
+VERSION="`echo -en "\e\x60" | nc -u -q1 $CIT $PORT`"
+
+if test -f img/kitty.gif; then
+	curl ftp://$CIT/img/kitty.gif --upload-file img/kitty.gif
+fi
+
+while true; do
+
+	VERSION="`echo -en "\e\x5f" | nc -u -q1 $CIT $PORT`"
+	echo VERSION=$VERSION
+	if test -z "$VERSION"; then
+		echo "`date` ERROR: Could not get version" 1>&2
+	fi
+
+	if ! curl ftp://$CIT/install --upload-file install  > /dev/null  2> /dev/null; then
+		echo "`date` ERROR: Could not upload file 'install'" 1>&2
+	fi
+
+	if ! curl http://$CIT > /dev/null 2> /dev/null; then
+		echo "`date` ERROR: Could not access http://$CIT" 1>&2
+	fi
+
+
+	echo -en "\e\x25" | nc -u $CIT $PORT
+	echo -en "\e\x2c\x85\x40Hello\x03" | nc -u $CIT $PORT
+	sleep 1
+	echo -en "\e\x2c\x89\x80kitty\x03" | nc -u $CIT $PORT
+	sleep 1
+	echo -en "\e\x2c\x8a\x60\e\xf0kitty.gif\x03" | nc -u $CIT $PORT
+	sleep 1
+	echo -en "\e\x2c\x30\x30\e\xf01.gif\x03" | nc -u $CIT $PORT
+	sleep 1
+	echo -en "\e\x2c\xe4\x30\e\xf02.gif\x03" | nc -u $CIT $PORT
+	sleep 1
+	echo -en "\e\x2c\xe4\x90\e\xf03.gif\x03" | nc -u $CIT $PORT
+	sleep 1
+	echo -en "\e\x2c\x30\x90\e\xf04.gif\x03" | nc -u $CIT $PORT
+
+	sleep 4
+
+	# back to idle
+	echo -en "\e\xf3" | nc -u $CIT $PORT
+
+	sleep 1
+
+done

@@ -1,0 +1,169 @@
+#!/bin/bash
+
+if test -f .cit.ip; then
+	CIT="`cat .cit.ip`"
+else
+	echo "ERROR: not .cit.ip found. Use 'make discover' to correct this (or do that manually)" 1>&2
+	exit 1
+fi
+
+PORT=9101
+
+# ===========================================================================
+# functions
+
+function upload_conf( )
+{
+	cat > cit.conf
+	curl ftp://${CIT}/ -T cit.conf
+}
+
+function send( )
+{
+	echo -en $1 | nc localhost $PORT
+}
+
+function send_wait1( )
+{
+	nquire-cmd.exe -ip=127.0.0.1 -port=$PORT -answer=1 -msg="$1" > /dev/null
+}
+
+function send_wait_answer( )
+{
+	nquire-cmd.exe -ip=127.0.0.1 -port=$PORT -answer=1 -msg="$1"
+}
+
+# ===========================================================================
+# prepare
+
+cat << EOF | upload_conf
+/cit/mode = "TCP server"
+/cit/tcp_port = 9101
+
+/cit/messages/fontsize/small = 18
+/cit/messages/fontsize/large = 28
+ 
+/cit/messages/idle/timeout = 3
+/cit/messages/error/timeout = 2
+/dev/mifare/suppress_beep = false
+
+EOF
+
+# wait for the settings to be effective
+sleep 2
+
+# start the testserver
+while killall testserver; do sleep .1; done 2> /dev/null
+testserver -d --ip=$CIT --difftime
+
+# ===========================================================================
+# testing
+
+function prep_test()
+{
+	echo ""
+	while killall testserver; do sleep .1; done 2> /dev/null
+	testserver -d --ip=$CIT
+	echo "$1"
+}
+
+function prep_test_diff()
+{
+	echo ""
+	while killall testserver; do sleep .1; done 2> /dev/null
+	testserver -d --ip=$CIT --difftime
+	echo "$1"
+}
+
+function text_lm()
+{
+	# font, cls, text left middle
+	send '\x1b\x42\x30\x1b\x24\x1b\x2e\x33'"$1"'\x03'
+}
+
+function text_cm()
+{
+	# font, cls, text center middle
+	send '\x1b\x42\x30\x1b\x24\x1b\x2e\x34'$1'\x03'
+}
+
+# @param $1 ::= "I" | "E"
+# @param $2 ::= timeout
+# @param $3 ::= delay
+# @param $4 ::= tag
+function timeout()
+{
+	send '\x1b\xf4'"$1$2$3$4"'\x03'
+}
+
+# @param $1 ::= "I" | "E"
+# @param $2 ::= timeout
+# @param $3 ::= delay
+# @param $4 ::= tag
+function timeout_w()
+{
+	send_wait1 '\x1b\xf4'"$1$2$3$4"'\x03'
+}
+
+function t1()
+{
+prep_test_diff "Wait for timeout shorter that original idle timeout"
+text_lm 'This should:\n1: display for 3 seconds\n2: then idle msg'
+timeout_w I 1 1 test-less-idle
+sleep 4
+}
+
+function t2()
+{
+prep_test_diff "Wait for timeout longer that original idle timeout"
+text_lm 'This should:\n1: display for 8 seconds\n2: then idle msg'
+timeout_w I 4 4 test-less-idle
+sleep 6
+}
+
+function t3()
+{
+prep_test_diff "Wait for idle timeout shorter than original, then error messege"
+text_lm 'This should:\n1: display for 2 seconds\n2: then error msg'
+timeout_w E 1 1 test-less-error
+sleep 4
+}
+
+function t4()
+{
+prep_test_diff "Wait for idle timeout longer than original, then error messege"
+text_lm 'This should:\n1: display for 8 seconds\n2: then error msg'
+timeout_w E 4 4 test-less-error
+sleep 6
+}
+
+function t5()
+{
+prep_test_diff "Cut off idle message timeout"
+text_lm 'This should:\n1: display for 3 seconds\n2: then idle msg'
+timeout I 4 2 test-less-idle
+sleep 3
+send '\x1b\xf3'
+sleep 4
+}
+
+function t6()
+{
+prep_test_diff "Cut off idle message timeout before error message"
+text_lm 'This should:\n1: display for 3 seconds\n2: then idle msg'
+timeout E 4 2 test-less-error
+sleep 3
+send '\x1b\xf3'
+sleep 4
+}
+
+
+t1
+t2
+t3
+t4
+t5
+t6
+
+killall testserver
+

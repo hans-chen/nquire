@@ -447,6 +447,24 @@ function validate_password( encrypted, pwd )
 end
 
 
+-- date-time format should be: 'YYYY.MM.DD-hh:mm:ss'
+function set_date_time( date_time )
+	if date_time and date_time:match("^%d%d%d%d%.%d%d%.%d%d%-%d%d:%d%d:%d%d$") then
+		os.execute("date " .. date_time .. " ; hwclock -w")
+		return true
+	else
+		return false
+	end
+end
+
+-- returned format is: 'YYYY.MM.DD-hh:mm:ss'
+function get_date_time()
+	local fd = io.popen("hwclock -s ; date +%Y.%m.%d-%T")
+	local now = fd:read("*line")
+	fd:close()
+	return now
+end
+
 
 --
 -- Translate string to given codepage

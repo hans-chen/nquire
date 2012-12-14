@@ -17,7 +17,58 @@ else
 	ADDRESS="cit"
 fi
 
-test_1()
+all=""
+# ===========================================================================
+
+#/cit/codepage = "ibm852"
+
+all="$all set_codepage_ibm852"
+test_set_codepage_ibm852()
+{
+    cat 1>&2 << !EOF!
+Change settings: Set codepage to ibm852
+!EOF!
+
+cat > cit.conf << !EOF!
+/cit/codepage = "ibm852"
+!EOF!
+curl -s -S ftp://${ADDRESS}/ -T cit.conf 
+sleep 3
+}
+
+all="$all set_codepage_ibm1253"
+test_set_codepage_ibm1253()
+{
+    cat 1>&2 << !EOF!
+Change settings: Set codepage to ibm1253 (greek)
+!EOF!
+
+cat > cit.conf << !EOF!
+/cit/codepage = "ibm1253"
+!EOF!
+curl -s -S ftp://${ADDRESS}/ -T cit.conf 
+sleep 3
+}
+
+all="$all set_codepage_utf8"
+test_set_codepage_utf8()
+{
+    cat 1>&2 << !EOF!
+Change settings: Set codepage to utf-8
+!EOF!
+
+cat > cit.conf << !EOF!
+/cit/codepage = "utf-8"
+!EOF!
+curl -s -S ftp://${ADDRESS}/ -T cit.conf 
+sleep 3
+}
+
+
+
+# typical usage
+all="$all text_1"
+test_text_1()
 {
     cat 1>&2 << !EOF!
 Testing normal operation with clean text and
@@ -32,7 +83,6 @@ Mineral water
                   € 0.98
 ------------------------
 !EOF!
-	echo -en "\e\x42\x30"					# Font size 0
 	echo -en "\e\x24"						# Clear screen
 	echo -en "\e\x42\x30"           		# font size small
 	echo -en "Mineral water\x03"			# Text
@@ -42,30 +92,10 @@ Mineral water
 	echo -en "\e\x2e\x38${EURO} 0.98\x03"	# Align text right bottom
 }
 
-test_2()
-{
-    cat 1>&2 << !EOF!
-Testing normal operation, centered aligned
-The display should show ("Special offer" in font big):
-------------------------
-   Coca Cola 0.33Ltr
-     € 2.69 (Crate)
-     
-     
-     
-     Special Offer!
-------------------------
-!EOF!
-	echo -en "\e\x42\x30"						# Font size 0
-	echo -en "\e\x24"							# Clear the screen
-	echo -en "\e\x2e\x31Coca Cola 0.33Ltr\x03" 	# Text center - top
-	echo -en "\e\x2c\x30\x45"					# Set pixel position (0,21)
-	echo -en "\e\x2e\x3a${EURO} 2.69 (Crate)\x03"	# Align text to horizontal center
-	echo -en "\e\x42\x31"						# Font size 1
-	echo -en "\e\x2e\x37Special Offer !\x03"	# Text bottom center
-}
 
-test_3()
+# alignment
+all="$all text_2"
+test_text_2()
 {
     cat 1>&2 << !EOF!
 Testing alignment
@@ -106,7 +136,8 @@ lb      xb cb         rb
 	echo -en "\e\x2e\x3Bry\x03" 		# right keep y
 }
 
-test_4()
+all="$all text_3"
+test_text_3()
 {
     cat 1>&2 << !EOF!
 Testing utf8 euro sign
@@ -120,18 +151,8 @@ Required: utf8
 	echo -en "\e\x2e\x30\xe2\x82\xac\x03"	# Left top € sign = \xe2\x82\xac
 }
 
-test_5()
-{
-    cat 1>&2 << !EOF!
-Testing fake barcode scan
-The display should should the error message (please ask for assistance)
-And the received parcode should be "A1234" == 
-(this only works when the application is started in debug mode (commandline -D)
-!EOF!
-	echo -en "\e\xff\x30A1234\x03"				# Fake barcode scan
-}
-
-test_6()
+all="$all text_5"
+test_text_5()
 {
     cat 1>&2 << !EOF!
 Testing chinese charracters
@@ -160,7 +181,8 @@ The extra fontset should be available in /mnt (micro sd card)
 	echo -en "\x03"
 }
 
-test_7()
+all="$all text_6"
+test_text_6()
 {
 
 	echo -en "\e\x42\x31"				# Set font
@@ -170,37 +192,8 @@ test_7()
 	echo -en "\x03"
 }
 
-test_8()
-{
-    cat 1>&2 << !EOF!
-Disabling scanner. Verify whether the scanner is disabled
-!EOF!
-	echo -en "\e\x5b\x30"				# Scanner disable
-}
-
-test_9()
-{
-    cat 1>&2 << !EOF!
-Enable scanner. Verify whether the scanner is enabled
-!EOF!
-	echo -en "\e\x5b\x31"				# Scanner enable
-}
-
-test_10()
-{
-    cat 1>&2 << !EOF!
-Show config.
-Verify: 
-	serial number
-	application version
-	ip-address
-	used interface
-	mac address
-!EOF!
-	echo -en "\e\xfe"					# Show config
-}
-
-test_11()
+all="$all text_7"
+test_text_7()
 {
     cat 1>&2 << !EOF!
 Check operation with sloppy formatting 
@@ -222,16 +215,9 @@ The display should look like:
 	echo -en "Two of 2\x03"				# Text
 }
 
-test_12()
-{
-    cat 1>&2 << !EOF!
-Play a beep
-!EOF!
 
-	echo -en "\e\x5e"					# Beep
-}
-
-test_14()
+all="$all text_8"
+test_text_8()
 {
     cat 1>&2 << !EOF!
 Testing greek letters in utf8:
@@ -244,7 +230,8 @@ Testing greek letters in utf8:
 	echo -en "\e\x2e\x31βιβλος γενεσεως ιησου\x03" 	# Text center - top
 }
 
-test_15()
+all="$all text_9"
+test_text_9()
 {
     cat 1>&2 << !EOF!
 Testing special german charracters (utf8)
@@ -257,7 +244,8 @@ Testing special german charracters (utf8)
 	echo -en "\e\x2e\x31őŐűŰúÚ\x03" 	# Text center - top
 }
 
-test_16()
+all="$all text_10"
+test_text_10()
 {
     cat 1>&2 << !EOF!
 Testing special greek charracters (ibm1253)
@@ -272,94 +260,8 @@ Testing special greek charracters (ibm1253)
 	
 }
 
-test_gpio_OUT1_low ()
-{
-	# Eddy GPIO 1/Output		GPIO1-->PC16 (offset:1)
-	# Eddy GPIO 3/Output		GPIO3-->PC18 (offset:3)
-	# Eddy GPIO 5/Input			GPIO5-->PC20 (offset:5)
-	# Eddy GPIO 7/Input			GPIO7-->PC22 (offset:7)
-	# NQ201 whitelight(only for nQuire 201)		GPIO11 --> PC26(offset:11)
-	#											High level disable ;	Low level enable	
-	# Peripheral power(usb,wifi,2027,GPRS,lcd-backlight)	PID1  --> PC7 (offset:18)
-	#											High level enable ;	Low level disable
-
-    cat 1>&2 << !EOF!
-Set gpio OUT1 low
-!EOF!
-	
-	echo -en "\e\x7e00"
-}
-
-
-test_gpio_OUT1_high ()
-{
-    cat 1>&2 << !EOF!
-Set gpio OUT1 high
-!EOF!
-	echo -en "\e\x7e01"
-}
-
-test_gpio_OUT2_low ()
-{
-    cat 1>&2 << !EOF!
-Set gpio OUT2 low
-!EOF!
-	echo -en "\e\x7e10"
-}
-
-test_gpio_OUT2_high ()
-{
-    cat 1>&2 << !EOF!
-Set gpio OUT2 high
-!EOF!
-	echo -en "\e\x7e11"
-}
-
-test_gpio_IN1 ()
-{
-    cat 1>&2 << !EOF!
-Get gpio IN1
-!EOF!
-	echo -en "\e\x7f0"
-}
-
-test_gpio_IN2 ()
-{
-    cat 1>&2 << !EOF!
-Get gpio IN2
-!EOF!
-	echo -en "\e\x7f1"
-}
-
-test_sleep ()
-{
-    cat 1>&2 << !EOF!
-Set scanner in sleep mode (should only works with scanners
-from production batch 1 and than only when using the ethernet interface)
-!EOF!
-
-	echo -en "\e\x5d\x30"               # scanner sleep
-}
-
-test_wakeup ()
-{
-    cat 1>&2 << !EOF!
-Wake up scanner from sleep mode
-!EOF!
-	echo -en "\e\x5d\x31"               # scanner wake up
-}
-
-test_19 ()
-{
-    cat 1>&2 << !EOF!
-return the firmware version, SG15 format.
-Expect: "SG15V01.03" ==
-!EOF!
-
-	echo -en "\e\x60"                   # SG15 firmware version
-}
-
-test_20 ()
+all="$all text_11"
+test_text_11 ()
 {
     cat 1>&2 << !EOF!
 Required: Utf 8 
@@ -381,7 +283,8 @@ Cheese
 	echo -en "${EURO} 5.69\x03"
 }
 
-test_21 ()
+all="$all text_12"
+test_text_12 ()
 {
     cat 1>&2 << !EOF!
 Test right bottom alignement for chinese charracters
@@ -399,7 +302,8 @@ Expect:
 	echo -en "欢迎光临\x03"
 }
 
-test_22 ()
+all="$all text_13"
+test_text_13 ()
 {
     cat 1>&2 << !EOF!
 Test small and big chinese font
@@ -420,7 +324,8 @@ Expect
 	echo -en "2.5元\x03"
 }
 
-test_23 ()
+all="$all text_14"
+test_text_14 ()
 {
     cat 1>&2 << !EOF!
 Test use of NL ('\n') in line with centered alignment and long text
@@ -444,7 +349,8 @@ line2 part 2 blabla
 	echo -en "\e\x2e\x38Line3 part 1\nline3 part 2 blabla\x03" # right bottom
 }
 
-test_24 ()
+all="$all text_15"
+test_text_15 ()
 {
     cat 1>&2 << !EOF!
 Testing SG15 compatebility for line breaks
@@ -470,7 +376,8 @@ line2 part 2 blabla
 }
 
 
-test_25 ()
+all="$all text_16"
+test_text_16 ()
 {
     cat 1>&2 << !EOF!
 Test use of line break in text
@@ -496,7 +403,8 @@ line 2 part 2
 	echo -en "Line2 part 1\x0dline2 part 2\x03"
 }
 
-test_26 ()
+all="$all text_17"
+test_text_17 ()
 {
     cat 1>&2 << !EOF!
 Test use of line break in text
@@ -516,7 +424,8 @@ line 1 part 2
 	echo -en "Line1 part 1\nline1 part 2\x03"
 }
 
-test_27 ()
+all="$all text_18"
+test_text_text_18 ()
 {
     cat 1>&2 << !EOF!
 Test use of NL (unix style) in text with alignments
@@ -546,7 +455,8 @@ lb2       cb02       rb2
 	echo -en "\e\x2e\x38rb\nrb2\x03" 		# Right bottom
 }
 
-test_28 ()
+all="$all text_19"
+test_text_19 ()
 {
     cat 1>&2 << !EOF!
 Test use of CR (SG15) in text with alignments
@@ -576,7 +486,8 @@ lb2       cb02       rb2
 	echo -en "\e\x2e\x38rb\x0drb2\x03" 		# Right bottom
 }
 
-test_29 ()
+all="$all text_20"
+test_text_20 ()
 {
     cat 1>&2 << !EOF!
 Test use of line break in text with alignments
@@ -602,7 +513,8 @@ tbd
 	echo -en "\e\x2e\x3Bry\nry2\x03" 	# right keep y
 }
 
-test_30 ()
+all="$all text_21"
+test_text_21 ()
 {
     cat 1>&2 << !EOF!
 Test use of NL (SG15 style) in text with alignments
@@ -630,7 +542,8 @@ tbd
 
 
 
-test_31 ()
+all="$all text_22"
+test_text_22 ()
 {
     cat 1>&2 << !EOF!
 Test custom font size (very small and VERY BIG)
@@ -642,7 +555,200 @@ Test custom font size (very small and VERY BIG)
 }
 
 
-test_32 ()
+all="$all text_23"
+test_text_23 ()
+{
+    cat 1>&2 << !EOF!
+Test overwrite with big font
+NOTE: This does not work when using -base64
+!EOF!
+	echo -en "\e\x25" 				# clear screen
+	echo -en "\e\x42\x36" # 96pt
+	echo -en "\e\x2e\x34wo 10 juli\n10:10\x03"
+	sleep 1
+	echo -en "\e\x25" 				# clear screen
+	echo -en "\e\x42\x36" # 96pt
+	echo -en "\e\x2e\x34wo 10 juli\n10:11\x03"
+}
+
+
+# ===========================================================================
+all="$all enable"
+test_disable()
+{
+    cat 1>&2 << !EOF!
+Disabling scanner. Verify whether the scanner is disabled
+!EOF!
+	echo -en "\e\x5b\x30"				# Scanner disable
+}
+
+all="$all disable"
+test_enable()
+{
+    cat 1>&2 << !EOF!
+Enable scanner. Verify whether the scanner is enabled
+!EOF!
+	echo -en "\e\x5b\x31"				# Scanner enable
+}
+
+# ===========================================================================
+
+all="$all config"
+test_config()
+{
+    cat 1>&2 << !EOF!
+Show config.
+Verify: 
+	serial number
+	application version
+	ip-address
+	used interface
+	mac address
+!EOF!
+	echo -en "\e\xfe"					# Show config
+}
+
+all="$all version"
+function test_version()
+{
+    cat 1>&2 << !EOF!
+return the firmware version
+Expect something like: "1.5"
+!EOF!
+	echo -en "\e\x5f"
+}
+
+
+all="$all version_sg15"
+test_version_sg15 ()
+{
+    cat 1>&2 << !EOF!
+return the firmware version, SG15 format.
+Expect: "SG15V01.03" ==
+!EOF!
+
+	echo -en "\e\x60"                   # SG15 firmware version
+}
+
+
+# ===========================================================================
+
+all="$all beep"
+test_beep()
+{
+    cat 1>&2 << !EOF!
+Play a beep
+!EOF!
+
+	echo -en "\e\x5e"					# Beep
+}
+
+# ===========================================================================
+
+all="$all gpio_OUT1_low"
+test_gpio_OUT1_low ()
+{
+	# Eddy GPIO 1/Output		GPIO1-->PC16 (offset:1)
+	# Eddy GPIO 3/Output		GPIO3-->PC18 (offset:3)
+	# Eddy GPIO 5/Input			GPIO5-->PC20 (offset:5)
+	# Eddy GPIO 7/Input			GPIO7-->PC22 (offset:7)
+	# NQ201 whitelight(only for nQuire 201)		GPIO11 --> PC26(offset:11)
+	#											High level disable ;	Low level enable	
+	# Peripheral power(usb,wifi,2027,GPRS,lcd-backlight)	PID1  --> PC7 (offset:18)
+	#											High level enable ;	Low level disable
+
+    cat 1>&2 << !EOF!
+Set gpio OUT1 low
+!EOF!
+	
+	echo -en "\e\x7e00"
+}
+
+
+all="$all gpio_OUT1_high"
+test_gpio_OUT1_high ()
+{
+    cat 1>&2 << !EOF!
+Set gpio OUT1 high
+!EOF!
+	echo -en "\e\x7e01"
+}
+
+all="$all gpio_OUT2_low"
+test_gpio_OUT2_low ()
+{
+    cat 1>&2 << !EOF!
+Set gpio OUT2 low
+!EOF!
+	echo -en "\e\x7e10"
+}
+
+all="$all gpio_OUT2_high"
+test_gpio_OUT2_high ()
+{
+    cat 1>&2 << !EOF!
+Set gpio OUT2 high
+!EOF!
+	echo -en "\e\x7e11"
+}
+
+all="$all gpio_IN1"
+test_gpio_IN1 ()
+{
+    cat 1>&2 << !EOF!
+Get gpio IN1
+!EOF!
+	echo -en "\e\x7f0"
+}
+
+all="$all gpio_IN2"
+test_gpio_IN2 ()
+{
+    cat 1>&2 << !EOF!
+Get gpio IN2
+!EOF!
+	echo -en "\e\x7f1"
+}
+
+# ===========================================================================
+all="$all sleep"
+test_sleep ()
+{
+    cat 1>&2 << !EOF!
+Set scanner in sleep mode (should only works with scanners
+from production batch 1 and than only when using the ethernet interface)
+!EOF!
+
+	echo -en "\e\x5d\x30"               # scanner sleep
+}
+
+all="$all wakeup"
+test_wakeup ()
+{
+    cat 1>&2 << !EOF!
+Wake up scanner from sleep mode
+!EOF!
+	echo -en "\e\x5d\x31"               # scanner wake up
+}
+
+
+# ===========================================================================
+
+all="$all fake_barcode"
+test_fake_barcode()
+{
+    cat 1>&2 << !EOF!
+Testing fake barcode scan
+The display should show the error message (please ask for assistance)
+And the received barcode should be "A1234" == 
+(this only works when the application is started in debug mode (commandline -D)
+!EOF!
+	echo -en "\e\xff\x30A1234\x03"				# Fake barcode scan
+}
+
+
+all="$all watson_bug"
+test_watson_bug ()
 {
     cat 1>&2 << !EOF!
 Watson bug: \0 charracters instead of '\x03'
@@ -653,15 +759,24 @@ Watson bug: \0 charracters instead of '\x03'
 	
 }
 
+# ===========================================================================
 
-test_33 ()
+all="$all touch_keypad"
+test_touch_keypad ()
 {
-    cat 1>&2 << !EOF!
-Image test. Displayed images should be clickable
-!EOF!
-	echo -en "\e\x25" 				# clear screen
 
-	echo -en "\e\xf2anim.gif\r\r33\x03"
+
+    cat 1>&2 << !EOF!
+Touch keyboard image test. Use touch_click to test touch click events.
+!EOF!
+
+	curl -v ftp://cit/img/ -T img/kitty.gif
+    cat 1>&2 << !EOF!
+Image test. 1 image in each corner and 'winking kitty' in the middle
+!EOF!
+
+	echo -en "\e\x25" 				# clear screen
+	echo -en "\e\xf2kitty.gif\r\r33\x03"
 
 	echo -en "\e\xf21.gif\r\r44\x03"
 	echo -en "\e\xf22.gif\r\r55\x03"
@@ -678,10 +793,46 @@ Image test. Displayed images should be clickable
 	echo -en "\e\xf29.gif\r\ree\x03"
 	echo -en "\e\xf20.gif\r\rff\x03"
 	
-	echo -en "\e\x2e\x30This is text\x0dlt2\x03"
+	echo -en "\e\x2e\x30This is text\x03"
+
 }
 
-test_34 ()
+all="$all touch_click"
+touch_click_sleep=8
+test_touch_click()
+{
+    cat 1>&2 << !EOF!
+Receive touch keyboard events for 8 seconds..
+Use touch_click to display clickable images.
+You should see the events like 
+K41.gif
+K7OK.gif
+!EOF!
+}
+
+all="$all touch_timeout"
+touch_timeout_sleep=12
+test_touch_timeout()
+{
+    cat 1>&2 << !EOF!
+Waiting for a touch timeout (waiting 12 seconds)....
+Preparation: set the touch timeout to 10 seconds using the webui
+You should see a KT event when the display is cleared.
+Then after error-message-timeout seconds the idle message should be displayed
+!EOF!
+}
+
+all="$all touch_quit"
+test_touch_quit()
+{
+    cat 1>&2 << !EOF!
+Force a touch16 quit event (KQ) by clearing the display
+!EOF!
+	echo -en "\e\x25" 				# clear screen
+}
+
+all="$all idle"
+test_idle ()
 {
     cat 1>&2 << !EOF!
 Image test: back to idle mode, use after test_33 to break keyboard input
@@ -689,10 +840,13 @@ Image test: back to idle mode, use after test_33 to break keyboard input
 	echo -en "\e\xf3"
 }
 
-test_35 ()
+all="$all image_anim"
+image_anim_sleep=3
+test_image_anim ()
 {
+	curl -v ftp://cit/img/ -T img/kitty.gif
     cat 1>&2 << !EOF!
-Image test. 1 image in each corner
+Image test. 1 image in each corner and 'winking kitty' in the middle
 !EOF!
 	echo -en "\e\x25" 				# clear screen
 	echo -en "\e\xf01.gif\x03"
@@ -706,11 +860,13 @@ Image test. 1 image in each corner
 	echo -en "\e\x2c\x30\x90"
 	echo -en "\e\xf04.gif\x03"
 	
-	echo -en "\e\x2c\x68\x58"
-	echo -en "\e\xf0anim.gif\x03"
+	echo -en "\e\x2c\x90\x60"
+	echo -en "\e\xf0kitty.gif\x03"
+	
 }
 
-test_36 ()
+all="$all backlight_off"
+test_backlight_off ()
 {
     cat 1>&2 << !EOF!
 Turn backlight off
@@ -718,7 +874,8 @@ Turn backlight off
 	echo -en "\e\x5c\x30"
 }
 
-test_37 ()
+all="$all backlight_on"
+test_backlight_on ()
 {
     cat 1>&2 << !EOF!
 Turn backlight on
@@ -726,7 +883,8 @@ Turn backlight on
 	echo -en "\e\x5c\x31"
 }
 
-test_38 ()
+all="$all backlight_flicker"
+test_backlight_flicker ()
 {
     cat 1>&2 << !EOF!
 Flicker backlight
@@ -734,6 +892,84 @@ Flicker backlight
 	echo -en "\e\x5c\x30\e\x5c\x31"
 }
 
+# ===========================================================================
+
+all="$all mifare_read_1"
+mifare_read_1_sleep=4
+test_mifare_read_1 ()
+{
+    cat 1>&2 << !EOF!
+Read from mifare card.
+Note: This test only works correct when output encryption is not turned on!
+First make some settings...
+!EOF!
+
+cat > cit.conf << !EOF!
+/dev/mifare/relevant_sectors = ""
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/sector_data_format = "hex"
+/dev/mifare/sector_data_seperator = "comma"
+/dev/mifare/suppress_beep = true
+!EOF!
+curl -s -S ftp://${ADDRESS}/ -T cit.conf 
+sleep 3
+echo "Now present card..." 1>&2
+
+	echo -en "\e\x25"					# Clear display
+	echo -en "\e\x42\x30"				# Set font
+	echo -en "\e\x2e\x34Present mifare card\x03" 		# Center middle
+	sleep 2
+	echo -en "\e\x25"					# Clear display
+	echo -en "\e\x2e\x34Reading card 76262fa5\nsector 3, block 0\n\x03"
+	echo "Reading now 1:0 in binary and and 15:2 in hex" 1>&2
+	echo -en "\e\xf876262fa5,FFFFFFFFFFFF:10Bf2H\x03"
+}
+
+all="$all mifare_shift_transaction_log"
+mifare_shift_transaction_log_sleep=1
+test_mifare_shift_transaction_log ()
+{
+    cat 1>&2 << !EOF!
+Shift mifare transaction log to 1234abcd
+!EOF!
+	echo -en "\e\xfa1234abcd\x03"	
+}
+
+# ===========================================================================
+
+all="$all delay_msg_idle_1"
+delay_msg_idle_1_sleep=4
+test_delay_msg_idle_1 ()
+{
+    cat 1>&2 << !EOF!
+Show something and delay the timeout shorter than the origial timeout
+Returned should be: "Ttakkie"
+!EOF!
+	echo -en "\e\x25"					# Clear display
+	echo -en "\e\x42\x30"				# Set font
+	echo -en "\e\x2e\x34Waiting for\nidle timeout\x03" 		# Center middle
+	echo -en "\e\xf4I25takkie\x03"
+}
+
+all="$all delay_msg_idle_1"
+delay_msg_error_1_sleep=4
+test_delay_msg_error_1 ()
+{
+    cat 1>&2 << !EOF!
+Show something and delay the timeout shorter than the origial timeout
+Returned should be: "Ttakkie"
+Than after the error-message-timeout, the error message should be shown
+!EOF!
+	echo -en "\e\x25"					# Clear display
+	echo -en "\e\x42\x30"				# Set font
+	echo -en "\e\x2e\x34Waiting for\nerror timeout\x03" 		# Center middle
+	echo -en "\e\xf4E25takkie\x03"
+}
+
+# ===========================================================================
+
+all="$all crash"
 test_crash()
 {
     cat 1>&2 << !EOF!
@@ -743,80 +979,25 @@ This should be catched and logged
 	echo -en "\e\xfd"
 }
 
-test_utf8()
-{
-    cat 1>&2 << !EOF!
-Change to utf8 using fake barcode scan.
-!EOF!
-	echo -en "\e\xffF%#\$^*%\x03"					# Fake barcode scan: enter programming mode
-	sleep 3
-	echo -en "\e\xffF020705\x03"					# program settings
-	sleep 4
-	echo -en "\e\xffF/cit/codepage = utf8\x03"		# Fake barcode scan
-	sleep 1
-	echo -en "\e\xffF%*^\$#%\x03"					# Fake barcode scan: exit programming mode
-}
-
-
-test_ibm852()
-{
-    cat 1>&2 << !EOF!
-Change to utf8 using fake barcode scan.
-!EOF!
-	echo -en "\e\xffF%#\$^*%\x03"					# Fake barcode scan: enter programming mode
-	#echo -en "\e\xff020705\x03"						# program settings
-	#echo -en "\e\xff/cit/codepage = ibm852\x03"		# Fake barcode scan
-	#echo -en "\e\xff%*^\$\#%\x03"					# Fake barcode scan: exit programming mode
-}
-
+# ===========================================================================
 
 if test -z "$1" -o "$1" = "-h" -o "$1" = "--help";
 then
+cat << EOF
+cit-test -h|{[-udp][-tcp][-imb852][-utf8] [-a <ip address>] <test id>}+
+Send a certain string to the cit
+Output is done to port 9000 for TCP
+ -udp        use udp messages
+ -tcp        use tcp messages (default)
+ -ibm852     use ibm852 euro sign charracter (default)
+ -utf8       use utf8 euro sign charracter
+ -a address  the address or name of the nquire (when ommitted, the
+             contents of .cit.ip is used)
+ -base64     messages are to be 'encrypted' using base64
 
-	echo "cit-test -h|{[-udp][-tcp][-imb852][-utf8] [-a <ip address>] <test id>}+"
-	echo "Send a certain string to the cit"
-	echo "Output is done to port 9000 for TCP"
-	echo " -udp        use udp messages"
-	echo " -tcp        use tcp messages (default)"
-	echo " -utf8       use utf8 euro sign charracter"
-	echo " -ibm852     use imb852 euro sign charracter (default)"
-	echo " -a address  the address or name of the nquire (when ommitted, the"
-	echo "             contents of .cit.ip is used)"
-	echo "Test id's:"
-	echo " 1           Mineral water"
-	echo " 2           Coca Cola"
-	echo " 3           All alignments"
-	echo " 5           fake barcode scan"
-	echo " 8           scanner disable"
-	echo " 9           scanner enable"
-	echo "10           show config"
-	echo "11           test sloppy formatting without end of string (=\x03) chars"
-	echo "12           beep"
-	echo "OUT1_low     Set gpio OUT1"
-	echo "OUT1_high    Set gpio OUT1"
-	echo "OUT2_low     Set gpio OUT2"
-	echo "OUT2_high    Set gpio OUT2"
-	echo "IN1          read gpio IN1"
-	echo "IN2          read gpio IN2"
-	echo "sleep        scanner sleep"
-	echo "wakeup       scanner wakeup"
-	echo "19           SG15 firmware version"
-	echo "20           utf8 font"
-	echo "21           chinese"
-	echo "22           small and big chinese"
-	echo "23           newline in line"
-	echo "24           CR in line (SG15 compatebility)"
-	echo "25           right align with same y"
-	echo "26           alignment tests"
-	echo "27           alignment tests"
-	echo "28           alignment tests"
-	echo "29           alignment tests"
-	echo "30           alignment tests"
-	echo "31           alternative font sizes"
-	
-	echo "utf8         change to utf8 using fake barcode scan"
-	echo "ibm852       change to imb852 using fake barcode scan"
-
+Available tests:
+$all
+EOF
 	exit
 
 else
@@ -836,11 +1017,25 @@ else
 			shift
 			ADDRESS=$1
 			echo "$ADDRESS" > .cit.ip
+		elif test "$1" = "-base64"; then
+			ENCODE="base64"
+			DECODE="base64 -d"
 		else 
 			echo ------------------------------------------------------------------
 			echo "test $1 on ${ADDRESS}:${PORT}"
-			test_$1 | nc -w1 $UDP ${ADDRESS} ${PORT}
-			sleep 1
+			#set -x
+			wait_for_answer=1
+			sleep_var=${1}_sleep
+			if test ${!sleep_var}; then
+				wait_for_answer=${!sleep_var}
+			fi
+			if test -z $ENCODE; then
+				test_$1 | nc -q $wait_for_answer $UDP ${ADDRESS} ${PORT} 
+			else
+				answer="`test_$1 | $ENCODE | nc -q $wait_for_answer $UDP ${ADDRESS} ${PORT}`"
+				echo -n "$answer" | $DECODE
+			fi
+			set +x
 		fi
 		shift
 	done

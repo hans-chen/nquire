@@ -8,10 +8,11 @@
 #
 
 # exe targets:
-ALL_EXE = nquire-server.exe
+ALL_EXE = nquire-server.exe nquire-cmd.exe
 ALL_TESTS = misc-tester database-tester
 
 nquire-server.exe_SRC = common/misc.cpp database.cpp server.cpp
+nquire-cmd.exe_SRC = common/misc.cpp nquire-cmd.cpp
 misc-tester_SRC = common/misc.cpp common/misc-tester.cpp
 database-tester_SRC = database.cpp database-tester.cpp common/misc.cpp
 
@@ -41,7 +42,10 @@ clean:
 clobber: clean
 	rm -f *~
 	rm -rf testresults
-	rm -f nquire-server.log database-tester.log
+	rm -f nquire-server.log database-tester.log .dependencies.mk
+
+install: nquire-server.exe nquire-cmd.exe
+	if test -d ~/bin; then cp nquire-server.exe nquire-cmd.exe ~/bin; fi
 
 debug:
 	@echo "ALL_EXE=$(ALL_EXE)"

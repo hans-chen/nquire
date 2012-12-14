@@ -2,6 +2,7 @@
  * Copyright © 2007 All Rights Reserved.
  */
 
+#include <assert.h>
 #include <SDL.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -89,7 +90,7 @@ static double hirestime(void)
 static int l_new(lua_State *L)
 {
 	struct dpydrv *dd;
-	TRACE(" ");
+	TRACE();
 
 	dd = lua_newuserdata(L, sizeof *dd);
 	if(dd == NULL) {
@@ -121,7 +122,7 @@ static int get_fb_info(struct dpydrv *dd)
 		//BARF(L,"Error: reading variable information");
 	}
 
-	TRACE("/dev/fb0: xsize=%d,ysize=%d\n", dd->vinfo.xres, dd->vinfo.yres );
+	TRACE("/dev/fb0: xsize=%d,ysize=%d", dd->vinfo.xres, dd->vinfo.yres );
 	close(fd);
 	return 0;
 }
@@ -132,17 +133,17 @@ static int l_open(lua_State *L)
 	struct dpydrv *dd;
 	dd = lua_touserdata(L, 1);
 
-	/* Parse arguments */
+	// Parse arguments
 
 	dd->w = lua_tonumber(L, 2);
 	dd->h = lua_tonumber(L, 3);
 	dd->c = lua_tonumber(L, 4);
 	TRACE(" w=%d, h=%d", dd->w, dd->h);
 
-	/* Mute directfb */
+	// Mute directfb
 	setenv("DFBARGS", "quiet=info,no-banner", 1);
 
-	/* SDL */
+	// SDL
 	if( SDL_Init(SDL_INIT_VIDEO) == -1 )
 		BARF(L, "SDL_Init failed: %s", SDL_GetError());
 
@@ -209,7 +210,7 @@ static int l_close(lua_State *L)
 	struct dpydrv *dd;
 
 	dd = lua_touserdata(L, 1);
-	TRACE(" ");
+	TRACE();
 
 	// free current images
 	int i;
@@ -296,7 +297,7 @@ static int draw_char(struct dpydrv *dd, int ch, int silent)
 
 	SDL_Surface *surf = dd->image[0].surf[0];
 	
-	TRACE("char='%c', slot->bitmap_top=%d, dd->font_size=%d\n", ch, slot->bitmap_top, dd->font_size );
+	TRACE("char='%c', slot->bitmap_top=%d, dd->font_size=%d", ch, slot->bitmap_top, dd->font_size );
 	py = surf->pixels + 
 	     (dd->y - slot->bitmap_top + dd->font_size - 2) * surf->pitch +
 	     (dd->x + slot->bitmap_left)* 4;
@@ -545,8 +546,12 @@ static void image_blit(struct dpydrv *dd, Image *image, SDL_Rect* rect)
 	//TRACE("nframes=%d, frame=%d, x=%d, y=%d, w=%d, h=%d", image->nframes, image->frame, rect->x, rect->y, rect->w, rect->h );
 
 	// transparent blit: see SDL_SetColorKey in surface innitialisation
-	SDL_BlitSurface(image->surf[image->frame], NULL, dd->screen, rect);
-	
+	assert( image->surf[image->frame] );
+	if( image->surf[image->frame] )
+		SDL_BlitSurface(image->surf[image->frame], NULL, dd->screen, rect);
+	else
+		TRACE("FATAL ERROR: image->surf[image->frame]==null");
+
 	if(image->nframes > 1)
 	{
 		if( now >= image->t_update )
@@ -621,6 +626,8 @@ static int l_update(lua_State *L)
 // return image_index, error
 static int l_draw_image(lua_State *L)
 {
+	//TRACE_ON();
+
 	struct dpydrv *dd = lua_touserdata(L, 1);
 	const char *fname = luaL_optstring(L, 2, "");
 	lua_Number img_x = luaL_optnumber(L, 3, 0);
@@ -630,14 +637,17 @@ static int l_draw_image(lua_State *L)
 	dd->x = (int)img_x;
 	dd->y = (int)img_y;
 	
-	/* Find empty image slot */
+	// Find empty image slot
 	Image *image = NULL;
 	int animations = 0;
 	int ii;
-	for(ii=1; ii<MAX_IMAGES; ii++) {
+	int image_index = 0;
+	for(ii=1; ii<MAX_IMAGES; ii++) 
+	{
 		if(dd->image[ii].nframes == 0 && image==0)
 		{
 			image = &dd->image[ii];
+			image_index = ii;
 		}
 		else if( dd->image[ii].nframes > 1 )
 		{
@@ -649,17 +659,32 @@ static int l_draw_image(lua_State *L)
 
 	memset(image, 0, sizeof *image);
 
-	/* Open and read GIF image */
+	// Open and read GIF image
 	
 	GifFileType *gif = DGifOpenFileName(fname);
 	if(gif == NULL) 
 		BARF(L, "Could not open image '%s', error '%d'", fname, GifLastError() );
 
+	TRACE("gif->SWith=%d,gif->SHeight=%d", gif->SWidth, gif->SHeight );
+	TRACE("gif->SColorResolution=%d", gif->SColorResolution );
+	TRACE("gif->SBackGroundColor=%d", gif->SBackGroundColor );
+	
+/*	if( gif->SWidth > dd->w || gif->SHeight > dd->h )
+	{
+		DGifCloseFile(gif);
+		BARF(L, "Error loading image %s: Image size can be max %dx%d", fname, dd->w, dd->h);
+	}
+*/
+	TRACE("gifslurp...");
 	int r = DGifSlurp(gif);
-	if(r != GIF_OK) {
+	if(r != GIF_OK)
+	{
 		DGifCloseFile(gif);
 		BARF(L, "Error decoding image '%s'", fname);
 	}
+
+	TRACE("gif->ImageCount=%d", gif->ImageCount );
+	TRACE("gif->Image.Interlace=%d", gif->Image.Interlace );
 
 	int nframes = gif->ImageCount < MAX_FRAMES ? gif->ImageCount : MAX_FRAMES;
 	if( nframes > 1 && animations >= 2 )
@@ -671,73 +696,195 @@ static int l_draw_image(lua_State *L)
 	image->nframes = nframes;
 	image->rect.x = dd->x;
 	image->rect.y = dd->y;
-	image->rect.w = gif->SWidth;
-	image->rect.h = gif->SHeight;
+	image->rect.w = gif->SWidth < dd->w ? gif->SWidth : dd->w;
+	image->rect.h = gif->SHeight < dd->h ? gif->SHeight : dd->h;
 	image->frame = 0;
 
-	/* Temp surf for reading gif data */
+	// Temp surf for reading gif data
 
 	SDL_Surface *surf = SDL_CreateRGBSurface(
 		SDL_SWSURFACE,
 		image->rect.w, 
 		image->rect.h,
 		8, 0, 0, 0, 0);
+	if( !surf )
+	{
+		DGifCloseFile(gif);
+		BARF(L, "Could not allocate memory for image '%s'", fname);
+	}
 
 	int i;
 	for(i=0; i<image->nframes; i++) 
 	{
 		struct SavedImage *savedimage = gif->SavedImages + i;
-		struct GifImageDesc *desc = &savedimage->ImageDesc;
 
-		/* Copy colormap from gif into surface */
+		// Copy colormap from gif into surface
+		TRACE("gif=%u, gif->SColorMap=%u, savedimage->ImageDesc.ColorMap=%u", (unsigned)gif, (unsigned)gif->SColorMap, (unsigned)savedimage->ImageDesc.ColorMap);
 
-		struct GifColorType *gif_colormap = gif->SColorMap->Colors;
 		SDL_Color surf_colormap[256];
-		{   int j;
-			for(j=0; j<256; j++) {
-				surf_colormap[j].r = gif_colormap[j].Red;
-				surf_colormap[j].g = gif_colormap[j].Green;
-				surf_colormap[j].b = gif_colormap[j].Blue;
+		memset(surf_colormap, 0, sizeof(SDL_Color)*128);
+		memset(&(surf_colormap[128]), 0xff, sizeof(SDL_Color)*128);
+
+		ColorMapObject *cmap = gif->Image.ColorMap ? gif->Image.ColorMap : gif->SColorMap;
+		if(cmap)
+		{
+			struct GifColorType *gif_colormap = cmap->Colors;
+			TRACE("gif_colormap = %u, colorcount=%d", (unsigned)gif_colormap, cmap->ColorCount);
+			{   int j;
+				for(j=0; j<cmap->ColorCount; j++) 
+				{
+					#ifdef DEBUG
+						if( gif_colormap[j].Red != 0 || gif_colormap[j].Green != 0 || gif_colormap[j].Blue != 0 )
+							TRACE("color[%d]=%d,%d,%d", j, gif_colormap[j].Red, gif_colormap[j].Green, gif_colormap[j].Blue );
+					#endif
+					surf_colormap[j].r = gif_colormap[j].Red;
+					surf_colormap[j].g = gif_colormap[j].Green;
+					surf_colormap[j].b = gif_colormap[j].Blue;
+				}
 			}
 		}
+		
+TRACE();
 
 		SDL_SetColors(surf, surf_colormap, 0, 256);
 
-		/* Copy pixel data */
-		{   int j;
-			for(j=0; j<desc->Height; j++) {
+		// Copy pixel data
+		{   
+			TRACE("Copying pixel data");
+
+			struct GifImageDesc *desc = &savedimage->ImageDesc;
+			TRACE( "desc->Width=%d, desc->Height=%d, desc->Left=%d, desc->Top=%d",
+					desc->Width, desc->Height, desc->Left, desc->Top);
+			TRACE( "image->rect.w=%d, image->rect.h=%d", image->rect.w, image->rect.h);
+			TRACE( "surf->pitch=%d", surf->pitch);
+
+			int cw = desc->Width;
+			if( cw + desc->Left > image->rect.w ) cw = image->rect.w - desc->Left ;
+			if( cw < 0 ) cw = 0;
+			
+			int ch = desc->Height;
+			if( ch + desc->Top > image->rect.h ) ch = image->rect.h - desc->Top ; 
+			if( ch < 0 ) ch = 0;
+
+			TRACE("cw=%d, ch=%d", cw, ch);
+			
+			int j;
+			for(j=0; j<ch; j++)
+			{
 				Uint8 *pfrom = savedimage->RasterBits + (desc->Width * j);
 				Uint8 *pto = surf->pixels + (surf->pitch * (j + desc->Top)) + desc->Left;
-				memcpy(pto, pfrom, desc->Width);
+				memcpy(pto, pfrom, cw);
+				#ifdef NODEF //DEBUG
+				printf("pixels: ");
+				int k;
+				for(k=0; k < gif->SWidth; k++)
+				{
+					printf("%d,", pfrom[k]);
+				}
+				printf("\n");
+				
+				#endif
 			}
 		}
 
-		/* If animated gif, get delay time */
+		// If animated gif, get delay time
 		double delay = 0;
 		{   int j;
-			for(j=0; j<savedimage->ExtensionBlockCount; j++) {
+			for(j=0; j<savedimage->ExtensionBlockCount; j++)
+			{
 				ExtensionBlock *eb = &savedimage->ExtensionBlocks[j];
-				if(eb->Function == 0xf9) {
+				if(eb->Function == 0xf9) 
+				{
 					delay = ((unsigned char)eb->Bytes[2]*256 + (unsigned char)eb->Bytes[1]) / 100.0;
+					TRACE("delaytime=%f", delay);
 				}
 			}
 		}
 		image->delay[i] = delay;
 
+TRACE();
+
+		// turn on transparency when the transparent color is used:
+		int j;
+		for(j=0; j<255; j++)
+		{
+			if( surf_colormap[j].r == 0 && 
+				surf_colormap[j].g == 0 &&
+				surf_colormap[j].b == 255 )
+			{
+				// pure blue functions as transparent
+				SDL_SetColorKey(surf, SDL_SRCCOLORKEY, SDL_MapRGB(surf->format, 0, 0, 255));
+				break;
+			}
+		}
+TRACE();
+
 		// Copy indexed GIF surface to image frame surface
-		// pure blue functions as transparent
-		SDL_SetColorKey(surf, SDL_SRCCOLORKEY, SDL_MapRGB(surf->format, 0, 0, 255));
 		image->surf[i] = SDL_DisplayFormatAlpha(surf);
 	}
 
+	TRACE("SDL_FreeSurface");
 	SDL_FreeSurface(surf);
+
+	TRACE("DGifCloseFile");
 	DGifCloseFile(gif);
 
+	//TRACE_OFF();
+
+	dd->t_dirty = hirestime();
+
 	// and return the image index:
-	lua_pushinteger(L, ii);
+	lua_pushinteger(L, image_index);
 	return 1;
 }
 
+/* invert all pixels of a certain layer
+ * watch out: this cost some performance!
+ * use L[1]=layer 
+ */
+static int l_invert(lua_State *L)
+{
+	//TRACE_ON();
+	struct dpydrv *dd = lua_touserdata(L, 1);
+
+	int layer_nr = (int)luaL_optnumber(L, 2, 0);
+
+	if( layer_nr < MAX_IMAGES )
+	{
+		Image *image = &dd->image[layer_nr];
+		if( image->nframes > 0 )
+		{
+			int frame;
+			for(frame=0; frame < image->nframes; frame++)
+			{
+				TRACE("inverting layer %d, frame %d", layer_nr, frame);
+				Uint32 white = SDL_MapRGB(image->surf[frame]->format, 0xff,0xff,0xff );
+				Uint32 black = SDL_MapRGB(image->surf[frame]->format, 0x00,0x00,0x00 );
+			
+				int l = image->rect.w * image->rect.h;
+				TRACE("Processing #%d pixels", l );
+				int c=0;
+				for( c = 0; c < l; c++ )
+				{
+					Uint32 *p = &((Uint32*)image->surf[frame]->pixels)[c];
+					//TRACE("Inverting pixel %d (0x%ld)", c++, (unsigned long)p);
+					if( *p == white )
+					{
+						*p = black;
+					}
+					else if( *p == black )
+					{
+						*p = white;
+					}
+				}
+			
+			}
+			dd->t_dirty = hirestime();
+		}
+	}
+	//TRACE_OFF();
+	return 0;
+}
 
 /* clear screen
  * use L[1]=layer to clear only a certain layer. (layer[0] is for text)
@@ -751,7 +898,7 @@ static int l_clear(lua_State *L)
 	dd = lua_touserdata(L, 1);
 	int layer = luaL_optint(L, 2, -1);
 
-	TRACE(" ");
+	TRACE();
 	SDL_FillRect(dd->screen, NULL, dd->background_color);
 	if(layer==-1 || layer==0)
 		SDL_FillRect(dd->image[0].surf[0], NULL, dd->background_color);
@@ -764,8 +911,10 @@ static int l_clear(lua_State *L)
 		if(layer == -1 || layer == i)
 		{
 			image = &dd->image[i];
-			for(j=0; j<image->nframes; j++) {
+			for(j=0; j<image->nframes; j++) 
+			{
 				SDL_FreeSurface(image->surf[j]);
+				image->surf[j] = 0;
 			}
 			image->nframes = 0;
 		}
@@ -780,7 +929,7 @@ static int l_clear(lua_State *L)
 static int l_free(lua_State *L) 
 { 
 	struct dpydrv *dd;
-	TRACE(" ");
+	TRACE();
 	
 	l_close(L);
 
@@ -809,6 +958,7 @@ static struct luaL_Reg dpydrv_metatable[] = {
 	{ "draw_box",		l_draw_box },
 	{ "draw_filled_box",l_draw_filled_box },
 	{ "clear",			l_clear },
+	{ "invert",			l_invert },
 	{ "update",			l_update },
 	{ "list_fonts",		l_list_fonts },
 	{ "dump",           l_dump }, // for testing pruposes only!
@@ -824,7 +974,7 @@ static struct luaL_Reg dpydrv_table[] = {
 
 int luaopen_dpydrv(lua_State *L)
 {
-	TRACE(" ");
+	TRACE();
 	luaL_newmetatable(L, "Dpydrv"); 
 	lua_pushstring(L, "__index");
 	lua_pushvalue(L, -2); 

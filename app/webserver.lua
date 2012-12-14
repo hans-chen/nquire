@@ -35,7 +35,7 @@ local lgid = "webserver"
 -- return: remaining next_buf
 local function handle_request(client, method, uri, headers, next_buf)
 
-	logf(LG_DMP,lgid,"handle_request(client.address=%s, method='%s',uri='%s')", client.address, method or "nil", uri or "nil")
+	logf(LG_DBG,lgid,"handle_request(client.address=%s, method='%s',uri='%s')", client.address, method or "nil", uri or "nil")
 
 	local request = {
 		method = method,
@@ -212,17 +212,17 @@ local function on_fd_client(event, client)
 			--print("DEBUG: uri=" .. (uri or "null"))
 			--print("DEBUG: headers=\n" .. dump(headers or "null"))
 
-			logf(LG_INF,lgid,"http request: '%s'", uri)
+			logf(LG_DBG,lgid,"http request: '%s'", uri)
 
 			if method=="GET" then
 				next_buf = handle_request(client, method, uri, headers, next_buf)
 			elseif method=="POST" then
 				local content_length = headers:match("Content[-]Length:%s+(%d+)")+0
-				logf(LG_DMP, lgid, "Content-Length=%d", content_length)
-				logf(LG_DMP, lgid, "#next_buf=%d", #next_buf)
+				logf(LG_DBG, lgid, "Content-Length=%d", content_length)
+				logf(LG_DBG, lgid, "#next_buf=%d", #next_buf)
 				if content_length and content_length>#next_buf then
 					-- TODO: test this exception from normal operation
-					logf(LG_DMP, lgid, "Not all data received. Next time better")
+					logf(LG_DBG, lgid, "Not all data received. Next time better")
 					break
 				end
 				next_buf = handle_request(client, method, uri, headers, next_buf)

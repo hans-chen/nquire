@@ -32,9 +32,11 @@ fi
 make clean
 rm -f app.tar
 #make DEBUG=ON mifare.so
-make base64.so beepthread.so dpydrv.so net.so sys.so mifare.so
-make install
-make app.tar
-curl ftp://$CIT/ --upload-file app.tar
-curl ftp://$CIT/ --upload-file install
+if make base64.so beepthread.so dpydrv.so net.so sys.so mifare.so && 
+		make install && 
+		make app.tar;
+then
+	curl ftp://$CIT/ --upload-file app.tar
+	curl ftp://$CIT/ --upload-file install
+fi
 

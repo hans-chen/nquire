@@ -55,7 +55,12 @@ prefixes = {
    { name = "2_5-Standard",       prefix_2d = "f", prefix_1d = "s", prefix_hid = "s", prefix_out = "o"  },
    { name = "2_5-Industrial",     prefix_2d = "I", prefix_1d = "i", prefix_hid = "s", prefix_out = "o"  },
 
-   { name = "mifare",             prefix_out = "MF" },
+   -- event prefixes that are also reserved
+   --{ name = "mifare",             prefix_out = "MF" },
+   --{ name = "timeout",            prefix_out = "T" }, -- in response to \e\fb.....\x03
+   --{ name = "touch16",            prefix_out = config:get("/dev/touch16/prefix") }, -- default = "K"
+   --{ name = "gpio",               prefix_out = config:get("/dev/gpio/prefix") }, -- default = "I"
+   --{ name = "warning",            prefix_out = "W" }, -- some kind of warning about the state of the nquire (eg fs low)
 }
 
 -- codes to turn on and off scanner codes

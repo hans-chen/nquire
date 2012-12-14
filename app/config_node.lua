@@ -5,14 +5,16 @@ module("Config_node", package.seeall)
 --
 -- id                     the id of the node
 -- type                   one of "number", "string", "password", "boolean", "enum", 
---                        "ip_address", "pattern"
+--                        "ip_address", "pattern", "custom"
 -- config_type            optional, "number", when the type in the .conf should not be quoted
 --                        e.g. when an enum represents a number
 -- label                  optional, this is the label in the webui
 -- default                optional, e.g. "123bf"
 -- match                  optional, e.g. "^%x*$"
--- range                  optional, e.g. "1,5:8"
+-- range                  optional, e.g. "1,5", or a function in case of type=="custom"
 -- size                   optional, this is the alternative size of the editbox in the webui
+-- option                 optional, 'b' for binary strings
+-- mode                   optional, 'r', 'w', 'p' (default mode is "wp" when mode==nil)
 
 
 local lgid="config_n"
@@ -47,6 +49,12 @@ end
 --
 
 local function set(node, value, now)
+
+	if Upgrade.busy() then
+		logf(LG_WRN,lgid,"Setting config item rejected because an upgrade is in progress")
+		return false
+	end
+
 	value = tostring(value)
 	if type_check(node.type, node.range, value) and 
 	   ( node.match == nil or value:match(node.match) ) then
@@ -233,7 +241,7 @@ local function is_visible(node)
 			if not ok then
 				logf(LG_WRN, lgid, "Error in depend-expression %s: %s", exp, result)
 			end
-			logf(LG_DMP, lgid, "Depend-expression: %s = %s", exp, tostring(result))
+			logf(LG_DBG, lgid, "Depend-expression: %s = %s", exp, tostring(result))
 			return result
 		else
 			logf(LG_WRN, lgid, "Error in depend-expression: %s", err)
@@ -251,6 +259,7 @@ end
 local function is_readable(node)   if node.mode then return node.mode:find("r") else return true end end
 local function is_writable(node)   if node.mode then return node.mode:find("w") else return true end end
 local function is_persistent(node) if node.mode then return node.mode:find("p") else return true end end
+local function is_binary(node)     if node.options then return node.options:find("b") else return false end end
 local function has_data(node)      return node.value and true or false end
 local function has_children(node)  return node.child_list and true or false end
 
@@ -275,6 +284,7 @@ local node_meta = {
 		is_readable = is_readable,
 		is_writable = is_writable,
 		is_persistent = is_persistent,
+		is_binary = is_binary,
 		has_data = has_data,
 		has_children = has_children,
 	}

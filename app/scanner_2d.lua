@@ -6,7 +6,7 @@ module("Scanner_2d", package.seeall)
 
 local lgid = "scanner"
 
-local first_time = true
+local version_info_acquired = false
 
 --  scanner programming codes as defined in "HR200 User Guide 090720"
 local SCANNER_CMD_SAVE              = "0000160"
@@ -79,7 +79,7 @@ local function on_fd_scanner(event, scanner)
 
 	if data and data ~= "" then
 
-		logf(LG_DMP,lgid,"Scanned: '%s'", data)
+		logf(LG_DBG,lgid,"Scanned: '%s'", data)
 		scanner.scanbuf = scanner.scanbuf .. data
 
 		local barcode_counter = 0
@@ -142,16 +142,24 @@ local function on_fd_scanner(event, scanner)
 end
 
 local function _write( scanner, txt )
-	sys.write(scanner.fd, txt)
-	logf( LG_DMP, lgid, "> %s", txt )
+	if scanner and scanner.fd and txt then
+		sys.write(scanner.fd, txt)
+		logf( LG_DBG, lgid, "> %s", txt or "nil" )
+	else
+		logf( LG_WRN, lgid, "Scanner write ignored (no fd): %s", txt or "nil" )
+	end
 end
 
 local function _read( scanner, max )
-	local r = sys.read(scanner.fd, max)
-	if r and #r>0 then
-		logf( LG_DMP, lgid, "< %s", r )
+	if scanner and scanner.fd then
+		local r = sys.read(scanner.fd, max)
+		if r and #r>0 then
+			logf( LG_DBG, lgid, "< %s", r )
+		end
+		return r
+	else
+		logf( LG_WRN, lgid, "Scanner read ignored (no fd): %s", txt or "nil" )
 	end
-	return r
 end
 
 --
@@ -197,7 +205,7 @@ end
 --
 
 local function _wait_ack(scanner)
-	logf(LG_DMP, lgid, "wait_ack()")
+	logf(LG_DBG, lgid, "wait_ack()")
 	local buf = ""
 	local tstart = sys.hirestime()
 	repeat
@@ -205,7 +213,7 @@ local function _wait_ack(scanner)
 		if data and #data > 0 then
 			buf = buf .. data
 			if data:find("\006") then
-				logf(LG_DMP, lgid, "ACK")
+				logf(LG_DBG, lgid, "ACK")
 				return buf
 			end
 			sys.sleep(0.1)
@@ -213,46 +221,37 @@ local function _wait_ack(scanner)
 	until sys.hirestime() - tstart > 4.0
 	logf(LG_WRN, lgid, "Timeout waiting for ACK")
 	if #buf > 0 then
-		logf(LG_DMP, lgid, "< %s", buf)
+		logf(LG_DBG, lgid, "< %s", buf)
 	end
 	return nil
 end
 
 local function _cmd_commit(scanner)
 	local errors = false
-
-	-- Send out collected commands and wait for an answer
-	-- first all in one batch:
 	local bytes = 0
 	local answer = ""
+
+	local function f( scanner )
+		logf(LG_DBG,lgid,"sent #bytes=%d", bytes)
+		answer = _wait_ack(scanner)
+		errors = errors or not answer or answer:find("\015")
+	end
+	
+	-- Send out collected commands and wait for an answer
+	-- command batches can be 100 bytes max!
+	
 	for _,command in ipairs(scanner.commands) do
 		if bytes + #command >= 100 then
-			logf(LG_DBG,lgid,"sent #bytes=%d", bytes)
-			answer = _wait_ack(scanner)
-			bytes=0
-			errors = errors or not answer or answer:find("\015")
+			f( scanner )
+			bytes = 0
 		end
 		_write(scanner, command )
 		bytes = bytes + #command
 	end
-	logf(LG_DBG,lgid,"sent #bytes=%d", bytes)
-	answer = _wait_ack(scanner)
-	errors = errors or not answer or answer:find("\015")
-	
-	if errors then
-		errors = false
-		logf(LG_INF,lgid,"Configuring with batch of commands failed. Retry one by one.")
-		answer = ""
-		for _,command in ipairs(scanner.commands) do
-			_write(scanner, command )
-			local ack = _wait_ack(scanner)
-			if not ack then
-				errors = true
-			else
-				answer = answer .. ack
-			end
-		end
+	if bytes>0 then
+		f( scanner )
 	end
+	
 	scanner.commands = {}
 	return errors, answer
 end
@@ -286,7 +285,7 @@ local function _configure_barcode( scanner, name )
 	local value = config:get(string.format("/dev/scanner/enable-disable/%s", name))
 	local code = find_by_name( enable_disable_HR200, name )
 	local layout = find_by_name( prefixes, name ).layout
-	logf(LG_DMP,lgid,"name=%s, value=%s, code.on=%s, code.off=%s, layout=%s", name, (value or "nil"), (code.on or "nil"), (code.off or "nil"), (layout or "nil"))
+	logf(LG_DBG,lgid,"name=%s, value=%s, code.on=%s, code.off=%s, layout=%s", name, (value or "nil"), (code.on or "nil"), (code.off or "nil"), (layout or "nil"))
 	
 	if code and does_firmware_support(code) then
 		if layout ~= "2D" or config:get("/dev/scanner/barcodes") == "1D and 2D"  then
@@ -300,7 +299,7 @@ local function _configure_barcode( scanner, name )
 				logf(LG_DBG, lgid, "Using factory default %s for barcode type %s", (value=="true" and "enabled" or "disabled"), name)
 			end
 		else
-			logf(LG_DMP,lgid,"Skipping configuration of %s because layout = %s and %s is selected" , name, layout, config:get("/dev/scanner/barcodes") )
+			logf(LG_DBG,lgid,"Skipping configuration of %s because layout = %s and %s is selected" , name, layout, config:get("/dev/scanner/barcodes") )
 		end
 	else
 		logf(LG_DBG, lgid, "%s not supported by firmware", (name or "nil"))
@@ -353,55 +352,61 @@ local function open(scanner)
 	_wait_ack(scanner)
 	logf( LG_DBG, lgid, "Scanner disabled during programming...")
 
+	-- Get version info. We need to match some stuff in a blob of free 
+	-- formatted text to get the proper info
+	if not version_info_acquired then
+		logf( LG_INF, lgid, "Getting scanner module info")
+		_cmd(scanner,SCANNER_CMD_GET_INFO)
+		err,answer = _cmd_commit(scanner)
+		if not err then
+			local version = ""
+			local tmp = answer:match("Device ID: %s+(%S+)")
+			if tmp then version = version .. tmp .. " " end
+			local tmp = answer:match("App Ver:%s*(CIT App %S*)") -- eg "App Ver: CIT App 1.01.001"
+			if tmp then version = version .. "/" .. tmp .. " " end
+			local tmp = answer:match("Firmware Ver:%s+(%S+)")
+			if tmp then version = version .. "/fw:" .. tmp .. " " end
+			config:lookup("/dev/scanner/version"):setraw(version)
+			version_info_acquired = true
+
+			for _,rec in ipairs( scanner.enable_disable ) do
+				if not does_firmware_support( rec ) then
+					logf(LG_INF,lgid,"Barcode %s not supported by firmware %s", rec.name, config:get("/dev/scanner/version"))
+				end
+			end
+		else
+			logf(LG_WRN, lgid, "Could not acquire scanner version information")
+			errors = true
+		end
+	end
+
+	local function l_cmd_commit( scanner, txt )
+		err, answer = _cmd_commit(scanner)
+		if err then
+			logf( LG_WRN, lgid, "Error setting em2027 %s", txt )
+			errors = true
+		end
+	end
+
 	logf( LG_INF, lgid, "Restoring defaults")
 	_cmd(scanner, SCANNER_CMD_SET_DEFAULTS )
-	err, answer = _cmd_commit(scanner)
-	if err then
-		logf( LG_WRN, lgid, "Error setting scanner defaults." )
-		errors = true
-	end
+	l_cmd_commit(scanner, "defaults")
 
 	logf( LG_INF, lgid, "Making basic settings")
 	_cmd(scanner, 
 				SCANNER_ALLOW_READ_BATCH_CODE,
 				SCANNER_CMD_SET_STOP_SUFFIX,
 				SCANNER_CMD_ENABLE_STOP_SUFFIX,
---				SCANNER_CMD_AUTO_SCAN,
 				SCANNER_CMD_CODE_ID_ON
 			)
-	err, answer = _cmd_commit(scanner)
-	if err then
-		logf( LG_WRN, lgid, "Error setting innitial settings" )
-		errors = true
-	end
-
-	-- Get version info. We need to match some stuff in a blob of free formatted text to 
-	-- get the proper info
+	l_cmd_commit(scanner, "basics")
 	
-	logf( LG_INF, lgid, "Getting scanner module info")
-	_cmd(scanner,SCANNER_CMD_GET_INFO)
-	err,answer = _cmd_commit(scanner)
-	if not err then
-		local version = ""
-		local tmp = answer:match("Device ID: %s+(%S+)")
-		if tmp then version = version .. tmp .. " " end
-		local tmp = answer:match("uIMG Ver:%s+(%S+)")
-		if tmp then version = version .. "/ app:" .. tmp .. " " end
-		local tmp = answer:match("Firmware Ver:%s+(%S+)")
-		if tmp then version = version .. "/ fw:" .. tmp .. " " end
-		config:lookup("/dev/scanner/version"):setraw(version)
-	else
-		logf(LG_WRN, lgid, "Could not acquire scanner version information")
-		errors = true
-	end
-	
-	if first_time then
-		for _,rec in ipairs( scanner.enable_disable ) do
-			if not does_firmware_support( rec ) then
-				logf(LG_INF,lgid,"Barcode %s not supported by firmware %s", rec.name, config:get("/dev/scanner/version"))
-			end
-		end
-		first_time = false
+	-- make pre-settings
+	local pre_init = config:get("/dev/scanner/em2027_pre_init")
+	if pre_init ~= "" then
+		logf( LG_INF, lgid, "Applying em2027_pre_init")
+		_cmd(scanner, unpack( pre_init:split( ";" ) ) )
+		l_cmd_commit(scanner,"em2027_pre_init")
 	end
 
 	logf( LG_INF, lgid, "Setting reading constraint and 2d/1d")
@@ -418,11 +423,7 @@ local function open(scanner)
 	else
 		_cmd(scanner,SCANNER_CMD_2D_ENABLE)
 	end
-	err, answer = _cmd_commit(scanner)
-	if err then
-		logf( LG_WRN, lgid, "Error setting 1d/2d or reading constraint" )
-		errors = true
-	end
+	l_cmd_commit(scanner, "1d/2d or reading constraint" )
 
 	-- enable/disable barcodes when this is configured
 	for _,code in ipairs(enable_disable_HR200) do
@@ -431,11 +432,7 @@ local function open(scanner)
 			_configure_barcode( scanner, code.name )
 		end
 	end
-	err, answer = _cmd_commit(scanner)
-	if err then
-		logf( LG_WRN, lgid, "Error enabling/disabling barcodes." )
-		errors = true
-	end
+	l_cmd_commit(scanner, "enabling/disabling barcodes" )
 
 	-- Configure code prefixes
 	for _,i in ipairs(prefixes) do
@@ -443,11 +440,7 @@ local function open(scanner)
 			_cmd(scanner, i.cmd_HR200 .. '="' .. i.prefix_2d .. '"' )
 		end
 	end
-	err, answer = _cmd_commit(scanner)
-	if err then
-		logf( LG_WRN, lgid, "Error configuring prefixes." )
-		errors = true
-	end
+	l_cmd_commit(scanner, "code prefixes" )
 
 	-- Configure illumination mode: Blinking,Always ON,Always OFF
 	_cmd(scanner, get_illumination_mode_code( config:get("/dev/scanner/illumination_led") ) )
@@ -461,11 +454,7 @@ local function open(scanner)
 	else 
 		_cmd(scanner, SCANNER_CMD_AIM_WINK )
 	end
-	err, answer = _cmd_commit(scanner)
-	if err then
-		logf( LG_WRN, lgid, "Error configuring aiming mode." )
-		errors = true
-	end
+	l_cmd_commit(scanner, "aiming mode" )
 
 	-- Configure sensitivity: Low,Medium,High
 	local reading_sensitivity = config:get("/dev/scanner/reading_sensitivity")
@@ -478,32 +467,27 @@ local function open(scanner)
 		_cmd(scanner, SCANNER_CMD_SENSITIVITY_NORMAL )
 	end
 
-	-- this should be the last: it enabled scanning!
-	_cmd(scanner, SCANNER_CMD_AUTO_SCAN )
-	err, answer = _cmd_commit(scanner)
-	if err then
-		logf( LG_WRN, lgid, "Error setting scanner sensitivity." )
-		errors = true
+	-- make post-settings
+	local post_init = config:get("/dev/scanner/em2027_post_init")
+	if post_init ~= "" then
+		logf( LG_INF, lgid, "Applying em2027_post_init")
+		_cmd(scanner, unpack( post_init:split( ";" ) ) )
 	end
 
---logf( LG_WRN, lgid, "Temporary insert with wait for debugging disable")
---for q=1,20 do
---	sys.sleep(0.1)
---	local data = _read(scanner,5003)
---end
---logf( LG_WRN, lgid, "Continueing")
---if false then
---end
 
-	-- enable scanner
-	_write(scanner, "\0272")
-	_wait_ack(scanner)
+	-- this should be the last: it enabled scanning!
+	_cmd(scanner, SCANNER_CMD_AUTO_SCAN )
+	l_cmd_commit(scanner, "finalize")
+
+	-- enable scanner: superflous, is same as SCANNER_CMD_AUTO_SCAN 
+	--_write(scanner, "\0272")
+	--_wait_ack(scanner)
 
 	evq:fd_add(fd)
 	evq:register("fd", on_fd_scanner, scanner)
 
 	if errors == true then
-		logf(LG_WRN, lgid, "Finnished configuring scanner, but there were errors.")
+		logf(LG_WRN, lgid, "Finished configuring scanner, but there were errors.")
 		
 		led:set("yellow","blink")
 		scanner.retry_counter = scanner.retry_counter + 1
@@ -577,7 +561,7 @@ end
 local function disable(scanner)
 	logf(LG_DBG, lgid, "Disabling scanner")
 	if scanner.fd then
-		--logf(LG_DMP,lgid,"%s",debug.traceback() )
+		--logf(LG_DBG,lgid,"%s",debug.traceback() )
 		_write(scanner, "\0270")
 		_wait_ack(scanner)
 		_cmd(scanner, get_illumination_mode_code("Always OFF") )
@@ -642,17 +626,16 @@ function new()
 	}
 
 	config:add_watch("/dev/scanner", "set", function (e) evq:push( "reinit_scanner" ) end)
-	evq:register("reinit_scanner", function (e,s) s:close() s:open() end, scanner)
-	
-	evq:register( "input", 	
-		function( event, scanner )
-			if event.data.msg == "disable" then
-				scanner:close()
-			elseif event.data.msg == "enable" then
-				scanner:open()
+	evq:register("reinit_scanner", 
+		function (e,s) 
+			if Upgrade.busy() then
+				logf(LG_WRN,lgid,"Scanner not reinitialized because an upgrade is in progress")
+			else
+				s:close() 
+				s:open() 
 			end
-		end, scanner )
-
+		end, scanner)
+	
 	return scanner
 
 end

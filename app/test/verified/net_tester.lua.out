@@ -1,11 +1,23 @@
-# *** Running ./net_tester.lua
+# *** Running module/net_tester.lua
 
 
 # *** Start test 'test_get_interface_ip'
-ip(eth0)=192.168.1.129, err=nil
+ip(eth0)=192.168.1.100, err=nil
 ip(none)=nil, err=Error requesting interface flags
 
 # *** Start test 'test_get_interface_mac'
 mac(eth0)=00:1b:38:8d:ef:6c, err=nil
 mac(wlan0)=00:13:e8:b4:e0:b3, err=nil
 mac(none)=nil, err=Error requesting mac-address
+
+# *** Start test 'test_gethostbyname_test'
+1 = 	0.0.0.1
+1.2 = 	1.0.0.2
+1.2.3 = 	1.2.0.3
+1.2.3.4 = 	1.2.3.4
+1.2.3.4.5= Error: No address associated with hostname
+localhost = 	127.0.0.1
+www.vdtai.nl = 	193.138.157.29
+www.vdtai.nl/index.html= Error: No address associated with hostname
+www.newland-id.nl = 	194.150.208.116
+www.unknown42.nl= Error: No address associated with hostname

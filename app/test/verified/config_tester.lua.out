@@ -1,6 +1,6 @@
-# *** Running ./config_tester.lua
+# *** Running module/config_tester.lua
 
-[wrn] config    391:config.lua  : No config file found. Using defaults.
+[wrn] : No config file found. Using defaults.
 
 # *** Start test 'config:set_config_item('/group1/number1 = 3')'
 Before:
@@ -82,3 +82,20 @@ on_group1_string1, data=mydata, value=blabla
 before set: direct
 on_group1_string1, data=mydata, value=direct
 after set
+[wrn] : No config file found. Using defaults.
+[inf] : Loading config file cit.conf
+/dev/mifare/key_A = FFFFFFFFFFFF
+/dev/mifare/relevant_sectors = 0:0,15:2
+range("1") = true
+range("0") = true
+range("15") = true
+range("16") = false
+range("0,15") = true
+range("0,16") = false
+range("0:0") = true
+range("15:2") = true
+range("0:3") = false
+range("15:3") = false
+range("16:0") = false
+range("0:0,0:1,0:2") = true
+range("15:0,15:1,15:2") = true

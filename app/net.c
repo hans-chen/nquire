@@ -57,12 +57,63 @@ static int l_socket(lua_State *L)
 	}
 }
 
+/* get host ip address(es) by name
+ * IN: hostname
+ * return: 
+ *    ips      array with ip-address(es) for specified hostname
+ *    errstr   ips==nil ? "<error-text>" : nil
+ *    errnr    ips==nil ? "<error-number>" : nil
+ * NOTE: currently only ipv6 is supported
+ */
+static int l_gethostbyname( lua_State *L )
+{
+	const char *node = luaL_checkstring(L, 1);
+	struct addrinfo hints;
+	memset( &hints, 0, sizeof(hints) );
+	hints.ai_family = AF_INET;
+	
+	struct addrinfo * result;
+	int error = getaddrinfo( node, 0, &hints, &result );
+	if( error != 0 )
+	{
+		lua_pushnil( L );
+		lua_pushstring( L, gai_strerror(error) );
+		lua_pushnumber( L, error );
+		return 3;
+	}
+	struct addrinfo *res;
+	int addr_counter = 0;
+	
+	lua_newtable(L);
+
+	for( res = result; res != 0; res = res->ai_next )
+	{
+		// only push the address on the stack when it is unique
+		struct addrinfo *fres;
+		for( fres = result; fres != res && memcmp(fres->ai_addr,res->ai_addr,sizeof(struct sockaddr_in)) != 0; fres = fres->ai_next )
+		{}
+		if( fres == res )
+		{
+			char s[INET_ADDRSTRLEN];
+			struct sockaddr_in *sa = (struct sockaddr_in*)res->ai_addr;
+			inet_ntop(sa->sin_family, &sa->sin_addr, s, sizeof(s));
+			addr_counter++;
+		
+			lua_pushnumber(L, addr_counter);
+			lua_pushstring(L, s);
+			lua_settable(L, -3);
+		}
+	}
+	freeaddrinfo( result );
+	return 1;
+}
+
+
 /* connect socket to server (tcp sockets only)
-* In contrast with the c-api, this call adds name resolve when required.
-* @param l[1]   socket descriptor
-* @param l[2]   ipv4 address or server-name
-* @param l[3]   port
-* @return 0=ok | 
+ * @param l[1]   socket descriptor
+ * @param l[2]   ipv4 address (string presentation format)
+ * @param l[3]   port
+ * @return 0=ok | 
  *        1=operation in progress |
  *        -1=try again later, <error string> |
  *        -2=error, <error string>
@@ -80,48 +131,13 @@ static int l_connect(lua_State *L)
 	port = luaL_checknumber(L, 3);
 
 	memset(&sa, 0, sizeof(sa));
-	
-	struct hostent *he = gethostbyname(addr);
-	if( he == 0 )
+	sa.sin_family = AF_INET;
+	if( inet_pton( AF_INET, addr, &sa.sin_addr ) != 1)
 	{
-		switch( h_errno )
-		{
-		case HOST_NOT_FOUND: 
-			lua_pushinteger(L, -2);
-			lua_pushstring(L, "Host not found."); 
-			break;
-		//case NO_ADDRESS: 
-		case NO_DATA:
-			lua_pushinteger(L, -2);
-			lua_pushstring(L, "The requested name is valid but does not have an IP address."); 
-			break;
-		case NO_RECOVERY: 
-			lua_pushinteger(L, -2);
-			lua_pushstring(L, "A non-recoverable name server error occurred."); 
-			break;
-		case TRY_AGAIN: 
-			lua_pushinteger(L, -1);
-			lua_pushstring(L, "A temporary error occurred on an authoritative name server.  Try again later"); 
-			break;
-		default:
-			lua_pushinteger(L, -2);
-			lua_pushstring(L, "Unspecified name-resolve error"); 
-			break;
-		}
-		
-		return 2;
-	}	
-	TRACE("he->h_name = %s", he->h_name );
-	sa.sin_family = he->h_addrtype; //AF_INET;
-	if( sa.sin_family != AF_INET )
-	{
-		lua_pushnil(L);
-		lua_pushstring(L, "Only AF_INET sockets (ipv4) supported.");
+		lua_pushinteger(L, -2);
+		lua_pushstring(L, "Address not parsable as IPV4");
 		return 2;
 	}
-	
-	TRACE("name = %s, addr = %u.%u.%u.%u", he->h_name, (unsigned char)he->h_addr[0], (unsigned char)(he->h_addr[1]), (unsigned char)he->h_addr[2], (unsigned char)he->h_addr[3] );
-	sa.sin_addr.s_addr = *((in_addr_t *)(he->h_addr));//inet_addr(he->h_addr);
 	sa.sin_port = htons(port);
 	
 	r = connect(fd, (struct sockaddr *)&sa, sizeof(sa));
@@ -418,18 +434,22 @@ static int l_setsockopt(lua_State *L)
 	switch(opt) {
 		case 0:
 			valint = luaL_checknumber(L, 3);
+			TRACE("TCP_NODELAY %d", valint);
 			r = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void *)&valint, sizeof valint);
 			break;
 		case 1:
 			valint = luaL_checknumber(L, 3);
+			TRACE("SO_BROADCAST %d", valint);
 			r = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, (void *)&valint, sizeof valint);
 			break;
 		case 2:
 			valint = luaL_checknumber(L, 3);
+			TRACE("SO_REUSEADDR %d", valint);
 			r = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&valint, sizeof valint);
 			break;
 		case 3:
 			valstr = luaL_checkstring(L, 3);
+			TRACE("IP_ADD_MEMBERSHIP %s", varstr);
 			bzero(&mreq, sizeof mreq);
 			mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 			mreq.imr_multiaddr.s_addr = inet_addr(valstr);
@@ -437,10 +457,12 @@ static int l_setsockopt(lua_State *L)
 			break;
 		case 4:
 			valint = luaL_checknumber(L, 3);
+			TRACE("IP_MULTICAST_TTL %d", valint);
 			r = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, (void *)&valint, sizeof valint);
 			break;
 		case 6:
 			valint = luaL_checknumber(L, 3);
+			TRACE("SO_KEEPALIVE %d", valint);
 			r = setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &valint, sizeof(valint));
 			break;
 		default:
@@ -557,6 +579,7 @@ static int l_get_interface_mac(lua_State *L)
 	
 static struct luaL_Reg net_table[] = {
 	{ "socket",	l_socket },
+	{ "gethostbyname", l_gethostbyname },
 	{ "bind",	l_bind },
 	{ "accept",	l_accept },
 	{ "connect",	l_connect },

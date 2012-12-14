@@ -3,9 +3,11 @@ Maarten van Dootingh <maarten@vdtai.nl>
 
 Revision history
 
-`-------`-----------------------`-------------------------------------------------------------
-v1.0 	Dec 21 2009	            Conversion from hand-written html
-----------------------------------------------------------------------------------------------
+[cols="1^,4,10",options="header"]
+|===================================================
+|Version|Date            |Comment
+|v1.0 	|Dec 21 2009	 |Conversion from hand-written html
+|===================================================
 
 These pages are the application documention of the nquire.
 

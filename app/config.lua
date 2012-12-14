@@ -41,7 +41,17 @@ local function load_schema(config, fname)
 
 		include = function(fname)
 			return load_schema(config, fname)
-		end
+		end,
+		
+		-- functions to be imported from the global env.
+		-- add more if required for "custom" node verification
+		string = {
+			find = string.find,
+			sub = string.sub,
+			match = string.match,
+		},
+		--print = print,
+		tonumber = tonumber,
 	}
 
 	local env_meta = {
@@ -93,7 +103,7 @@ local function load_db(config, fname_db)
 
 	local fd, err = io.open(fname_db, "r")
 	if not fd then
-		return
+		return false
 	end
 	logf(LG_INF, lgid, "Loading config file %s", fname_db)
 
@@ -110,8 +120,8 @@ local function load_db(config, fname_db)
 end
 
 --
--- set a config item from a cit.conf formatted line
--- TODO: Note that, because this line can also be read from a barcode, it can
+-- set a config item from a configfile formatted line
+-- CHECK: Note that, because this line can also be read from a barcode, it can
 -- actually contain multiple definitions like:
 -- /nodename = "value x" /group/name2 = y
 -- or:
@@ -131,23 +141,24 @@ local function set_config_item( config, l )
 		else
 			local node = config:lookup(fid)
 			if node then
-				local is_string = node.options and node.options:find("b") or 
+				local is_string = node:is_binary() or 
 						node.type == "enum" and (not node.config_type or node.config_type ~= "number") or 
 						node.type == "string" or 
 						node.type == "password" or 
-						node.type == "pattern" 
+						node.type == "pattern" or
+						node.type == "custom"
 				local value
 				value, next_tv = fetch_value( rest, is_string )
 				--logf(LG_DMP,lgid,"read: l='%s', fid='%s', value='%s', rest='%s'" , l, fid or "nil", value or "nil", (next_tv or "nil"))
 				if value then
 					local vvalue = value
-					if node.options and node.options:find("b") or node.type == "string" then
+					if node:is_binary() or node.type == "string" then
 						vvalue = escapes_to_binstr( value, "\"" )
 					end
 					if type_check(node.type, node.range, vvalue) then
 						node:set(vvalue)
 					else
-						logf(LG_WRN,lgid,"Incorrect type for node %s with value '%s'", fid, vvalue )
+						logf(LG_WRN,lgid,"Incorrect node-value: %s = \"%s\"", fid, vvalue )
 					end
 				else
 					logf(LG_WRN,lgid,"Could not read value for node %s", fid)
@@ -169,16 +180,22 @@ local function save_db(config, fname_db)
 
 	logf(LG_DBG, lgid, "Saving configuration to %s", fname_db)
 
+	if Upgrade.busy() then
+		logf(LG_WRN,lgid,"Saving configfile prohibited because an upgrade is in progress")
+		return
+	end
+
 	local function s(fd, node, prefix)
-			
+		
 		if node:is_persistent() then
 
 			if node:has_data() then
 				local prefix2 = prefix:gsub("^%.", "")
-				if node.options and node.options:find("b") then
+				if node:is_binary() then
 					fd:write(prefix2 .. "/" .. node.id .. " = \"" .. binstr_to_escapes(node.value,nil,nil,"\"") .. "\"\n")
-				elseif node.type == "string" or (node.type == "enum" and node.config_type ~= "number") or node.type == "password" or node.type == "pattern" then
-					-- TODO: check whether this also works with high utf8 charracters
+				elseif node.type == "string" or (node.type == "enum" and node.config_type ~= "number") or 
+							node.type == "password" or node.type == "pattern" or node.type == "custom" then
+					-- CHECK: whether this also works with high utf8 charracters
 					fd:write(prefix2 .. "/" .. node.id .. " = \"" .. binstr_to_escapes(node.value, 32, 256, "\"" ) .. "\"\n")
 				else
 					fd:write(prefix2 .. "/" .. node.id .. " = " .. node.value .. "\n")
@@ -322,14 +339,20 @@ end
 
 local function on_config_timer(event, config)
 
+	-- do not check when an upgrade is busy
+	if Upgrade.busy() then
+		return true
+	end
+
 	-- Check mtime of main config file
 	
 	local s = sys.lstat(config.fname_db)
 
 	if not s or s.mtime > config.mtime then
 		logf(LG_DBG, lgid, "Config file was modified, rereading")
-		config:load_db(config.fname_db)
-		config:save_db(config.fname_db)
+		if config:load_db(config.fname_db) then
+			config:save_db(config.fname_db)
+		end
 	end
 
 	-- Check mtime of config file in /home/ftp
@@ -338,8 +361,9 @@ local function on_config_timer(event, config)
 
 	if s and s.mtime > config.mtime then
 		logf(LG_DBG, lgid, "FTP Config file was modified, rereading")
-		config:load_db("/home/ftp/" .. config.fname_db)
-		config:save_db(config.fname_db)
+		if config:load_db("/home/ftp/" .. config.fname_db) then
+			config:save_db(config.fname_db)
+		end
 	end
 
 	-- rescedule the event:

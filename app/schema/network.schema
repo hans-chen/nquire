@@ -45,7 +45,38 @@ return group {
 			default = "255.255.255.255",
 		},
 	},
+	
+	group {
+		id = "tcp_keepalive",
+		
+		object {
+			id = "use_keepalive",
+			type = "boolean",
+			default = "true", 
+		},
+		
+		object {
+			id = "time",
+			type = "number",
+			default = "60", 
+			range = "20:600",
+		},
+		
+		object {
+			id = "intvl",
+			type = "number",
+			default = "20", 
+			range = "5:120",
+		},
 
+		object {
+			id = "probes",
+			type = "number",
+			default = "6", 
+			range = "2:32",
+		},
+	},
+	
 	group {
 		id = "ip",
 		label = "IP settings",
@@ -69,21 +100,21 @@ return group {
 			id = "gateway",
 			label = "Gateway",
 			type = "ip_address",
-			default = "192.168.1.254",
+			default = "192.168.1.1",
 		},
 
 		object { 
 			id = "ns1",
 			label = "Nameserver 1",
 			type = "ip_address",
-			default = "194.109.6.66",
+			default = "192.168.1.1",
 		},
 
 		object { 
 			id = "ns2",
 			label = "Nameserver 2",
 			type = "ip_address",
-			default = "194.109.9.99",
+			default = "192.168.1.1",
 		},
 
 	},

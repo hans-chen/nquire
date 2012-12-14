@@ -1,0 +1,165 @@
+= Nquire mifare =
+Maarten van Dootingh <maarten@vdtai.nl>
+
+Revision history
+
+[cols="1^,4,10",options="header"]
+|===================================================
+|Version|Date            |Comment
+|v1.0   |October 21 2010 | New
+|===================================================
+
+This document describes how the NQuire application handles mifare
+
+== Context ==
+
+A mifare module is an NQuire hardware option. The current module only supports reading and writing with key A.
+
+The nquire can be used to read and write mifare classic cards.
+
+
+== Mifare read ==
+
+There are two ways to read a mifare card using the nquire:
+
+ - off-line: the access key and which sectors should be read are stored (configured) in the nquire; 
+ - on-line: the access key and sectors to be read are transmitted to the nquire;
+
+=== Off-line: ===
+
+When a card is presented to the nquire, the specified sectors are read using the preconfigured access key. The retrieved data is send to the connected server(s).
+
+=== On-line ===
+
+When a card is presented, only the card-num is send to the (connected) server. The server than decides what to do, eg:
+
+ - read data from the card
+ - display a message
+ - activate the touchscreen
+ 
+This way it is possible to:
+
+ - support multiple keys for reading different sectors
+ - interact with the user using the touchscreen in-between presenting the card and reading (or writing) the card (eg in case of writing: ask for confirmation).
+
+NOTE: Do not use off-line mode when mifare keys are to be secret because keys, data and event messages are transmitted unencrypted using tcp and/or udp. It 'is' possible to transmit the message encoded in base64 making them unreadble for humans. However, base64 is easily recognized and decoded.
+
+== Mifare write ==
+
+A mifare write is only implemented on-line. Off course, it is only possible to use mifare write when a mifare card is presented to the nquire.
+
+The server is notified of presenting a mifare card using the configured mifare read event message.
+
+NOTE: It is possible to disable to mifare-read-success-beep so the is no 'ok' beep after the read message. That would be confusing because the transacting would not be complete after the beep: a write stilll has to be done.
+
+=== On-line ===
+
+ - The server sends a message to nquire to write data in a certain block.
+ - When the write succeeds or fails an event message is generated with the result. 
+ - The result is also logged in a persistent log-file (see "Transaction log-file")
+ 
+== Transaction log-file ==
+ 
+All mifare write transactions are logged in a logfile:
+
+log/mifare.log
+
+This is accesible via ftp.
+
+Logfiles are shifted upon the escape command: "shift mifare-log". The logfile will be named:
+
+mifare-<shift id>.log
+
+The shift id is specified by the "shift mifare transaction log" escape command.
+
+The server can get a "log-file too big" message indicating that the mifare transaction log is too big. This can influence performance. As a response, the server should innitiate a "shift mifare log", download the log and remove the log. 
+When this is not done, it is possible that transactions will fail due to insuficcient space to log transactions.
+
+NOTE: The space to log files is also used by uploaded gif-images.
+
+=== Log file format: ===
+
+Bnf format:
+-----
+line := <transaction-id> {<command> <result>}+
+command := "W" | "I" | "D"
+result := "
+-----
+
+
+== Messages ==
+
+=== escape commands (server to nquire) ===
+
+For a complete definition see: link:server_communication.html[server_communication.html]
+
+[cols="1verse,4",options="header"]
+|===================================================
+|command|defined as
+|\x1b\xf8<cardnum>KaaaaaaaaaaaaR{<sector><block>}+\x03|read mifare card
+|\x1b\xf9<cardnum><transaction id>KaaaaaaaaaaaaW<sector><block><format><data>\x03|write data
+|\x1b\xf9<cardnum><transaction id>KaaaaaaaaaaaaI<sector><block>\x03|increment block
+|\x1b\xf9<cardnum><transaction id>KaaaaaaaaaaaaD<sector><block>\x03|decrement block
+|\x1b\xfahhhhhhhh\x03|shift transaction log
+|===================================================
+
+=== Events (nquire to server) ===
+
+[cols="1verse,4verse",options="header"]
+|===================================================
+|Event|defined as
+|MF<cardnum>[<data>]|Mifare data read. 'Data' is optional depending on the configuration. Cardnum and data formatting depends on configuration
+|===================================================
+
+== Configuration ==
+
+[cols="1verse,1verse,1,8verse",options="header"]
+|===================================================
+|conf id|value format|example|explanation
+|/dev/mifare/device|'/dev/<dev>'|"/dev/ttyS2"|Don't touch this
+|/dev/mifare/key_A|<nibble>12|"FFFFFFFFFFFF"|
+|/dev/mifare/relevant_sectors|[<n>[,<n>]*]|"1,15"|
+Comma seperated list of the sectors to be read.
+Sector data is send in this order.
+
+|/dev/mifare/prevent_duplicate_scan_timeout|n|3|
+A detected card will be ignored when it was 
+the same as the last scanned mifare card within
+n seconds ago.
+
+|/dev/mifare/cardnum_format|"binary"
+"hexadecimal"|"hexadecimal"|
+The cardnum is formatted according this parameter:
+'binary': data is send as it is (null
+charracters are send as null carrecters, etc)
+'hexadecimal': all charracters are transmitted in 
+their hexadecimal value formatted as 2 nibbles
+for each charracter.
+
+|/dev/mifare/send_cardnum_only|true,false|false|
+When 'true', only the cardnum is send, even when
+|/dev/mifare/sector_data_format|"binary"
+"base 64"
+"hex escapes"
+"hex"|"binary"|
+Sector data is formated according this parameter:
+'binary': data is send as it is (null
+charracters are send as null carrecters, etc)
+'base 64': the data is encoded using base 64
+Each sector is encoded seperate!
+'hex escapes': all charracters below ascii
+value 32 (hex 0x20) and '\\' are escaped (eg 
+ the null charracter is transmitted as '\x00')
+'hex': all charracters are transmitted in 
+their hexadecimal value formatted as 2 nibbles
+for each charracter.
+ 
+|/dev/mifare/msg/incomplete_scan/text|<text>|"Wait for beep\nwhen scanning"|
+The error message that is displayed when a
+card scan was incomplete.
+
+|/dev/mifare/msg/access_violation/text|<text>|"Card access\ndenied"|
+The message that is displayed when card 
+access was denied. 
+|===================================================
+

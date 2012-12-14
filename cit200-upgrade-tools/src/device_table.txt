@@ -43,7 +43,7 @@
 /dev/fb0	c	666	0	0	29	0	0	0	-
 /dev/gpio	c	666	0	0	99	0	0	0	-
 /dev/misc/rtc	c	666	0	0	254	0	0	0	-
-/dev/mtd0	c	666	0	0	90 0  0 0 -
+/dev/mtd1	c	666	0	0	90 2  0 0 -
 /dev/mmcblk0	b	666	0	0	179	0	0	0	-
 /dev/mmcblk0p1	b	666	0	0	179	1	0	0	-
 /dev/mtdblock/0	b	666	0	0	31	0	0	0	-

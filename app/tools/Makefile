@@ -5,7 +5,8 @@
 #
 
 # modules
-MODULES += dpydrv.so sys.so net.so sim300com batchcode.gif
+MODULES += dpydrv.so sys.so net.so batchcode.gif
+TARGET_EXE += just-read-em2027 sim300com
 
 # extra compile flags per module:
 LDFLAGS_dpydrv.so	+= -lrt -lungif -lSDL_image -lfreetype
@@ -29,20 +30,26 @@ CC 	    = gcc
 AR      = ar
 LD 	    = ld
 STRIP   = strip
-MAKE	= $(MAKE)
+MAKE	= make
 
 
-.PHONY: all test clean clobber
+.PHONY: all test clean clobber 
 
-all: $(MODULES) $(TESTS)
+all: links $(MODULES) $(TESTS) $(TARGET_EXE)
+	$(MAKE) -C img $@
 
 clean:
-	-rm -f $(MODULES)
+	-rm -f $(MODULES) $(TARGET_EXE)
+	$(MAKE) -C img $@
 
 clobber: clean
-	-rm -rf results *~ img/anim.gif
-
+	-rm -rf results *~ nquire-cmd.exe .cit.ip cit.conf
+	$(MAKE) -C img $@
+	
 debug:
+
+links:
+	ln -sf ../../cit200-windows-tools/nquire-server/nquire-cmd.exe .
 
 %.so: ../%.c
 	$(CC) -shared $(CFLAGS) $< -o $@ $(LDFLAGS) $(CFLAGS_$@) $(LDFLAGS_$@)
@@ -52,5 +59,8 @@ batchcode.gif:
 	../../app/tools/gen-batchcode
 
 
-sim300com: sim300com.c
-	/opt/toolchain-newland/bin/arm-softfloat-linux-gnueabi-gcc -g -Wall -O3 -Werror  -fPIC -I../toolchain/usr/include -I../toolchain/usr/include/SDL -I../toolchain/usr/include/freetype2 sim300com.c -o sim300com
+$(TARGET_EXE):
+
+%: %.c
+	/opt/toolchain-newland/bin/arm-softfloat-linux-gnueabi-gcc -g -Wall -O3 -Werror  -fPIC -I../toolchain/usr/include -I../toolchain/usr/include/SDL -I../toolchain/usr/include/freetype2 $@.c -o $@
+

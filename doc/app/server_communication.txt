@@ -3,23 +3,31 @@ Maarten van Dootingh <maarten@vdtai.nl>
 
 Revision history
 
-`-------`-----------------------`-------------------------------------------------------------
-v1.0 	December 21 2009	Conversion from hand-written html
-----------------------------------------------------------------------------------------------
+[cols="1^,4,10",options="header"]
+|===================================================
+|Version|Date            |Comment
+|v1.0 	|December 21 2009|Conversion from hand-written html
+|v1.1 	|Oct 21 2010|Complete server communication documentation
+|===================================================
 
 == Message types ==
 
 The nquire server communication is 3-fold (as seen from the server):
 
  -	link:nquire-discovery-protocol.html[Discovery] of available Nquires on a network
- -	Barcode data messages from Nquire to server
- -	Messages from server to NQuire (display, beep, etc).
+ -	Event messages from Nquire to server (barcode, gpio, touchscreen, mifare)
+ -	Control (esacpe) code messages from server to NQuire (display, beep, etc).
  
 Note that discovery can also be done using the SG15 compatebility.
 
 == Protocol == 
 
-The server communication is done by UDP and/or TCP. The TCP connection can be in server mode or in client mode. In server mode the Nquire will listen to connections on the configured TCP port, whereas in client mode the quire will try to make the connection using the configured "remote ip address" and "tcp port". When there are multiple connections (server mode only), scanned barcode data will be sent to all connected servers and sent to the configured UDP server:port.
+The server communication is done by UDP and/or TCP. The TCP connection can be in server mode or in client mode. In server mode the Nquire will listen to connections on the configured TCP port, whereas in client mode the quire will try to make the connection using the configured "remote ip address" and "tcp port".
+
+There are two types of data trafiic comming from the nquire:
+
+ - event messages: This is data generated in reaction to an event on the nquire (e.g. a scanned barcode or a touchscreen keyclick) These messages are sent to all connected clients and possibly the configured server (UDP or TCP).
+ - return data: This is data which is generated in response of executing an escape command. This is only send back to the client that issued the command.
 
 Depending on the configuration (webui), the barcode prefix will or will not be sent along with the barcode.
 
@@ -29,120 +37,267 @@ Putting text on the nquire is done by a (downwards) SG15 compatible protocol: th
 
  -	The screen is bigger so "set pixel position" allows bigger values.
  -	"select font set" is extended: values 0x32 to 0x40 represent fonts from	6px to 96px with steps of 6px.
- -	For testing purposes there is a 'fake scan' escape code.
+ -  various extra commands are defined (such as for controlling the touch screen)
+
+anchor:event-messages[event messages]
+
+=== Event messages ===
+
+Event messages are sent to each connected host and, when UDP communication is enabled, to the configured server-ip.port address. This means that a connection which is used to send commands, will also get event messages.
+However, an event message will never come inbetween a command and it's return message.
+
+Event messages are seperated by the configured message separator (+/cit/message_separator+): +LF+,+CR+ or +CRLF+.
+
+Different event messages can be recognized by their prefix:
+
+[cols="10,2,2,50",options="header"]
+|===================================================
+|Name|Prefix hid|prefix out|Meaning
+
+|Code128            |j|#|
+|UCC_EAN-128        |u|P|
+|EAN-8              |g|FF|
+|EAN-13             |d|F|
+|UPC-E              |h|E|
+|UPC-A              |c|A|
+|Interleaved-2_of_5 |i|i|
+|Code39             |b|*|
+|Codabar            |a|%|
+|Code93             |y|c|
+|PDF417             |r|r|
+|QR_Code            |s|s|
+|Aztec              |z|z|
+|DataMatrix         |u|u|
+|Chinese-Sensible   |h|h|
+|GS1_Databar        |R|R|
+|ISBN               |B|B|
+|Code-11            |z|Z|
+|2_5-Matrix         |v|v|
+|ITF14              |q|q|
+|MSI-Plessey        |m|m|
+|Plessey            |p|n|
+|2_5-Standard       |s|o|
+|2_5-Industrial     |s|o|
+|USB                ||U|
+When configuration option "/dev/extscanner/raw = true", the data as received from the external scanner is send to the server, prefixed with an 'U': no prefix translation is performed!
+The data received on the USB is chopped in chunks. The chunks received from the USB are to be seperated by CR or LF.
+
+|mifare             ||MF|
+|timeout            ||T|in response to \e\fb.....\x03
+|touch16            ||K|Configurable in /dev/touch16/prefix, default="K"
+|gpio               ||I|Configurable in /dev/gpio/prefix, default="I"
+|warning            ||W|some kind of warning about the state of the nquire (see xref:error-codes[])
+|===================================================
+
+anchor:error-codes[error codes]
+
+=== Error codes ===
+
+Error codes are used in return and event messages. They are used to indicate errors and warnings. The exact usage is defined in the escape command or the event message.
+
+
+-----
+	'0'	OK 
+	'1'	Error (undefined)
+	'2'	Error: Mifare card unavailable
+	'3'	Error: Mifare Card access denied (incorrect key?)
+	'4'	Error: invalid message format
+	'5'	Error: Mifare invalid card (mifare cardnum mismatch)
+	'6'	Error: file system full (no space left to log).
+	'7'	Error: Mifare format error in cardnum or transaction-id
+	'8'	Warning: big-log-file detected (this can slow down the system). Please rotate and cleanup.
+-----
+
+NOTE: Error '6' (file-system-full) causes an error state for the file-system. The only way out it to reboot the nquire and correct the situation by removing a file using ftp.
+
+== encryption ==
+
+Traffic from and to the nquire can be encrypted. The only encryption supported as of version 1.5 is base64 (not really encryption but it is no longer human readable text). This is configurable using config item: /cit/message_encryption
+
+Default operation mode is 'none' in which case all messages are transmitted as they are.
+
+When /cit/message_encryption = base64 , the following traffic is encoded:
+
+    * All event traffic (barcode, mifare, touchscreen, gpio events) from nquire attached clients is encoded in base64. The base64 lines are separated with the configured message separator (config item: /cit/message_separator). These are only for separating the base64 strings. The actual messages will contain the event(s). Each event ends with the configured message separator.
+    * All escape code traffic to the nquire is expected to be encoded the same manner.
+    
+NOTE: discovery packets are NOT encoded. 
+
 
 == Supported SG15 compatible escaped codes ==
 
 === clear screen ===
 -----
-\x24
+\x1b\x24
 -----
 
 or
 
 -----
-\x25
+\x1b\x25
 -----
+
+Also see 'clear text layer'.
 
 === set cursor position ===
 -----
-\x27
+\x1b\x27xy
 -----
+
+The x and y values start at 0x30 representing coordinate 0. 0,0 represents resp. left,top. 
+
+The valid x and y range is determined by the size of the currently used font.
+
 === set pixel position ===
 -----
-\x2c
+\x1b\x2cxy
 -----
+
+The x and y values start at 0x30 representing coordinate 0. 0,0 represents resp. left,top.
+
+The valid range is determined by the size of the display (for the nquire: 240x128).
+
 === align string of text ===
 
-	Parameter:
-	[0x30] = lt
-	[0x31] = ct
-	[0x32] = rt
-	[0x33] = lm
-	[0x34] = cm
-	[0x35] = rm
-	[0x36] = lb
-	[0x37] = cb
-	[0x38] = rb
-	[0x39] = l.
-	[0x3a] = c.
-	[0x3b] = r.
-	[0x3c] = .t
-	[0x3d] = .m
-	[0x3e] = .b
+-----
+\x1b\x2e<align><text>\x03
 
+The align parameter can be one of:
+
+	\x30 = left top
+	\x31 = center top
+	\x32 = right top
+	\x33 = lleft middle
+	\x34 = center middle
+	\x35 = right middle
+	\x36 = left bottom
+	\x37 = center bottom
+	\x38 = right bottom
+	\x39 = left (vertical position is not changed)
+	\x3a = center (vertical position is not changed)
+	\x3b = right (vertical position is not changed)
+	\x3c = top (horizontal position is not changed)
+	\x3d = middle (horizontal position is not changed)
+	\x3e = bottom (horizontal position is not changed)
+-----
 E.g. "blabla" in left top:
 -----
-\x2e\x30blabla\x03
+\x1b\x2e\x30blabla\x03
 -----
 
 === NOP ===
-	[0x40] = NOP
-
-=== NOP ===
-	[0x41] = NOP
+-----
+\x1b\x40
+-----
 
 === select font set ===
-	[0x42] = "select font set",
-		
-		0x30 = small
-		0x31 = large
-		0x32 .. 0x40 = 6px,12px, 18px ...
+
+-----
+\x1b\x42<param>
+-----
+Param can be one of:		
+-----
+	\x30 = small
+	\x31 = large
+	\x32 .. 0x40 = 6px,12px, 18px ...
+-----
+
+E.g. Set font to the configured 'large' value:
+-----
+\x1b\x42\x31
+-----
+
 
 === reboot ===
-	[0x5a] = reboot
-
+-----
+\x1b\x5a
+-----
 === enable/disable scanning ===
-	[0x5b] = "enable/disable scanning",
-
+-----
+\x1b\x5b<param>
+-----
+param can be one of:
+-----
+	\x30	= disable
+	\x31	= enable
+-----
 === enable/disable backlight ===
-	[0x5c] = "enable/disable backlight",
-
+-----
+\x1b\x5c<param>
+-----
+Param can beone of:
+-----
+	\x30	= off
+	\x31	= on
+-----
 === sleep/wakeup barcode scanner ===
-	[0x5d] = "sleep/wakeup barcode scanner",
-
+-----
+\x1b\x5d<param>
+-----
+Param can be 1 of:
+-----
+	\x30	= sleep
+	\x31	= wakeup
+-----
 === beep ===
-	[0x5e] = "beep",
-
+-----
+\x1b\x5e
+-----
 === get firmware version ===
-	[0x5f] = "get firmware version",
+-----
+\x1b\x5f
+-----
 
+This is the nquire formatted firmware version for the application only.
+The version is returned on the established connection only (or returned to sender address.port in case of udp communication).
+
+Format is:
+-----
+<major>.<minor>[.<patch>]
+-----
 === get firmware version in SG15 format ===
-	[0x60] = "get firmware version in SG15 format",
+-----
+\x1b\x60
+-----
 
 === Set GPIO output ===
 
-Command: [0x7E]
-	
-Parameter 1: OUT1 = 0x30 or ''0'', OUT2 = 0x31 or ''1''
-
-Parameter 2: low = 0x30 or ''0'', high = 0x31 or ''1''
-	
+------
+\x1b\x7e<param1><param2>
+------
+Parameter defintion:
+-----
+Param1: \x30	= OUT1
+        \x31	= OUT2  
+        
+Param2: \x30	= low
+        \x31	= high
+-----	
 E.g. setting OUT2 to low:
 ------
-\x7e\x31\x30
-
-or the equivalent:
-
-\x7e10
+\x1b\x7e\x31\x30
 ------
 
 === Get GPIO input ===
 
-Command: [0x7F]
-
-Parameter: IN1 = 0x30 or ''0'', IN2 = 0x31 or ''1''
-
+-----
+\x1b\x7f<param>
+-----
+Param can be 1 of:
+-----
+	\x30	= IN1
+	\x31	= IN2
+-----
 E.g. requesting the state of IN1:
 
 ------
-\x7f\x30
+\x1b\x7f\x30
 ------
 
 This send the value back using the following format:
-
+-----
 <prefix><pin><value>
-
+-----
 E.g. with the default prefix for IN1, value high:
 
 ------
@@ -154,22 +309,29 @@ I01
 	
 === display a picture ===
 
-Display a picture on the current pixel position. Just specify the filename, close with.
+Display a picture on the current pixel position. Just specify the filename, close with \x03.
 
 -----
-\xf0filename.gif\x03
+\x1b\xf0filename.gif\x03
 -----
 	
 === display touchscreen button picture ===
 
 The shown picture is related to 1 or more touchscreen buttons.
+-----
+\x1b\xf2<released.gif>\x0d<pressed.gif>\x0d<position by key-id><coupled to key-id>n\x03
+-----
+The meaning of the parameters is explained below:
+-----
+	release.gif = filename of the gif image when the button is not 'pressed'
+	pressed.gif = filename of the gif image when the button is 'pressed' (NOT IMPLEMENTED)
+	position by key-id = specify position of left top of image
+	coupled to key-id = specify to which keys the image is related
+-----
 
-\xf2<released.gif>\x0d<pressed.gif>\x0d<position by key-id><coupled to key-id>n \x03
+When "pressed.gif" is empty, the image of name-released will be inverted when pressed (NOT IMPLEMENTED).
 
-
-When "pressed.gif" is empty, the image of name-released will be inverted when pressed.
-
-The names of the images should not be too long and not contain spaces together they can have 64-16-3=45 charracters
+The names of the images should not be too long and not contain spaces. Together they can have 64-16-3=45 charracters
 
 Touch screen position layout:
 
@@ -181,29 +343,241 @@ c d e f
 -----
 
 E.g. display image on position 5, and associate to key 5
-
 -----
-\xf21.gif\x0d\x0d55\x03
+\x1b\xf21.gif\x0d\x0d55\x03
 -----
 
 E.g. display image on position 6, and associate to key 6 and a
-
 -----
-\xf21.gif\x0d\x0d6a\x03
+\x1b\xf21.gif\x0d\x0d66a\x03
 -----
 
 === show idle message ===
 -----
-\xf3
+\x1b\xf3
 -----
 	
+This clears the display and shows immediately the idle message (without error message timeout!)
+
+
+=== set one-time-timeout and server-event ===
+
+This command can be used to change the next idle or error message timeout. 
+Additionally, it will send an event when a delay-time is passed.
+
+-----
+\x1b\xf4<type><delay><timeout><tag>\x03
+
+In which:
+
+type ::= "I" or "E"
+delay ::= \x31 .. \x7f
+timeout ::= \x31 .. \x7f
+tag ::= some ascii text unique identifying this timeout message
+-----
+
+For example:
+-----
+\e\xf4I62takky\x03
+-----
+Would give an event to the server after 6 seconds, then, when the server did not respond with any message within 2 second, the idle display is shown.
+
+The event would be formatted as follows:
+-----
+event ::= 'T' <act><tag>
+
+In which:
+act ::= 'T' or 'Q'		# resp: 'T'=normal timeout or 'Q'=timeout quit (e.g. due to scanning a "enter programming mode" barcode)
+
+E.g.:
+
+TTtakky
+-----
+
+NOTE: no message is send when the timeout is interupted due to a clear-screen command.
+
 === clear text layer ===
 -----
-\xf5
+\x1b\xf5
 -----
+
+=== read mifare card ===
+-----
+\x1b\xf8<cardnum>,<keyA>:{<sector><block><format>}n\x03
+
+In which:
+cardnum ::= <nibble>8
+keyA ::= <hex nibble>12
+sector ::= 0x30 .. 0x3f
+block ::= '0' or '1' or '2' or '-'
+format ::= 'B' or 'H'
+-----
+
+Explanation:
+
+cardnum:: the cardnumer of the card to be written. The transaction is refused when 
+     it does not match the current card.
+keyA:: This is the key that will be used to access the mifare card.
+sector:: One byte specifying the sector to be written: values 0x30 .. 0x3f respectively representing sector 0 to 15
+block:: this is the block to be read. The whole sector will be read when using '-'
+format:: The required format of the returned data.
+	'B'::: The read data is retured as binary (just as it is on the card).
+	'H'::: The read data is formatted as hex-nibbles.
+
+For example, the command for reading sector 1 block 2 formatted as binary, all blocks of sector 4 formatted in hex, and sector 15 block 0 also formatted in hex, using access keyA = "FFFFFFFFFFFF" from card with cardnum 76262fa5 looks like:
+-----
+\x1b\xf876262fa5,FFFFFFFFFFFF:\x31\x32B\x34-H\x3f\30H\x03
+-----
+
+Of course, this will only succeeds when the correct card is presented to the reader of which the specified sectors can be read with the specified access key.
+
+On success, the data is returned. The data of each block (or whole sector) read concatenated, possibly seperated by the configured seperator charracter (/dev/mifare/sector_data_seperator). The default seperator is `none'.
+------
+response-message ::= { ACK <data> {<sep> <data>}* } | { NAK <error code> }
+
+sep ::= "" | <SPACE> | <TAB> | "," | ":" | ";"
+------
+
+For example, the above could return something like (assumming all blocks are filled with "dirk has access!" and +/dev/mifare/sector_data_seperator = "comma"+):
+------
+<ACK>Dirk has access!,4469726b20686173206163636573735c4469726b20686173206163636573735c4469726b20686173206163636573735c,4469726b20686173206163636573735c<CR>
+------
+
+NOTE: the message seperator depends on configuration item +/cit/message_separator+ (in this case "CR").
+
+NOTE: when issuing multiple write commands in a row, one should xref:disable-mifare-card-detection[]
+
+This also shows the limited use of binary-formatting: when the read data contains `,' or <CR> charracters it will obfuscate the return string.
+
+
+On failure it will return an xref:error-codes[error code].
+
+
+
+
+=== write mifare card ===
+
+By using this command it is possible to write 1 or more blocks of data to a mifare card in 1 transaction.
+The transaction id is logged together with the result for each command within the transaction.
+Half-way broken transactions are not reverted (it is impossible to do that reliable with a mifare-card). Instead, 
+the return code and logging provides a way to determine were a transaction went wrong.
+
+-----
+\x1b\xf9<cardnum>,<transaction-id>:{<cmd>}+\x03
+
+In which:
+cardnum ::= <nibble>8
+transaction-id ::= <nibble>1-8
+cmd ::= {"K" <keyA>} or {"W" <sector> <block> <format+data>}
+keyA ::= <hex nibble>12
+sector ::= 0x30 .. 0x3f
+block ::= '0' or '1' or '2'
+format+data ::= {'B' <byte>16} or {'H' <nibble>32}
+-----
+
+Explanation:
+
+cardnum:: the cardnumer of the card to be written. The transaction is refused when 
+     it does not match the current card.
+transaction-id:: some id (hex) by which the server can identify this write. It 
+     should be max 8 hex nibbles long. It is used for transaction logging.
+cmd:: Their can more more than one command. Commands ar identified by a prefix: `K', `W', `I' or `D' respectively 'set-key', 'write block', 'increment block' or 'decrement block'. Only 'set key' and 'write block' are implemented.
+keyA:: This is the key that will be used to access the mifare card.
+sector:: One byte specifying the sector to be written: values 0x30 .. 0x3f respectively representing sector 0 to 15
+block:: this is the block to be written.
+format+data:: The data to be written can be formatted as binary (`B') or as hex-values (`H'). Exact 16 data-bytes are expected when format==`B'. Exact 32 nibbles are expected when format==`H'
+
+For example, transaction '1a2b3c' writing +Dirk has access!+ (note: 16 bytes long!) to block 2 sector 3 of card 0x76262fa5, with access key A = "FFFFFFFFFFFF", looks like:
+-----
+\x1b\xf876262fa5,1a2b3c:KFFFFFFFFFFFFW\x33\x32BDirk has access!\x03
+
+or 
+
+\x1b\xf876262fa5,1a2b3c:KFFFFFFFFFFFFW\x33\x32H4469726b20686173206163636573735c\x03
+-----
+
+Of course, this will only succeed when a card is presented to the reader of which the specified sectors can be written with the presented access key(s).
+Also note that writing in binary-mode is limited to data without the configured EOL control charracter(s).
+
+In response, the result is returned. On success a `0' charracter is returned. In case of an error, the result of all sequential commands is returned. That way, it is possible to see where a transaction went wrong. This is formated as:
+-----
+response-message ::= { ACK "0" } | { NAK {<cmd><id>}+ }
+-----
+
+Explanation:
+
+id:: This is a normal xref:error-codes[error code]
+
+This is also logged, preceeded with the transaction-id: Executing the example above with success would return +<ACK><CR>+ and +1a2b3d:0+ would be added to the log-file. On failure +<NAK>K0W2<CR>+ would be returned, and +1a2b3c:K0W2+ would be added to the logfile. In exceptional situations +<NAK>K0W06+ is returned when the transaction was OK but the log-file could not be written (this should not happen under normal circumstances).
+
+On receiving a error '6' (file-system full), the file system is in an error state. The only way out is:
+
+ - reboot the nquire
+ - forcing a log-rotate
+ - remove superflous files using ftp
+
+NOTE: the message seperator depends on configuration item +/cit/message_separator+ (in this case "CR").
+
+WARNING: file-system-full and format errors are 'only' retured in the response message and will 'not' be logged in the mifare.log file!
+
+CAUTION: Transaction logging shares partition space with (uploaded) gif-images.
+Transactions will fail (be refused) when there is no space left to log the transaction (at least 5 kb).
+
+NOTE: A `xref:event-messages[W8]' event (= warning: big log file) will be send when a `big' logfile is detected. This can slow down mifare handling. 
+The server is responsible for cleaning the transaction log by using the xref:shift-mifare-transaction-log[] command and remove the old log-files using ftp.
+
+NOTE: File system space is only verified in advance of a 'mifare write' command, and will never be verified when no mifare write is done.
+
+NOTE: when issuing multiple write commands in a row, one should xref:disable-mifare-card-detection[]
+
+
+anchor:shift-mifare-transaction-log[shift mifare transaction log]
+
+=== shift mifare transaction log ===
+All new mifare write transactions are logged in a file /log/mifare.log avialable by ftp.
+This file is read-only and would potentially require too much space. 
+It is therefore possible to rename the transaction log-file with the following command:
+
+-----
+\x1b\xfahhhhhhhh\x03
+
+In which
+
+hhhhhhhh	up to 8 hex-nibbles (usually the last transaction-id logged in that file).
+-----
+
+For example:
+-----
+\x1b\xfa123fed\x03
+-----
+would rename +mifare.log+ to +mifare-123fed.log+ and make the latter writeable.
+A new read-only mifare.log is created.
+
+On success an +ACK+ is retured. On failure a +NAK<error code>+ is returned.
+
+
+anchor:disable-mifare-card-detection[disable mifare card detection]
+
+=== disable/enable mifare card detection ===
+
+-----
+command ::= \x1b\xfb<onoff>
+onoff ::= \x30 | \x31
+-----
+
+Explanation:
+
+onoff:: 0x30 = disable, 0x30 = enable
+
+
+Card detection can interfere with reading and writing the mifare card when multiple seperate read or write commands are send in a row.
+It is therefore wise to disable the mifare card detection when doing so, and enabling it afterwards.
+
 
 === show configuration ===
+
 -----
-\xfe
+\x1b\xfe
 -----
 
+The configuration is shown on the display (e.g. serial number, mac-address, current ip, used interface, etc).

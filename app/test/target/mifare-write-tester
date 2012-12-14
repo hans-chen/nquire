@@ -1,0 +1,175 @@
+#!/bin/bash
+
+# test writing of a mifare card
+# 
+# For correct test execution this relies on:
+# 	MF event detection
+#  	mifare read
+#   a reliable and fast network (so network errors/delays can be excluded from the testresults)
+
+if test -f .cit.ip; then
+	CIT="`cat .cit.ip`"
+else
+	echo "ERROR: not .cit.ip found. Use 'make discover' to correct this (or do that manually)" 1>&2
+	exit 1
+fi
+
+PORT=9101
+KEY="FFFFFFFFFFFF"
+
+# ===========================================================================
+# functions
+
+function upload_conf( )
+{
+	cat > cit.conf
+	curl ftp://${CIT}/ -T cit.conf
+}
+
+function send( )
+{
+	echo -en $1 | nc localhost $PORT
+}
+
+function send_wait1( )
+{
+	nquire-cmd.exe -ip=127.0.0.1 -port=$PORT -answer=1 -msg="$1" > /dev/null
+}
+
+function send_wait_answer( )
+{
+	nquire-cmd.exe -ip=127.0.0.1 -port=$PORT -answer=1 -msg="$1"
+}
+
+# ===========================================================================
+# prepare
+
+cat << EOF | upload_conf
+/cit/mode = "TCP server"
+/cit/tcp_port = 9101
+/dev/mifare/key_A = "${KEY}"
+/dev/mifare/relevant_sectors = ""
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/send_cardnum_only = true
+/dev/mifare/sector_data_format = "hex"
+/dev/mifare/sector_data_seperator = "comma"
+/dev/mifare/suppress_beep = true
+EOF
+
+# wait for the settings to be effective
+sleep 2
+
+# start the testserver
+while killall testserver; do sleep .1; done 2> /dev/null
+testserver -d --ip=$CIT
+
+sleep 1
+
+# ===========================================================================
+# testing
+
+# turn on card detection (if it was not turned on yet)
+send '\x1b\xfb\x31'
+
+echo "Please present mifare card and keep at nquire"
+CARDNO=`send_wait_answer '\x1b\x24\x1b\x2e\x34Present card\nplease\x03' | cut -b3-10`
+echo "Received cardnumber: ${CARDNO}"
+
+# show message:
+send '\x1b\x24\x1b\x2e\x34Keep card close\nplease\x03'
+# and set a custom timeout
+send '\x1b\xf4E\xff\x31test took too long\x03'
+
+echo "Write data using different formats and validate write using a mifare read"
+send '\x1b\xfb\x30' # turn off mifare detection
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x311Bsector01-block1.\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x312H736563746f7230312d626c6f636b322e\x03'
+
+send_wait1 '\x1b\xf8'${CARDNO}','${KEY}':\x311B\x311H\x03'
+send '\x1b\xfb\x31' # turn on mifare detection
+
+sleep 3
+
+echo "Write 1 block"
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x310Bsector01-block0.\x03'
+sleep 3
+
+echo "Write 6 blocks in 1 transaction"
+send '\x1b\xfb\x30' # turn off mifare detection
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x310B0000000000000000W\x311B1111111111111111W\x312B2222222222222222W\x3f0B3333333333333333W\x3f1B4444444444444444W\x3f2B5555555555555555\x03'
+send_wait1 '\x1b\xf8'${CARDNO}','${KEY}':\x310B\x311B\x312B\x3f0B\x3f1B\x3f2B\x03'
+send '\x1b\xfb\x31' # turn on mifare detection
+
+sleep 3
+
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x310Bsector01-block0.W\x311Bsector01-block1.W\x312Bsector01-block2.W\x3f0Bsector0f-block0.W\x3f1Bsector0f-block1.W\x3f2Bsector0f-block2.\x03'
+send_wait1 '\x1b\xf8'${CARDNO}','${KEY}':\x310B\x311B\x312B\x3f0B\x3f1B\x3f2B\x03'
+
+sleep 3
+
+echo "Writing data quickly in a row"
+send '\x1b\xfb\x30' # turn off mifare detection
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x310B0000000000000000\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x311B1111111111111111\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x312B2222222222222222\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f0B3333333333333333\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f1B4444444444444444\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f2B5555555555555555\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x310Bsector01-block0.\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x311Bsector01-block1.\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x312Bsector01-block2.\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f0Bsector16-block0.\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f1Bsector16-block1.\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f2Bsector16-block2.\x03'
+send '\x1b\xfb\x31' # turn on mifare detection
+sleep 3
+
+echo "checking incorrect cardnumber"
+send_wait1 '\x1b\xf9deadbeef,0:K000000000000\x03'
+sleep 1
+
+echo "Checking response to invalid key with data to write"
+send_wait1 '\x1b\xf9'${CARDNO}',deadbeef:K000000000000W\x3f2Bsector16-block2.\x03'
+
+echo "Checking response to invalid key without data to write"
+send_wait1 '\x1b\xf9'${CARDNO}',deadbeef:K000000000000\x03'
+sleep 1
+
+echo "= format errors ="
+echo "checking invalid cardnumber format (2x)"
+send_wait1 '\x1b\xf9123,deadbeef:K000000000000\x03'
+send_wait1 '\x1b\xf9abcdefgh,deadbeef:K000000000000\x03'
+
+echo "checking response to invalid write command"
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'X\x3f2Bsector16-block2\x03'
+
+echo "checking response to write without key"
+send_wait1 '\x1b\xf9'${CARDNO}',0:W\x3f2Bsector16-block2.\x03'
+
+echo "checking response to invalid key format (2x)"
+send_wait1 '\x1b\xf9'${CARDNO}',0:K0123456W\x3f2Bsector16-block2.\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:KabcdefghW\x3f2Bsector16-block2.\x03'
+
+echo "checking response to invalid sector"
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x402Bsector16-block2.\x03'
+
+echo "checking response to invalid block (2x)"
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f3Bsector16-block2.\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f-Bsector16-block2.\x03'
+
+echo "checking response to invalid format specifier"
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f2Xsector16-block2.\x03'
+
+echo "checking response to invalid data (3x)"
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f2B0123456789abcde\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f2H0123456789abcdef\x03'
+send_wait1 '\x1b\xf9'${CARDNO}',0:K'${KEY}'W\x3f2H0123456789abcdef0123456789abcde\x03'
+
+# show end message
+send '\x1b\x24\x1b\x2e\x34Thank you\x03'
+sleep 1
+send '\x1b\xf3' # force idle message
+
+killall testserver
+

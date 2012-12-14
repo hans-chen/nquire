@@ -157,6 +157,13 @@ local function draw_css(client)
 
 
 	</style>
+	
+	<STYLE TYPE="text/css">
+		<!--
+		#dek {POSITION:absolute;VISIBILITY:hidden;Z-INDEX:200;}
+		//-->
+	</STYLE>
+
 	</head>
 	]])
 end
@@ -179,6 +186,60 @@ function enable_disable(tf, element)
     document.getElementById(element).disabled = ! tf; 
 }
 </script> 
+
+<DIV ID="dek"></DIV>
+
+<SCRIPT TYPE="text/javascript">
+<!--
+// the popup position.
+Xoffset=-60;
+Yoffset= 20;
+
+var old,skn,iex=(document.all),yyy=-1000;
+
+var ns4=document.layers
+var ns6=document.getElementById&&!document.all
+var ie4=document.all
+
+if (ns4)
+skn=document.dek
+else if (ns6)
+skn=document.getElementById("dek").style
+else if (ie4)
+skn=document.all.dek.style
+if(ns4)document.captureEvents(Event.MOUSEMOVE);
+else{
+skn.visibility="visible"
+skn.display="none"
+}
+document.onmousemove=get_mouse;
+
+function popup(msg,bak){
+var content="<TABLE  WIDTH=250 BORDER=1 BORDERCOLOR=black CELLPADDING=2 CELLSPACING=0 "+
+"BGCOLOR="+bak+"><TD ALIGN=left><FONT COLOR=black SIZE=2>"+msg+"</FONT></TD></TABLE>";
+yyy=Yoffset;
+ if(ns4){skn.document.write(content);skn.document.close();skn.visibility="visible"}
+ if(ns6){document.getElementById("dek").innerHTML=content;skn.display=''}
+ if(ie4){document.all("dek").innerHTML=content;skn.display=''}
+}
+
+function get_mouse(e){
+var x=(ns4||ns6)?e.pageX:event.x+document.body.scrollLeft;
+skn.left=x+Xoffset;
+var y=(ns4||ns6)?e.pageY:event.y+document.body.scrollTop;
+skn.top=y+yyy;
+}
+
+function kill(){
+yyy=-1000;
+if(ns4){skn.visibility="hidden";}
+else if (ns6||ie4)
+skn.display="none"
+}
+
+//-->
+</SCRIPT>
+
 ]])
 end
 
@@ -187,6 +248,13 @@ client:add_data([[
 </body>
 ]])
 end
+
+local function to_html_escapes( value, esc )
+	return value:gsub("[" .. esc .. "]",
+		function (c) 
+			return "&#" .. string.byte(c) .. ";"
+		end )
+end		
 
 ---------------------------------------------------------------------------
 -- Draw a config node
@@ -218,19 +286,26 @@ local function draw_node_value_data( client, node, ro, optarg )
 
 		if node:is_writable() and not ro then
 
+			popup = ""
+			if node.comment then
+				local html_comment = to_html_escapes(node.comment, "\"\'")
+				popup = "onMouseOver=\"popup('" .. html_comment .. "','lightgreen')\"; onMouseOut=\"kill()\""
+			end
+
+
 --			client:add_data("<input type='hidden' name='id' value=%q/>\n" % id)
 			if node.type == "boolean" and node.appearance=="checkbox" then
 				logf(LG_DBG,lgid,"displaying checkbox %s = %s", id, value)
 				local is_checked = (value == "true") and "checked" or ""
 				client:add_data("<input type='hidden' name='default-%s' value='off'/>\n" % { id })
-				client:add_data("<input type='checkbox' name='set-%s' %s %s/>\n" % { id, optarg, is_checked })
+				client:add_data("<input type='checkbox' name='set-%s' %s %s %s/>\n" % { id, optarg, is_checked, popup })
 			elseif node.type == "boolean" then
 				local c1 = (value == "false") and "checked" or ""
 				local c2 = (value == "true") and "checked" or ""
-				client:add_data("<input type='radio' name='set-%s' value='false' %s %s/> No\n" % { id, c1, optarg })
-				client:add_data("<input type='radio' name='set-%s' value='true' %s %s/> Yes\n" % { id, c2, optarg })
+				client:add_data("<input type='radio' name='set-%s' value='false' %s %s %s/> No\n" % { id, c1, optarg, popup })
+				client:add_data("<input type='radio' name='set-%s' value='true' %s %s %s/> Yes\n" % { id, c2, optarg, popup })
 			elseif node.type == "enum" then
-				client:add_data("<select name='set-%s' %s >\n" % {id, optarg})
+				client:add_data("<select name='set-%s' %s %s>\n" % {id, optarg, popup})
 				for item in node.range:gmatch("([^,]+)") do
 					local sel = (item == value) and " selected" or ""
 					client:add_data("<option value=%q%s>%s</option>\n" % { item, sel, item })
@@ -238,11 +313,11 @@ local function draw_node_value_data( client, node, ro, optarg )
 				client:add_data("</select>\n")
 			elseif node.type == "password" then
 				--client:add_data("<input type='password' name='set-%s' size='15' value=%q %s/>\n" % {id, value, optarg })
-				client:add_data("<input type='password' name='set-%s' size='15' value=%q %s/>\n" % {id, hidden_password, optarg })
+				client:add_data("<input type='password' name='set-%s' size='15' value=%q %s %s/>\n" % {id, hidden_password, optarg, popup })
 			else
 				if node.type == "ip_address" then
 					size = 15
-				elseif node.range then
+				elseif node.type ~= "custom" and node.range then
 					size = 0
 					for c in node.range:gmatch("(%d+)") do
 						local n = tonumber(c)
@@ -258,20 +333,13 @@ local function draw_node_value_data( client, node, ro, optarg )
 				if node.options and node.options:find("b") then
 					--print("DEBUG: node[= " .. id .. "]='" ..  value .. "'")
 					
-					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s/>\n" % {id, maxlength*4, (node.size or size*4), binstr_to_escapes(value,0,0), optarg })
+					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s %s/>\n" % {id, maxlength*4, (node.size or size*4), binstr_to_escapes(value,0,0), optarg, popup })
 				else
-					-- show string as it is, we have to replace all '&' and '\'' 
-					-- charracter with their html escape codes
-					local v = binstr_to_escapes(value:gsub("[&']",
-							function (c) 
-								if c=="'" then 
-									return "&#39;" 
-								elseif c=="&" then
-									return "&#38;"
-								end 
-							end ), 31, 256)
+					-- To show string as it is, we have to replace some charracters
+					-- by their html escape code
+					local v = binstr_to_escapes(to_html_escapes( value, "&\\\'\"" ), 31, 256)
 				
-					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s/>\n" % {id, maxlength, (node.size or size), v, optarg })
+					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s %s/>\n" % {id, maxlength, (node.size or size), v, optarg, popup })
 				end
 			end
 
@@ -418,6 +486,7 @@ local function page_home(client, request)
 	draw_node(client, config:lookup("/dev/scanner/version"))
 	draw_node(client, config:lookup("/network/macaddress"))
 	draw_node(client, config:lookup("/dev/hardware"))
+	body_end(client);
 end
 
 local function display_by_default( yes_do )
@@ -490,6 +559,8 @@ local function page_network(client, request)
 			draw_node(client, config:lookup("/network/ip/address"))
 			draw_node(client, config:lookup("/network/ip/netmask"))
 			draw_node(client, config:lookup("/network/ip/gateway"))
+			draw_node(client, config:lookup("/network/ip/ns1"))
+			draw_node(client, config:lookup("/network/ip/ns2"))
 		client:add_data("</table>")
 	box_end(client)
 
@@ -625,7 +696,7 @@ local function page_scanner( client, request )
 		if does_firmware_support( code ) and not is_2d_code(code.name) then
 			local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
 			if node then
-				logf(LG_DMP, lgid, "showing code %s", code.name)
+				logf(LG_DBG, lgid, "showing code %s", code.name)
 				draw_node(client, node)
 			else
 				logf(LG_DBG, lgid, "Code '%s' is no configuration item.", code.name)
@@ -643,7 +714,7 @@ local function page_scanner( client, request )
 			if does_firmware_support( code ) and is_2d_code(code.name) then
 				local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
 				if node then
-					logf(LG_DMP, lgid, "showing code %s", code.name)
+					logf(LG_DBG, lgid, "showing code %s", code.name)
 					draw_node(client, node, nil, nil, ("id='2d_code_" .. tostring(n)) .. "'" .. display_style )
 					n = n + 1
 				else
@@ -670,6 +741,11 @@ local function page_scanner( client, request )
 		draw_node(client, config:lookup("/dev/scanner/1d_scanning_mode"))
 		box_end(client)
 	end
+	
+	box_start(client, "extscanner", "External scanner")
+	draw_node(client, config:lookup("/dev/extscanner/raw"))
+	box_end(client)
+	
 
 	if Scanner_rf:is_available() then
 		box_start(client, "scanner", "Mifare scanner")
@@ -678,9 +754,11 @@ local function page_scanner( client, request )
 			draw_node(client, config:lookup("/dev/mifare/cardnum_format"))
 			draw_node(client, config:lookup("/dev/mifare/send_cardnum_only"))
 			draw_node(client, config:lookup("/dev/mifare/sector_data_format"))
+			draw_node(client, config:lookup("/dev/mifare/sector_data_seperator"))
 			draw_node(client, config:lookup("/dev/mifare/prevent_duplicate_scan_timeout"))
 			draw_node(client, config:lookup("/dev/mifare/msg/access_violation/text"))
 			draw_node(client, config:lookup("/dev/mifare/msg/incomplete_scan/text"))
+			draw_node(client, config:lookup("/dev/mifare/msg/transaction_error_message"))
 		box_end(client)
 	end
 
@@ -719,6 +797,7 @@ local function page_miscellaneous(client, request)
 	draw_node(client, config:lookup("/cit/messages/error/timeout"))
 	draw_node(client, config:lookup("/cit/codepage"))
 	draw_node(client, config:lookup("/cit/message_separator"))
+	draw_node(client, config:lookup("/cit/message_encryption"))
 	box_end(client)
 
 	box_start(client, "miscellaneous", "Interaction")
@@ -740,12 +819,14 @@ local function page_miscellaneous(client, request)
 		draw_node(client, config:lookup("/dev/touch16/prefix"))
 		draw_node(client, config:lookup("/dev/touch16/timeout"))
 		draw_node(client, config:lookup("/dev/touch16/keyclick"))
+		draw_node(client, config:lookup("/dev/touch16/invert"))
 		draw_node(client, config:lookup("/dev/touch16/minimum_click_delay"))
 		draw_node(client, config:lookup("/dev/touch16/send_active_keys_only"))
 		box_end(client)
 	end
 	
 	form_end(client)
+	body_end(client);
 
 end
 
@@ -779,6 +860,8 @@ local function page_log(client, request)
 		f:close()
 		box_end(client)
 	end
+
+	body_end(client);
 end
 
 
@@ -800,6 +883,7 @@ local function page_reboot(client, request)
 	client:add_data("<input type=submit value='Defaults'>")
 	client:add_data("</form>")
 	box_end(client)
+	body_end(client);
 
 end
 
@@ -841,7 +925,7 @@ local function page_rebooting(client, request)
 	
 	draw_css(client)
 
-	if Upgrade.upgrade_busy then
+	if Upgrade.busy() then
 		logf(LG_INF, "upgrade", "Upgrade in progress")
 
 		show_page_rebooting( client, [[
@@ -855,6 +939,9 @@ local function page_rebooting(client, request)
 
 		os.execute("reboot")
 	end
+
+	body_end(client);
+
 end
 
 
@@ -870,11 +957,11 @@ end
 
 local function on_webserver(client, request)
 	
-	logf(LG_DMP, lgid, "request.method=%s, request.post_data=%s", request.method, (request.post_data or "nil") )
+	logf(LG_DBG, lgid, "request.method=%s, request.post_data=%s", request.method, (request.post_data or "nil") )
 	local applied_setting;
 	local retval = ""
 
-	if not Upgrade.upgrade_busy then
+	if not Upgrade.busy() then
 		-- Watch out: this only works as long as the pages do not post binary data 
 		if request.method=="POST" and request.post_data then
 			string.gsub(request.post_data, "([^&=]+)=([^&;]*)[&;]?", 
@@ -885,6 +972,8 @@ local function on_webserver(client, request)
 		end
 
 		errors = {}
+		local skip = {}
+		
 		-- since a checkbox is only received when it is checked, the false value 
 		-- is faked with a hidden value of which the key starts with "default-" instead of "set-"
 		local keyvalues = {}
@@ -901,7 +990,7 @@ local function on_webserver(client, request)
 		end
 
 		for key, value in pairs(keyvalues) do
-			logf(LG_DMP,lgid,"keyvalue['%s'] = '%s'", key, value)
+			logf(LG_DBG,lgid,"keyvalue['%s'] = '%s'", key, value)
 		end
 	
 		-- and special validation for the password
@@ -914,13 +1003,23 @@ local function on_webserver(client, request)
 
 			-- reject when just changed from authentication disabled or username is
 			-- changed and passwords did not change or differ
-			if (config:get("/dev/auth/enable") == "false" or usr ~= config:get("/dev/auth/username")) and
-					(pwd == hidden_password or pwd ~= pwd_shadow) or usr=="" or pwd == "" then
-				logf(LG_DBG,lgid,"password is not entered but authentication or user is changed.")
+			if usr == "" or usr:match("^%s") or usr:match("%s$") then
+				skip["/dev/auth/enable"] = true
+				errors["/dev/auth/username"] = true
+				skip["/dev/auth/password"] = true
+				skip["/dev/auth/password_shadow"] = true
+			elseif pwd ~= pwd_shadow or pwd == "" or (pwd ~= hidden_password and pwd:match("\1")) then
+				skip["/dev/auth/enable"] = true
 				errors["/dev/auth/username"] = true
 				errors["/dev/auth/password"] = true
 				errors["/dev/auth/password_shadow"] = true
-				errors["/dev/auth/enable"] = true
+			elseif (config:get("/dev/auth/enable") == "false" or usr ~= config:get("/dev/auth/username")) and
+					(pwd == hidden_password)  then
+				logf(LG_DBG,lgid,"password is not entered but authentication or user is changed.")
+				skip["/dev/auth/enable"] = true
+				errors["/dev/auth/username"] = true
+				errors["/dev/auth/password"] = true
+				errors["/dev/auth/password_shadow"] = true
 		
 			-- ignore when user and password are not changed:
 			-- this only happens direct after authorisation because the browser will 
@@ -952,7 +1051,10 @@ local function on_webserver(client, request)
 				if node.type=="boolean" and node.appearance=="checkbox" and value~="false" then
 					value="true"
 				end
-				if errors[key] then
+				if skip[key] then
+					-- nothing to do, just skip because of some other error
+					logf(LG_DBG,lgid,"Skipped setting of %s because of some other error", key)
+				elseif errors[key] then
 					logf(LG_DBG,lgid,"Webui data entry error on field %s", key)
 				else
 					local prev_value = node:get()
@@ -969,11 +1071,8 @@ local function on_webserver(client, request)
 			end
 		end
 
-		-- TODO: should this also be done when there are errors?
 		if applied_setting then
 			logf(LG_DBG,lgid,"Applied settings")
-			-- notify other modules (touch16) before the screen is cleared
-			evq:push("apply_settings", nil, -1) 
 			display:set_font( nil, 18, nil )
 			display:show_message("Applying", "settings")
 			evq:push("cit_idle_msg", nil, 4.0)
@@ -1006,7 +1105,7 @@ local function on_webserver(client, request)
 
 	local p = request.param.p
 	local handler
-	if Upgrade.upgrade_busy then
+	if Upgrade.busy() then
 		handler = page_rebooting
 	elseif p and pagehandlers[p] then
 		handler = pagehandlers[p]

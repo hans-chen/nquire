@@ -3,9 +3,11 @@ Maarten van Dootingh <maarten@vdtai.nl>
 
 Revision history
 
-`-------`-----------------------`-------------------------------------------------------------
-v1.0 	December 21 2009	Conversion from hand-written html
-----------------------------------------------------------------------------------------------
+[cols="1^,4,10",options="header"]
+|===================================================
+|Version|Date            |Comment
+|v1.0 	|December 21 2009|Conversion from hand-written html
+|===================================================
 
 This document describes ...
 
@@ -70,7 +72,13 @@ Version 1 of the Nquire discovery protocol will send the following
 packet header and identifier-value pairs (values are an example):
 
 ----
-CIT-DISCOVER-RESPONSEDevice name: Newland NQuire 200Application version: 1.2Application build nr: 456Serial number: EI0123456RWIP-Address: 192.168.1.226MAC-Address: 08:00:46:31:60:95
+CIT-DISCOVER-RESPONSE
+Device name: Newland NQuire 200
+Application version: 1.2
+Application build nr: 456
+Serial number: EI0123456RW
+IP-Address: 192.168.1.226
+MAC-Address: 08:00:46:31:60:95
 ----
 
  -	Note 1: The protocol for a certain version will not change. Any

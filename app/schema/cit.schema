@@ -32,14 +32,29 @@ return group {
 		label = "Mode",
 		type = "enum",
 		default = "server",
-		range = "server,client,UDP,TCP server,TCP client,TCP client on scan"
+		range = "server,client,UDP,TCP server,TCP client,TCP client on scan",
+		comment = "server: tcp server and udp<br/>client: tcp client and udp<br/>UDP: only udp<br/>TCP client: only tcp client<br/>TCP server: only tcp server</br>TCP client on scan: connect on scan"
 	},
 
 	object {
 		id = "remote_ip",
 		label = "Remote IP address",
+		--type = "ip_address",
+		-- due to legacy this is called remote_ip, although it can be an ip or a name.
+		-- the resolved_remote_ip will be filled in according this name.
+		default = "192.168.1.201",
+		comment = "This is the ip-address or name of the remote server. It is used in UDP or server mode to send UDP messages to, or in client mode, this is the address to connect to.",
+
+		type = "string",
+		range = "1:128",
+		size = 25,
+	},
+
+	object {
+		mode = "r",
+		id = "resolved_remote_ip",
 		type = "ip_address",
-		default = "192.168.1.201"
+		default = "0.0.0.0",
 	},
 
 	object {
@@ -68,10 +83,20 @@ return group {
 
 	object {
 		id = "message_separator",
-		label = "Scan message separator",
+		label = "Scan event separator",
 		type = "enum",
 		default = "LF",
 		range = "LF,CR,CRLF",
+		comment = "This specifies the seperator byte (or bytes) that is used to indicate the end of a server event or escape command response message"
+	},
+
+	object {
+		id = "message_encryption",
+		label = "Message encryption",
+		type = "enum",
+		default = "none",
+		range = "none,base64",
+		coomment = "Escape commands and response messages can be transformend into a non-human readable format: base 64."
 	},
 
 	group {

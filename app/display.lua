@@ -107,14 +107,18 @@ local function draw_image(display, fname, xpos, ypos)
 		logf(LG_WRN, lgid, "No image fname given")
 		return false
 	end
-	local ok, err = display.drv:draw_image(fname, xpos, ypos)
-	if not ok then
+	logf(LG_DBG,lgid,"draw_image(%s,%d,%d)", fname, xpos, ypos)
+	local image_index, err = display.drv:draw_image(fname, xpos, ypos)
+	if image_index == nil then
 		logf(LG_WRN, lgid, "draw_image: %s", err)
-		return false
+		return nil
 	end
-	return true
+	return image_index
 end
 
+local function invert( display, image_index )
+	display.drv:invert( image_index )
+end
 
 local function draw_video(display, fname, w, h)
 	if not fname then
@@ -135,8 +139,8 @@ end
 --
 
 local function draw_image_blob(display, blob)
-	local ok, err = display.drv:draw_image(nil, blob)
-	if not ok then
+	local image_index, err = display.drv:draw_image(nil, blob)
+	if image_index == nil then
 		logf(LG_WRN, lgid, "draw_image: %s", err)
 	end
 end
@@ -162,7 +166,7 @@ end
 --
 
 local function set_font(display, family, size, attr)
-	logf(LG_DMP, lgid, "set_font( family=%s, size=%d )", family or "nil", size or 0 )
+	logf(LG_DBG, lgid, "set_font( family=%s, size=%d )", family or "nil", size or 0 )
 	display.font_family = family or display.font_family
 	display.font_size = size or display.font_size
 	display.font_attr = attr or display.font_attr
@@ -190,7 +194,7 @@ local function draw_text(display, fmt, ...)
 	end
 
 	local w, h, x, y = display.drv:draw_text(buf)
-	logf(LG_DMP,lgid,"txt='%s':w=%d,h=%d,x=%d,y=%d", buf,w,h,x,y)
+	logf(LG_DBG,lgid,"txt='%s':w=%d,h=%d,x=%d,y=%d", buf,w,h,x,y)
 	return w, h, x, y
 end
 
@@ -264,7 +268,7 @@ end
 local function set_color(display, v1, v2, v3)
 	
 	local r,g,b = get_rgb( v1, v2, v3 )
-	logf(LG_DMP,lgid,"r=%d, g=%d, b=%d", (r or -1),(g or -1),(b or -1))
+	logf(LG_DBG,lgid,"r=%d, g=%d, b=%d", (r or -1),(g or -1),(b or -1))
 	if r ~= nil then
 		display.drv:set_color(r,g,b)
 	end
@@ -300,7 +304,7 @@ end
 --               1..17: image layer
 --
 local function clear(display, layer)
-	logf(LG_DMP, lgid, "clear(layer=%d)", layer or -1)
+	logf(LG_DBG, lgid, "clear(layer=%d)", layer or -1)
 	display.drv:clear(layer)
 	if layer==nil then
 		-- watch out: event is handled direct (as a function call, not queued)
@@ -442,6 +446,7 @@ function new()
 		set_background_color = set_background_color,
 		set_font = set_font,
 		draw_image = draw_image,
+		invert = invert,
 		draw_video = draw_video,
 		draw_image_blob = draw_image_blob,
 		draw_text = draw_text,

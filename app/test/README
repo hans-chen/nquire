@@ -1,0 +1,44 @@
+= nquire app/test/README.txt =
+
+== Setup ==
+
+Testing the nquire application:
+
+This is done using scripts or small programs, each testing different parts of 
+the application. There are a number of module tests that are able to some 
+modules on the development host. The remaining tests are to be done on the 
+target.
+
+Each test is a small executable (compiled or script) conforming to:
+ - exit 0: no error during test execution
+ - exit <>0: execution of the test failed premature
+ - the stdout and stderr are redirected to a result-file which is compared with
+   a manually verified result file.
+
+The different tests can be found in subdirectories:
+
+module/
+target/
+
+
+Executing the tests can be done using the make file. E.g: the following would
+first clean everithing, than build preriquisites, than execute all tests and
+show a diff of the results with verified results using meld:
+--------
+make clobber
+make all test show
+--------
+
+NOTE: some tests require manual interaction (e.g. for presenting a mifare card
+to the nquire)
+
+== manual tests ==
+
+Manually verify whether there are no resource leaks on the target:
+
+[root@NEWLAND_CIT /cit200] (while true; do cat /proc/sys/fs/file-nr; sleep 1; done) &
+
+The first minus the second number of the output represents the number of 
+currently opened files. 
+
+

@@ -55,7 +55,7 @@ local function play(beeper, song)
 	local tempo = 120
 	local volume = config:get("/dev/beeper/volume") / 5
 
-	logf(LG_DMP, lgid, "Playing %s", song)
+	logf(LG_DBG, lgid, "Playing %s", song)
 
 	for char, mod, num, dot in string.gmatch(song, "([cdefgabpotdl><])([#\-]?)(%d*)(%.?)") do
 

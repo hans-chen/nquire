@@ -36,8 +36,8 @@ if ! cd $CIT_UPGRADE_TOOLS; then
 	exit -1
 else
 	cd -
+	cp -a $CIT_UPGRADE_TOOLS .
 	UPGRADE_TOOLS_DIR=${APP_DIR}/cit200-upgrade-tools
-	cp -a /home/maarten/workspace/NQuire/trunk/cit200-upgrade-tools .
 	rm -rf `find cit200-upgrade-tools/ -name '.svn'`
 	make -C cit200-upgrade-tools clean
 	SRC_IMG=${UPGRADE_TOOLS_DIR}/src/appfs.jffs2
@@ -93,10 +93,8 @@ make
 cd ${APP_DIR}
 
 # rename the result files:
-mkdir -p ${APP_DIR}/release
-
 F=${UPGRADE_TOOLS_DIR}/release/cit-firmware*.image
-FW=${APP_DIR}/release/`basename $F | sed -e "s/cit-firmware-.*.build.rexported/cit-firmware-$FIRMWARE_RELEASE_TAG/"`
+FW=${APP_DIR}/`basename $F | sed -e "s/cit-firmware-.*.build.rexported/cit-firmware-$FIRMWARE_RELEASE_TAG/"`
 cp $F ${FW}
 
 #F=${UPGRADE_TOOLS_DIR}/release/cit-app*.image

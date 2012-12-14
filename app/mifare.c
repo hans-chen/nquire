@@ -42,9 +42,30 @@ static int mifare_error( int nlrf_error )
     	case -NLRF_ERR_BACKUPTTY: return -8;
     	case -NLRF_ERR_RESTORETTY: return -9;
     	case -NLRF_ERR_UNKNOWN: return -10;
-    	default: return -100;
+    	default: return -100; // eg memory alloc error
     }
 }
+
+static const char* mifare_error_str( int nlrf_error )
+{
+	switch( nlrf_error )
+	{
+		case NLRF_OK: return "No error";
+		case -NLRF_ERR_NODEV: return "Mifare HW not found";
+    	case -NLRF_ERR_NOCARD: return "Mifare card not available";
+    	case -NLRF_ERR_WRONGKEY: return "Incorrect key accessing mifare card";
+    	case -NLRF_ERR_CARDORKEY: return "Card or key error";
+    	case -NLRF_ERR_IGNORE_ME: return "Ignore";
+    	case -NLRF_ERR_INVALID: return "Invalid parameter using mifare";
+    	case -NLRF_ERR_SETTTY: return "Incorrect tty during opening mifare";
+    	case -NLRF_ERR_BACKUPTTY: return "Backup tty failed during opening mifare";
+    	case -NLRF_ERR_RESTORETTY: return "Restore tty failed during close mifare";
+    	case -NLRF_ERR_UNKNOWN: return "Mifare error (not specific)";
+    	default: return "Unknown error from mifare"; // eg memory alloc error
+    }
+}
+
+
 
 static int l_new(lua_State *L)
 {
@@ -135,7 +156,6 @@ static int l_querycardinfo(lua_State *L)
 	switch( result )
 	{
 	case 0:
-		TRACE(" ");
 		lua_pushnumber(L, info.nsector);
 		lua_pushnumber(L, info.nblock);
 		lua_pushnumber(L, info.blocksize);
@@ -203,6 +223,8 @@ int l_fetch_querycardinfo(lua_State *L)
 // @param L[2] the access key to the mifare card
 static int l_chkkey(lua_State *L)
 {
+	//TRACE_ON();
+
 	Mifare *dd = lua_touserdata(L, 1);
 	unsigned int length=0U;
 	const char *key = lua_tolstring(L, 2, &length);
@@ -215,13 +237,16 @@ static int l_chkkey(lua_State *L)
 
 	lua_pushinteger(L, mifare_error(result));
 
+	//TRACE_OFF();
+
 	return 1;
 }
 
 // @param L[2] - sectornr
 // @param L[3] - blocknr
 // @param L[4] - size
-// return result, data
+// return data, result, result_str
+// Post cond: data!=nil exor result!=0
 static int l_readblock(lua_State *L)
 {
 	Mifare *dd = lua_touserdata(L, 1);
@@ -235,7 +260,10 @@ static int l_readblock(lua_State *L)
 	unsigned char *data = (unsigned char*)malloc( size );
 	if( !data ) 
 	{
-		BARF(L,"Could not allocate %d bytes: not performing nlrf_readblock()", size);
+		lua_pushnil(L);
+		lua_pushinteger( L, -100 );
+		lua_pushstring( L, "memory allocation failure" );
+		return 3;
 	}
 	else
 	{
@@ -244,17 +272,50 @@ static int l_readblock(lua_State *L)
 		int result = nlrf_readblock(dd->fd, sector, block, data, size);
 		TRACE("after: nlrf_readblock, result=%d", result);
 
-		lua_pushinteger(L, mifare_error(result));
-		int numpar = 1;
 		if (result == 0)
-		{
 			lua_pushlstring( L, (const char*)data, size );
-			numpar = 2;
-		}
+		else
+			lua_pushnil(L);
 
 		free(data);
-		return numpar;
+
+		lua_pushinteger(L, mifare_error(result));
+		lua_pushstring(L, mifare_error_str(result) );
+
+		return 3;
 	}
+}
+
+// @param L[2] - sectornr
+// @param L[3] - blocknr
+// @param L[4] - data
+// return result, result_str
+static int l_writeblock(lua_State *L)
+{
+	TRACE_ON();
+	Mifare *dd = lua_touserdata(L, 1);
+
+	if( dd->fd == 0 )
+	{
+		lua_pushinteger(L, -100);
+		lua_pushstring(L, "Interface not opened");
+		return 2;
+	}
+
+	int sector = lua_tointeger(L, 2);
+	int block = lua_tointeger(L, 3);
+	unsigned int size=0U;
+	const char *data = lua_tolstring(L, 4, &size);
+
+	TRACE("before: nlrf_writeblock( fd=%d, sector=%d, block=%d, size=%d )", dd->fd, sector, block, size);
+	int result = nlrf_writeblock(dd->fd, sector, block, (unsigned char*) data, size);
+	TRACE("after: nlrf_writeblock, result=%d", result);
+
+	lua_pushinteger(L, mifare_error(result));
+	lua_pushstring(L, mifare_error_str(result));
+	
+	TRACE_OFF();
+	return 2;
 }
 
 static int l_get_modeltype(lua_State *L)
@@ -284,6 +345,7 @@ static struct luaL_Reg mifare_metatable[] = {
 	{ "fetch_querycardinfo", l_fetch_querycardinfo },
 	{ "chkkey",			l_chkkey },
 	{ "readblock",		l_readblock },
+	{ "writeblock",		l_writeblock },
 	{ "get_modeltype",	l_get_modeltype },
 	
 	{ NULL },

@@ -3,10 +3,12 @@ Maarten van Dootingh <maarten@vdtai.nl>
 
 Revision history
 
-`-------`-----------------------`-------------------------------------------------------------
-v1.0 	March 29 2010           Innitial document
-v1.1    Jun 9 2010              CHnaged purpose of document
-----------------------------------------------------------------------------------------------
+[cols="1^,4,10",options="header"]
+|===================================================
+|Version|Date            |Comment
+|v1.0 	|March 29 2010   |Innitial document
+|v1.1   |Jun 9 2010      |Changed purpose of document
+|===================================================
 
 == NQuire test manual == 
 

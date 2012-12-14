@@ -23,7 +23,10 @@ else
 
 	if test "$1" == "-a"; then
 		shift
+		cp /cit200/cit.conf /mnt
 		cd /cit200 && rm -rf *
+		cp /mnt/cit.conf /cit200
+		rm /mnt/cit.conf
 		ifdown eth0
 		ifdown wlan0
 	fi

@@ -3,10 +3,12 @@ Maarten van Dootingh <maarten@vdtai.nl>
 
 Revision history
 
-`-------`-----------------------`-------------------------------------------------------------
-v1.0 	March 18 2010           Initial version
-v1.1    April 2 2010            Update documenting authentication section
-----------------------------------------------------------------------------------------------
+[cols="1^,4,10",options="header"]
+|===================================================
+|Version|Date            |Comment
+|v1.0 	|March 18 2010   |Initial version
+|v1.1   |April 2 2010    |Update documenting authentication section
+|===================================================
 
 == Introduction == 
 
@@ -98,7 +100,7 @@ NOTE: enabling authentication (either by magic barcode or by upload of cit.conf)
 	should always be accompanied by an encrypted password.
 	
 NOTE: the username is NOT reset when disabling authentication. This means that
-	anabling authentication with only /dev/auth/enable and /dev/auth/encrypted
+	enabling authentication with only /dev/auth/enable and /dev/auth/encrypted
 	will work using the previous password!
 
 E.g. (user=piet, password=puck):
@@ -119,24 +121,39 @@ The default content as of application version 1.4 is:
 # CIT settings
 
 /cit/codepage = "ibm852"
+# the TCP port to connect to when /cit/mode="client", "TCP client" or "TCP client on scan".
+# In server orTCP server is is the port on which is listend for incoming connects
 /cit/tcp_port = 9101
+# the port to send packet to (mode=server, udp server) and to listen
 /cit/udp_port = 9000
 /cit/mode = "server"
-/cit/remote_ip = 192.168.1.201
+# ip address or hostname. Used for sending udp messages or connecting int client mode.
+# When a hostname is specified:
+# /network/ip/ns1 and /network/ip/ns2 should be valid. 
+# A resolved address is chached for 24 hours.
+/cit/remote_ip = 192.168.1.100
 /cit/disable_scan_beep = false
 /cit/programming_mode_timeout = 15
-/cit/loglevel = 3
+# the logging level. In normal operation this should be 3. 4=debug, and 5=dump.
+/cit/loglevel = 4
+# the character that is used to seperate messages comming from and received by the nquire.
+/cit/message_separator = "LF"
+# this is how messages are encrypted. Currently only base64 is possible (note this is not really encryption)
+/cit/message_encryption = "none"
 
 # Messages
 
 
 # Font sizes
 
+# the font sizes to be used for 'large' and 'small' (escape codes).
+# Recommanded is to use multiples of 6, starting at 12
 /cit/messages/fontsize/small = 18
 /cit/messages/fontsize/large = 28
 
 # Idle message
 
+# the delay for showing the idle message after displaying something using an escape command
 /cit/messages/idle/timeout = 3
 
 # 
@@ -147,7 +164,7 @@ The default content as of application version 1.4 is:
 
 # Line 1
 
-/cit/messages/idle/1/text = "Welcome"
+/cit/messages/idle/1/text = "Welcome NOW"
 /cit/messages/idle/1/xpos = 0
 /cit/messages/idle/1/ypos = 10
 /cit/messages/idle/1/valign = "top"
@@ -196,25 +213,38 @@ The default content as of application version 1.4 is:
 
 # Network settings
 
+# Also specify the correct wifi settings when using "wifi"
+# Wifi is only valid when the nquire has the wifi hw option.
 /network/interface = "ethernet"
+# also specify the correct ip settings when false.
 /network/dhcp = false
 
 # 
 
 
-# IP settings
+# 
 
+# use tcp keepalive: Only disable when you know what you are doing.
+/network/tcp_keepalive/use_keepalive = true
+/network/tcp_keepalive/time = 60
+/network/tcp_keepalive/intvl = 20
+/network/tcp_keepalive/probes = 6
+
+# IP settings
+# the addres of the nquire when /network/dhcp=false
 /network/ip/address = 192.168.1.200
 /network/ip/netmask = 255.255.255.0
-/network/ip/gateway = 192.168.1.254
-/network/ip/ns1 = 194.109.6.66
-/network/ip/ns2 = 194.109.9.99
+/network/ip/gateway = 192.168.1.1
+# the used nameservers. Only important when /network/dhcp=false and 
+# remote_ip is a name instead of an ip-address. 
+/network/ip/ns1 = 194.168.1.1
+/network/ip/ns2 = 194.168.1.1
 
 # Wlan settings
-
-/network/wifi/essid = "default"
-/network/wifi/keytype = "off"
-/network/wifi/key = "1122334455"
+# only required when /network/interface="wifi"
+/network/wifi/essid = "yggdrasil"
+/network/wifi/keytype = "WPA / WPA2"
+/network/wifi/key = "Assuransetourix1."
 
 # GPRS/UMTS settings
 
@@ -237,7 +267,7 @@ The default content as of application version 1.4 is:
 # Barcode authentication
 
 /dev/barcode_auth/enable = false
-/dev/barcode_auth/security_code = ""
+/dev/barcode_auth/security_code = "0000"
 
 # Modem
 
@@ -248,11 +278,20 @@ The default content as of application version 1.4 is:
 
 /dev/scanner/barcodes = "1D only"
 /dev/scanner/enable_barcode_id = true
+/dev/scanner/prevent_duplicate_scan_timeout = NOP
 /dev/scanner/illumination_led = "Blinking"
+/dev/scanner/default_illumination_leds = "On"
 /dev/scanner/reading_sensitivity = "Low"
 /dev/scanner/aiming_led = "Blinking"
 /dev/scanner/1d_scanning_mode = "Sensor mode"
 /dev/scanner/multi_reading_constraint = "Semi"
+
+# use the next options for additional scanner settings
+# watch out: this can disturb correct operation
+/dev/scanner/em1300_pre_init = ""
+/dev/scanner/em1300_post_init = ""
+/dev/scanner/em2027_pre_init = ""
+/dev/scanner/em2027_post_init = ""
 
 # Barcodes
 
@@ -282,35 +321,76 @@ The default content as of application version 1.4 is:
 
 # External Scanner
 
+# do not touch this
 /dev/extscanner/device = "/dev/tty0"
+# do not replace the prefix in the external scanner data (but add another)
+/dev/extscanner/raw = true
 
 # Mifare scanner
 
+# do not touch this
 /dev/mifare/device = "/dev/ttyS2"
-/dev/mifare/key = "\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f"
-/dev/mifare/relevant_sectors = "1,3,5,15"
+# the key to be used when reading a mifare card on card detection
+# (only when relevant_sectors is not empty)
+/dev/mifare/key_A = "FFFFFFFFFFFF"
+# the block (or whole sectors) to be read on card-detection
+/dev/mifare/relevant_sectors = "1:0,15:2"
+# You can't scan the same card within this number of seconds again.
 /dev/mifare/prevent_duplicate_scan_timeout = 3
+# the format to be used for sending the card-number (recommended is "hexadecimal").
 /dev/mifare/cardnum_format = "hexadecimal"
-/dev/mifare/sector_data_format = "binary"
+# only sends the card-number, even when data was read.
+/dev/mifare/send_cardnum_only = false
+# the format to be used for the sector data (recommended is "base 64" or "hex")
+/dev/mifare/sector_data_format = "hex"
+/dev/mifare/sector_data_seperator = "comma"
+# When true: do not beep when a card is detected.
+#This comes in handy when using escape commands to read or write the card.
+/dev/mifare/suppress_beep = false
+/dev/mifare/msg/incomplete_scan/text = "Wait for beep\nwhen scanning"
+/dev/mifare/msg/access_violation/text = "Card access\ndenied"
+/dev/mifare/msg/transaction_error_message = "Transaction failed!\n\nThis is logged."
 
 # Error messages
 
 
 # Message for
 
-/dev/mifare/msg/incomplete_scan/text = "Wait for beep when scanning"
+/dev/mifare/msg/incomplete_scan/text = "Wait for beep\nwhen scanning"
 
 # Message for
 
-/dev/mifare/msg/access_violation/text = "Card access denied"
+/dev/mifare/msg/access_violation/text = "Card access\ndenied"
+/dev/mifare/msg/transaction_error_message = "Transaction failed!\n\nThis is logged."
 
 # Touch keypad
-
+# do not touch this
 /dev/touch16/device = "/dev/event0"
 /dev/touch16/prefix = "K"
+# The 'idle message timeout' for when a touch button is displayed
 /dev/touch16/timeout = 60
-/dev/touch16/keyclick = "o3c100"
+# which beep to use when a key is pressed
+/dev/touch16/keyclick = "beep1"
+# better not touch these beep values
+/dev/touch16/beep1 = "03a32"
+/dev/touch16/beep2 = "03c100"
+/dev/touch16/beep3 = "03g32"
+# 
+/dev/touch16/minimum_click_delay = ""
+# visualize keypresses by inverting the key
+/dev/touch16/invert = false
+# Als send touch key clicks when no button is displayed.
+# This is handy for keypad activation on touch
 /dev/touch16/send_active_keys_only = true
+
+# GPIO
+
+/dev/gpio/prefix = "I"
+# When should gpio be read: "On read GPIO","On change" or "Poll"
+/dev/gpio/method = "On read GPIO"
+# when method="Poll" a gpio event will be generated every poll_delay seconds, and
+# when a level did change
+/dev/gpio/poll_delay = "5"
 
 # Beeper
 
@@ -326,11 +406,16 @@ The default content as of application version 1.4 is:
 
 # Display
 
+# do not touch this
 /dev/display/mode = "240x128m"
+# recommended: do not touch this
 /dev/display/contrast = 2
+# recommended: do not touch this
 /dev/display/contrast_min = 100
+# recommended: do not touch this
 /dev/display/contrast_max = 160
 
 # End
+
 
 -------

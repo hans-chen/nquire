@@ -1,4 +1,4 @@
-# *** Running ./misc_tester.lua
+# *** Running module/misc_tester.lua
 
 
 # *** Start test 'test_binstr_to_escapes'
@@ -68,3 +68,10 @@ Search 'anim1.gif' in 'img:.': img/anim1.gif
 Search 'nonexist' in '': nil
 Search 'anim1.gif' in '.:verified': nil
 Search 'anim1.gif' in '.:nonexistdir': nil
+
+# *** Start test 'test_split'
+"a;bc;def":split(";")=	[1]="a", [2]="bc", [3]="def"
+split("ghij;klmno;",";")=	[1]="ghij", [2]="klmno", [3]=""
+split("",";"):	[1]=""
+split(";",";"):	[1]="", [2]=""
+split(";;",";"):	[1]="", [2]="", [3]=""

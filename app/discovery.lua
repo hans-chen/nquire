@@ -41,7 +41,7 @@ local function gen_reply_v1(self)
 		end
 	end
 	local reply = table.concat(reply, "\n")
-	logf(LG_DMP,lgid, "Discover Reply=%s", reply)
+	logf(LG_DBG,lgid, "Discover Reply=%s", reply)
 
 	return reply
 end

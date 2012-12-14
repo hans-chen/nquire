@@ -10,20 +10,31 @@
 #
 # depends on `nquire-discover` in the path
 #
-# usage: pcit [-a] <file>+
+# usage: pcit [-c] [-a] <file>+
+#  -c  use address in .cit.ip instead of using nquire-discover
+#  -a  send to all nquires when there is more than 1
+#
+# Note: use options in indicated order!
 
 # set -x
 
-nquire_ips=`nquire-discover -n=1`
+if test "$1" = "-c"; then
+	nquire_ips="`cat .cit.ip`"
+	shift
+else
+	nquire_ips=`nquire-discover.exe -1`
 
-if test `echo "$nquire_ips" | wc -w` -eq 0; then
-	echo "No enquire found"
-elif test `echo "$nquire_ips" | wc -w` -gt 1; then
-	echo "More than 1 nquire found:"
-	echo $nquire_ips
-	if test "$1" != "-a"; then
-		echo "Use option -a when you want to set it to all nquires!"
-		exit 1
+	if test `echo "$nquire_ips" | wc -w` -eq 0; then
+		echo "No enquire found"
+	elif test `echo "$nquire_ips" | wc -w` -gt 1; then
+		echo "More than 1 nquire found:"
+		echo $nquire_ips
+		if test "$1" != "-a"; then
+			echo "Use option -a when you want to send it to all nquires!"
+			exit 1
+		fi
+	else
+		echo $nquire_ips > .cit.ip
 	fi
 fi
 

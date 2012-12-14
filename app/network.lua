@@ -84,6 +84,8 @@ local function configure_wifi(network)
 	
 	local fd = open_or_die("/tmp/wpa_supplicant.conf", "w")
 
+	-- directory for 'debug' interface for: wpa_cli -p /tmp <command>
+	fd:write("ctrl_interface=/tmp\n") 
 	fd:write("network={\n")
 	fd:write("	ssid=\"%s\"\n" % essid)
 	fd:write("	scan_ssid=1\n")
@@ -117,7 +119,8 @@ local function configure_wifi(network)
 		fd:write("  gateway " .. config:get("/network/ip/gateway") .. "\n")
 	end
 	fd:write("  pre-up while killall udhcpc wpa_supplicant; do sleep .1; done; true\n")
-	fd:write("  pre-up wpa_supplicant -B -iwlan0 -c/tmp/wpa_supplicant.conf\n")
+	--fd:write("  pre-up wpa_supplicant -B -iwlan0 -c/tmp/wpa_supplicant.conf\n")
+	fd:write("  pre-up wpa_supplicant -iwlan0 -c/tmp/wpa_supplicant.conf -B\n")
 	fd:write("  post-down while killall wpa_supplicant; do sleep .1; done; true\n")
 
 	fd:write("\n")
@@ -358,9 +361,9 @@ local function get_current_ip_addr()
 	local ip, err = net.get_interface_ip( itf )
 	
 	if err then
-		logf(LG_DMP,lgid,"Interface %s: %s", itf, err)
+		logf(LG_DBG,lgid,"Interface %s: %s", itf, err)
 	end
-	--logf(LG_DMP,lgid,"ip('%s')=%s", itf, (ip or "nil"))
+	--logf(LG_DBG,lgid,"ip('%s')=%s", itf, (ip or "nil"))
 	return ip
 	
 end
@@ -435,7 +438,7 @@ local function up(network)
 
 	--print("DEBUG: Up() stack=" .. debug.traceback())
 	
-	logf(LG_DMP, lgid, "Running %q", cmd)
+	logf(LG_DBG, lgid, "Running %q", cmd)
 	upping_network = true
 	runbg(cmd, 
 		function(status,network)
@@ -456,7 +459,7 @@ local function up(network)
 			end
 		end,
 		function(data,network)
-			logf(LG_DMP, lgid, "ifup> %s", data)
+			logf(LG_DBG, lgid, "ifup> %s", data)
 		end,
 		network)
 
@@ -489,6 +492,33 @@ local function get_wlan_signal_strength( itf )
 	return tonumber(ss)
 end
 
+
+local function get_wpa_status( network )
+	if config:get("/network/interface") == "wifi" then
+		local kv = {}
+	
+		local f = io.popen( "wpa_cli -p /tmp status" )
+		if f then
+			local l
+			repeat
+				l = f:read()
+				if l then
+					local key, value = l:match( "(.+)=(.*)" )
+					if key and (key == "bssid" or key:match("state") or key == "ip_address") then
+						kv[key] = value
+					end
+				end
+			until l == nil
+			f:close()
+		end
+		return kv
+		
+	else
+		return nil
+	end
+end
+
+
 local function on_check_network_status_timer( event, nw )
 	local new_led_status = "flash"
 	local current_carrier_status = get_carrier_status()
@@ -513,10 +543,13 @@ local function on_check_network_status_timer( event, nw )
 			new_wlan_signal_strength = get_wlan_signal_strength( "wlan0" )
 			if wlan_signal_strength and new_wlan_signal_strength then
 				if new_wlan_signal_strength>=-255 then
-					new_led_status = "on"
+					if network:get_wpa_status()["wpa_state"] == "COMPLETED" then
+						new_led_status = "on"
+					end
 					if wlan_signal_strength<-255 then
 						logf(LG_INF, lgid, "wifi signal recovered")
 					end
+					
 				elseif wlan_signal_strength>=-255 then
 					logf(LG_WRN, lgid, "wifi signal lost. (%d dB)",
 							new_wlan_signal_strength)
@@ -545,23 +578,23 @@ local function on_check_network_status_timer( event, nw )
 		end
 	end
 
-	if interface == "wifi" and not upping_network and not current_ip_addr 
-			and Network:wlan_is_available() then
-		logf(LG_WRN,lgid,"Trying to re-init the network.")
- 		up(nw)
-	end
+--	if interface == "wifi" and not upping_network and not current_ip_addr 
+--			and Network:wlan_is_available() then
+--		logf(LG_WRN,lgid,"Trying to re-init the network.")
+-- 		up(nw)
+--	end
 
 	return true;
 end
 
 
-local function on_interface_changed(node, nw)
-	if config:get("/network/interface")=="wifi" then
-		os.execute("/cit200/reload_wlan_driver.sh &")
-	else
-		os.execute("while killall reload_wlan_driver.sh; do sleep .1; done")
-	end
-end
+--local function on_interface_changed(node, nw)
+-- if config:get("/network/interface")=="wifi" then
+--		os.execute("/cit200/reload_wlan_driver.sh &")
+--	else
+--		os.execute("while killall reload_wlan_driver.sh; do sleep .1; done")
+--	end
+--end
 
 
 local has_gprs_hw
@@ -628,6 +661,7 @@ function new()
 		-- methods
 		configure = configure,
 		up = up,
+		get_wpa_status = get_wpa_status,
 	}
 	
 	evq:signal_add("SIGCHLD")
@@ -648,11 +682,11 @@ function new()
 
 	config:add_watch("/network", "set", reconfigure, netwrk)
 	config:add_watch("/dev/modem", "set", reconfigure, netwrk)
-	config:add_watch("/network/interface", "set", on_interface_changed, netwrk)
-	on_interface_changed(nil,netwrk)
+	-- config:add_watch("/network/interface", "set", on_interface_changed, netwrk)
+	--	on_interface_changed(nil,netwrk)
 
 	evq:register("check_network_status_timer", on_check_network_status_timer, netwrk)
-	evq:push("check_network_status_timer", nil, 2.0)
+	evq:push("check_network_status_timer", nil, 4.0)
 
 	netwrk:configure()
 	
