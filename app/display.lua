@@ -35,7 +35,7 @@ local function open(display)
 			virtkbd_size = nil,	-- not enabled
 		},
 		["240x128m"] = {
-			native_font_size = 8,
+			native_font_size = 12,
 			virtkbd_size = nil,	-- not enabled
 		},
 		["320x160c"] = {
@@ -67,6 +67,7 @@ local function open(display)
 	local i = dpyinfo[mode]
 	if i then
 		for k,v in pairs(i) do
+			logf(LG_DBG,lgid,"mode %s: display[%s]=%d",mode, k,v)
 			display[k] = v
 		end
 	end
@@ -74,7 +75,7 @@ local function open(display)
 	display.w = w
 	display.h = h
 
-	display:set_font("arial.ttf", display.native_font_size)
+	display:set_font("arial.ttf", display["native_font_size"])
 
 	-- sensible defaults:
 	display:set_color("white")
@@ -104,12 +105,14 @@ end
 local function draw_image(display, fname, xpos, ypos)
 	if not fname then
 		logf(LG_WRN, lgid, "No image fname given")
-		return
+		return false
 	end
 	local ok, err = display.drv:draw_image(fname, xpos, ypos)
 	if not ok then
 		logf(LG_WRN, lgid, "draw_image: %s", err)
+		return false
 	end
+	return true
 end
 
 
@@ -159,7 +162,7 @@ end
 --
 
 local function set_font(display, family, size, attr)
-	logf(LG_DMP, "display", "set_font( family=%s, size=%d )", family or "nil", size or 0 )
+	logf(LG_DMP, lgid, "set_font( family=%s, size=%d )", family or "nil", size or 0 )
 	display.font_family = family or display.font_family
 	display.font_size = size or display.font_size
 	display.font_attr = attr or display.font_attr
@@ -292,10 +295,19 @@ end
 
 --
 --- Clear screen
+-- when layer == nil: clear all layers
+--               0: clear text layer
+--               1..17: image layer
 --
-local function clear(display)
-	logf(LG_DMP, "display", "clear()")
-	display.drv:clear()
+local function clear(display, layer)
+	logf(LG_DMP, lgid, "clear(layer=%d)", layer or -1)
+	display.drv:clear(layer)
+	if layer==nil then
+		-- watch out: event is handled direct (as a function call, not queued)
+		evq:push("display_clear",nil,-1)
+	else
+		evq:push("layer_clear", {layer=layer},-1)
+	end
 end
 
 
@@ -309,17 +321,22 @@ end
 
 --
 -- Format ia line of text (used by show message)
+-- text        - the text
+-- xpos,ypos   - the position in pixel coordinates
+-- align_h     - 'l'|'c'|'r'|nil  this overrules xpos in case of 'c' or 'r'
+-- align_v     - 't'|'m'|'b'|nil  this overrules ypos in case of 'm' or 'b'
+-- size        - n,nil            font size in pixels, nil=use current
 --
 local function format_text(display, text, xpos, ypos, align_h, align_v, size)
 
-	logf(LG_DBG,lgid,"format_text( xpos=%d, ypos=%d, align_h=%s, align_v=%s, size=%d )",xpos, ypos, align_h, align_v, size or display.font_size )
+	logf(LG_DBG,lgid,"format_text( xpos=%d, ypos=%d, align_h=%s, align_v=%s, size=%d )",xpos or 0, ypos or 0, align_h or 'nil', align_v or 'nil', size or display.font_size )
 	if size then
 		display.font_size = size;
 		display.drv:set_font_size(display.font_size)
 	end
 
-	align_h = align_h:sub(1, 1)
-	align_v = align_v:sub(1, 1)
+	align_h = (align_h or "l"):sub(1, 1)
+	align_v = (align_v or "t"):sub(1, 1)
 
 	-- and now for each line in text
 	local w=0
@@ -333,7 +350,8 @@ local function format_text(display, text, xpos, ypos, align_h, align_v, size)
 		local text_w, text_h = display:get_text_size(l)
 		-- weird correction neccessary for right aligning text 
 		-- (something to do with truncation errors????)
-		text_w = text_w + 1
+		text_w = (text_w or 0) + 1
+		text_h = (text_h or 0)
 
 		if align_h == "c" then xpos = display.w/2 - text_w / 2 end
 		if align_h == "r" then xpos = display.w - text_w end

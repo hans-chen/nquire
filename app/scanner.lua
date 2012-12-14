@@ -26,34 +26,36 @@
 
 local lgid = "scanner"
 
+-- Note that the default prefixed for:
+--  gpio: prefix_out = "I"
+--  touch16 keypad: prefix_out = "K"
 prefixes = {
-   { name = "Code128",            prefix_2d = "j", prefix_1d = "j", prefix_out = "#"  },
-   { name = "UCC_EAN-128",        prefix_2d = "J", prefix_1d = "u", prefix_out = "P", cmd_HR200 = "0004030" },
-   { name = "EAN-8",              prefix_2d = "d", prefix_1d = "g", prefix_out = "FF" },
-   { name = "EAN-13",             prefix_2d = "D", prefix_1d = "d", prefix_out = "F", cmd_HR200 = "0004050" },
-   { name = "UPC-E",              prefix_2d = "c", prefix_1d = "h", prefix_out = "E"  },
-   { name = "UPC-A",              prefix_2d = "C", prefix_1d = "c", prefix_out = "A", cmd_HR200 = "0004070" },
-   { name = "Interleaved-2_of_5", prefix_2d = "e", prefix_1d = "i", prefix_out = "i"  },
-   { name = "Code39",             prefix_2d = "b", prefix_1d = "b", prefix_out = "*"  },
-   { name = "Codabar",            prefix_2d = "a", prefix_1d = "a", prefix_out = "%"  },
-   { name = "Code93",             prefix_2d = "i", prefix_1d = "y", prefix_out = "c"  },
-   { name = "PDF417",             prefix_2d = "r", prefix_1d = "?", prefix_out = "r", layout="2D" },
-   { name = "QR_Code",            prefix_2d = "s", prefix_1d = "?", prefix_out = "s", layout="2D" },
-   { name = "Aztec",              prefix_2d = "z", prefix_1d = "?", prefix_out = "z", layout="2D" },
-   { name = "DataMatrix",         prefix_2d = "u", prefix_1d = "?", prefix_out = "u", layout="2D" },
-   { name = "Chinese-Sensible",   prefix_2d = "h", prefix_1d = "?", prefix_out = "h", layout="2D" },
-   { name = "GS1_Databar",        prefix_2d = "R", prefix_1d = "R", prefix_out = "R"  },
-   { name = "ISBN",               prefix_2d = "?", prefix_1d = "B", prefix_out = "B"  },
-   { name = "Code-11",            prefix_2d = "?", prefix_1d = "z", prefix_out = "Z"  },
-   { name = "2_5-Matrix",         prefix_2d = "?", prefix_1d = "v", prefix_out = "v"  },
-   { name = "ITF14",              prefix_2d = "q", prefix_1d = "q", prefix_out = "q"  },
-   { name = "MSI-Plessey",        prefix_2d = "?", prefix_1d = "m", prefix_out = "m"  },
+   { name = "Code128",            prefix_2d = "j", prefix_1d = "j", prefix_hid = "j", prefix_out = "#"  },
+   { name = "UCC_EAN-128",        prefix_2d = "J", prefix_1d = "u", prefix_hid = "u", prefix_out = "P", cmd_HR200 = "0004030" },
+   { name = "EAN-8",              prefix_2d = "d", prefix_1d = "g", prefix_hid = "g", prefix_out = "FF" },
+   { name = "EAN-13",             prefix_2d = "D", prefix_1d = "d", prefix_hid = "d", prefix_out = "F", cmd_HR200 = "0004050" },
+   { name = "UPC-E",              prefix_2d = "c", prefix_1d = "h", prefix_hid = "h", prefix_out = "E"  },
+   { name = "UPC-A",              prefix_2d = "C", prefix_1d = "c", prefix_hid = "c", prefix_out = "A", cmd_HR200 = "0004070" },
+   { name = "Interleaved-2_of_5", prefix_2d = "e", prefix_1d = "e", prefix_hid = "i", prefix_out = "i"  },
+   { name = "Code39",             prefix_2d = "b", prefix_1d = "b", prefix_hid = "b", prefix_out = "*"  },
+   { name = "Codabar",            prefix_2d = "a", prefix_1d = "a", prefix_hid = "a", prefix_out = "%"  },
+   { name = "Code93",             prefix_2d = "i", prefix_1d = "y", prefix_hid = "y", prefix_out = "c"  },
+   { name = "PDF417",             prefix_2d = "r", prefix_1d = "?", prefix_hid = "r", prefix_out = "r", layout="2D" },
+   { name = "QR_Code",            prefix_2d = "s", prefix_1d = "?", prefix_hid = "s", prefix_out = "s", layout="2D" },
+   { name = "Aztec",              prefix_2d = "z", prefix_1d = "?", prefix_hid = "z", prefix_out = "z", layout="2D" },
+   { name = "DataMatrix",         prefix_2d = "u", prefix_1d = "?", prefix_hid = "u", prefix_out = "u", layout="2D" },
+   { name = "Chinese-Sensible",   prefix_2d = "h", prefix_1d = "?", prefix_hid = "h", prefix_out = "h", layout="2D" },
+   { name = "GS1_Databar",        prefix_2d = "R", prefix_1d = "R", prefix_hid = "R", prefix_out = "R"  },
+   { name = "ISBN",               prefix_2d = "B", prefix_1d = "B", prefix_hid = "B", prefix_out = "B"  },
+   { name = "Code-11",            prefix_2d = "H", prefix_1d = "z", prefix_hid = "z", prefix_out = "Z"  },
+   { name = "2_5-Matrix",         prefix_2d = "v", prefix_1d = "v", prefix_hid = "v", prefix_out = "v"  },
+   { name = "ITF14",              prefix_2d = "e", prefix_1d = "q", prefix_hid = "q", prefix_out = "q"  },
+   { name = "MSI-Plessey",        prefix_2d = "m", prefix_1d = "m", prefix_hid = "m", prefix_out = "m"  },
+   { name = "Plessey",            prefix_2d = "n", prefix_1d = "p", prefix_hid = "p", prefix_out = "n"  },
+   { name = "2_5-Standard",       prefix_2d = "f", prefix_1d = "s", prefix_hid = "s", prefix_out = "o"  },
+   { name = "2_5-Industrial",     prefix_2d = "I", prefix_1d = "i", prefix_hid = "s", prefix_out = "o"  },
 
-	{ name = "Plessey",            prefix_2d = "?", prefix_1d = "p", prefix_out = "n"  },
-	{ name = "2_5-Standard",       prefix_2d = "?", prefix_1d = "s", prefix_out = "o"  },
-	{ name = "2_5-Industrial",     prefix_2d = "?", prefix_1d = "s", prefix_out = "o"  },
-
-	{ name = "mifare",             prefix_out = "MF" },
+   { name = "mifare",             prefix_out = "MF" },
 }
 
 -- codes to turn on and off scanner codes
@@ -68,8 +70,8 @@ enable_disable_HR100 = {
    { name = "EAN-13",             default="on", off="99910501" },
    { name = "UPC-E",              default="on", off="99911001" },
    { name = "UPC-A",              default="on", off="99911101" },
-   { name = "Interleaved-2_of_5", default="off", on="99911202" },
-   { name = "2_5-Matrix",         default="off", on="99912002" },
+   { name = "Interleaved-2_of_5", default="on", off="99911201", on="99911202" },
+   { name = "2_5-Matrix",         default="on", off="99912001", on="99912002" },
    { name = "Code39",             default="on", off="99912401" },
    { name = "Codabar",            default="on", off="99912501" },
    { name = "Code93",             default="on", off="99912601" },
@@ -77,9 +79,9 @@ enable_disable_HR100 = {
    { name = "Code-11",            default="on", off="99912701", on="99912702" },
    { name = "ITF14",              default="off", off="99911401", on="99911403" },
    { name = "MSI-Plessey",        default="on", off="99913101", on="99913102" },
-	{ name = "Plessey",            default="on", off="99913001", on="99913002" },
-	{ name = "2_5-Standard",       default="off", on="99912202" },
-	{ name = "2_5-Industrial",     default="off", on="99912102" },
+   { name = "Plessey",            default="on", off="99913001", on="99913002" },
+   { name = "2_5-Standard",       default="on", off="99912201", on="99912202" },
+   { name = "2_5-Industrial",     default="on", off="99912101", on="99912102" },
 }
 
 -- HR 200 scanner codes:
@@ -94,7 +96,7 @@ enable_disable_HR200 = {
    { name = "ITF14",              default="off", on ="0405090" },
    { name = "Code39",             default="on",  off="0408010" },
    { name = "Codabar",            default="on",  off="0409010" },
-   { name = "Code93",             default="on",  off="0410010" },
+   { name = "Code93",             default="off", off="0410010", on="0410020" },
    { name = "PDF417",             default="on",  off="0501010" },
    { name = "QR_Code",            default="on",  off="0502010", on="0502020" },
    { name = "Aztec",              default="on",  off="0503010" },

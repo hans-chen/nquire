@@ -23,26 +23,23 @@ local function gen_reply_v1(self)
 	end
 
 	-- Get current network address
-	local fd;
-	if config:get("/network/interface") == "ethernet" then
-		fd = io.popen("/sbin/ifconfig eth0")
-	else
-		fd = io.popen("/sbin/ifconfig wlan0")
-	end
-	if fd then
-		local data = fd:read("*a")
-		local addr;
-		addr = data:match("inet addr:(%S+)")
-		if addr then
-			table.insert(reply, "IP-Address: " .. addr)
+	local convert_to_itf = { ["ethernet"] = "eth0", ["wifi"]="wlan0" }
+	local itf = convert_to_itf[config:get("/network/interface")]
+	if itf ~= nil then
+		local ip, err = net.get_interface_ip( itf )
+		if err or not ip then
+			logf(lgid,LG_WRN,"%s", (err or "error getting ip"))
+		else
+			table.insert(reply, "IP-Address: " .. ip)
 		end
-		addr = data:match("HWaddr (%S+)")
-		if addr then
-			table.insert(reply, "MAC-Address: " .. addr)
+		
+		local mac, err = net.get_interface_mac( itf )
+		if err or not mac then
+			logf(lgid,LG_WRN,"%s", (err or "error getting mac"))
+		else
+			table.insert(reply, "MAC-Address: " .. mac)
 		end
-		fd:close()
 	end
-
 	local reply = table.concat(reply, "\n")
 	logf(LG_DMP,lgid, "Discover Reply=%s", reply)
 
@@ -59,16 +56,16 @@ local function on_fd_read(event, self)
 	local data, saddr, sport = net.recvfrom(self.fd, 4096)
 
 	if data and data:match("CIT%-DISCOVER%-REQUEST") then
-		logf(LG_DBG, lgid, "Received CIT-DISCOVER request from %s, version not checked yet", saddr)
+		logf(LG_DBG, lgid, "Received CIT-DISCOVER request from %s", saddr)
 		local version = data:match("Version:%s*(%d+)")
 		if version == "1" then
 			logf(LG_INF, lgid, "Received CIT-DISCOVER request from %s %s", saddr, sport)
 			local reply = gen_reply_v1()
-			if data:find("RESPONSE%-TO%-SENDER%-PORT") then
-				net.sendto(self.fd, reply, discovery_address, sport)
-			else
-				net.sendto(self.fd, reply, discovery_address, discovery_port)
-			end
+			local response_port = data:find("RESPONSE%-TO%-SENDER%-PORT") and sport or discovery_port
+			logf(LG_DBG, lgid, "sending response to %s:%d", discovery_address, response_port )
+			net.sendto(self.fd, reply, discovery_address, response_port)
+		else
+			logf(LG_WRN, lgid, "Cannot handle CIT-DISCOVER request from %s with version=%s", saddr, (version or "nil"))
 		end
 	end
 end

@@ -4,6 +4,8 @@
 
 module("Evq", package.seeall)
 
+local lgid = "evq"
+
 --
 -- Merge function implementing a skew heap. The result is written to r.right.          
 -- 
@@ -33,9 +35,12 @@ end
 -- Push a new event on the event queue. The delay parameter indicates when the
 -- event should be emitted, if not given or 0, the event is handled as soon as
 -- possible.
+-- @param delay	the delay in seconds. The event is handles direct without queing
+--                when delay==-1
 --
 
 local function push(evq, type, data, delay)
+	--logf(LG_DMP,lgid, "Pushing event %s with delay %d" , type, delay or 0)
 
 	-- Create new event
 	
@@ -47,9 +52,14 @@ local function push(evq, type, data, delay)
 		when = sys.hirestime() + delay,
 	}
 	
-	-- Insert the event in the event queue
-
-	skew_merge(evq.queue.right, event, evq.queue)
+	if delay == -1 then
+		-- handle direct
+		--logf(LG_DMP,lgid, "Direct handling event %s" , type)
+		evq:handle( event )
+	else
+		-- Insert the event in the event queue
+		skew_merge(evq.queue.right, event, evq.queue)
+	end
 
 end
 
@@ -85,12 +95,13 @@ end
 
 local function register(evq, type, fn, udata)
 
-	if not type then logf(LG_FTL, "evq", "No event type given") end
+	if not type then logf(LG_FTL, lgid, "No event type given") end
 	if not fn then 
 		print(debug.traceback())
-		logf(LG_FTL, "evq", "No callback function given")
+		logf(LG_FTL, lgid, "No callback function given")
 	end
 
+	--print("DEBUG: evq:register(type='" .. type .. "')")
 	evq.handler_list[type] = evq.handler_list[type] or {}
 	table.insert(evq.handler_list[type], {
 		type = type,
@@ -114,7 +125,7 @@ local function unregister(evq, type, fn, udata)
 			end
 		end
 	end
-	logf(LG_DBG, "evq", "Trying to unregister non-existing event handler for %s", type)
+	logf(LG_DBG, lgid, "Trying to unregister non-existing event handler for %s", type)
 end
 
 
@@ -125,7 +136,7 @@ end
 local function fd_add(evq, fd, what)
 	what = what or "r"
 	if not evq.fd_list[what] then
-		logf(LG_FTL, "evq", "Illegal fd type %s, use (r)ead (w)rite or (e)rror", what)
+		logf(LG_FTL, lgid, "Illegal fd type %s, use (r)ead (w)rite or (e)rror", what)
 	end
 	evq.fd_list[what][fd] = true
 end
@@ -138,7 +149,7 @@ end
 local function fd_del(evq, fd, what)
 	what = what or "r"
 	if not evq.fd_list[what] then
-		logf(LG_FTL, "evq", "Illegal fd type %s, use (r)ead (w)rite or (e)rror", what)
+		logf(LG_FTL, lgid, "Illegal fd type %s, use (r)ead (w)rite or (e)rror", what)
 	end
 	evq.fd_list[what][fd] = nil
 end

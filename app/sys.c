@@ -30,8 +30,7 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
-//#define TRACE(msg...) { fprintf(stderr,"%s:%d - %s ", __FILE__, __LINE__, __FUNCTION__);fprintf(stderr,msg);fprintf(stderr,"\n"); }
-#define TRACE(msg...) {}
+#include "misc.h"
 
 
 /**************************************************************************
@@ -198,6 +197,25 @@ static int l_hirestime(lua_State *L)
 	return 1;
 }
 
+// return: ms, sec, min, hours
+static int l_realtime(lua_State *L)
+{
+	struct timespec tv_now;
+	clock_gettime(CLOCK_REALTIME, &tv_now);
+	
+	time_t now = tv_now.tv_sec;
+	struct tm *gm_now = gmtime( &now );
+	
+	lua_pushnumber(L, gm_now->tm_sec + tv_now.tv_nsec/1e9);
+	lua_pushnumber(L, gm_now->tm_min);
+	lua_pushnumber(L, gm_now->tm_hour);
+	lua_pushnumber(L, gm_now->tm_mday);
+	lua_pushnumber(L, gm_now->tm_mon+1);
+	lua_pushnumber(L, gm_now->tm_year+1900);
+	
+	return 6;
+}
+
 
 static int l_sleep(lua_State *L)
 {
@@ -336,7 +354,7 @@ static int l_read(lua_State *L)
 
 	size_t len2 = read(fd, buf, len);
 	if(len2 == -1) {
-		TRACE("fd=%d buflen=%d errno=%d", fd, len2, errno)
+		TRACE("fd=%d buflen=%d errno=%d", fd, len2, errno);
 		if(errno != EAGAIN) {
 			free(buf);
 			lua_pushnil(L);
@@ -349,8 +367,8 @@ static int l_read(lua_State *L)
 		}
 	}
 
-	if(len2>0)
-		TRACE("fd=%d buflen=%d", fd, len2)
+	//if(len2>0)
+	//	TRACE("fd=%d buflen=%d", fd, len2);
 	lua_pushlstring(L, buf, len2);
 	free(buf);
 	return 1;
@@ -364,6 +382,9 @@ static int l_tcflush(lua_State *L)
 }
 
 // implement a sequential read with a timeout on received data
+// l[1] fd
+// l[2] max lenth of data to be received
+// l[3] maximum time to wait for first data (milliseconds)
 static int l_readport(lua_State *L)
 {
 	int no=0;
@@ -398,7 +419,7 @@ static int l_readport(lua_State *L)
 
 		if(no>0)
 		{
-			TRACE("fd=%d buflen=%d", fd, no)
+			TRACE("fd=%d buflen=%d", fd, no);
 			lua_pushlstring(L, buf, no);
 			free(buf);
 			return 1;
@@ -418,7 +439,7 @@ static int l_write(lua_State *L)
 
 	fd = luaL_checknumber(L, 1);
 	buf = luaL_checklstring(L, 2, &len);
-	TRACE("len=%d, buff=%s", len,buf)
+	TRACE("len=%d, buff=%s", len,buf);
 	r = write(fd, buf, len);
 
 	if(r >= 0) {
@@ -742,6 +763,53 @@ static int l_forkpty(lua_State *L)
 }
 
 
+/* The next function reads a "struct input_event" from the file indicated by fd
+   It assumes there is data available.
+	@param L[1]   - fd : the filedescriptor from which input_event is to be read
+	@return       - nil | input_event.value, input_event.code, input_event.type
+*/
+static int l_read_input_event( lua_State *L )
+{
+	int kbd_fd = luaL_checkinteger(L, 1);
+
+	struct input_event event;
+	int ret = read(kbd_fd, &event, sizeof(struct input_event));
+	if( ret != sizeof(struct input_event) )
+	{
+		lua_pushnil(L);
+		return 1;
+	}
+	else
+	{
+		lua_pushnumber(L, event.value);
+		lua_pushnumber(L, event.code);
+		lua_pushnumber(L, event.type);
+		return 3;
+	}
+}
+
+static int l_ioctl( lua_State* L )
+{
+	int fd = luaL_checkinteger(L, 1);
+	int p1 = luaL_checkinteger(L, 2);
+	int p2 = luaL_checkinteger(L, 3);
+	ioctl(fd, p1, (void *)p2);
+	return 0;
+}
+
+/* stop keypad/touchscreen from spawning events to /dev/tty0
+ * @param L[1]    - fd
+ * @param L[2]    - (int)1 = stop, (int)0 = resume
+ */
+static int l_ioctl_keypad( lua_State* L )
+{
+	int key_fd = luaL_checkinteger(L, 1);
+	int stopflag = luaL_checkinteger(L, 2);
+	ioctl(key_fd,EVIOCGRAB,(void *)stopflag);
+	return 0;
+}
+
+
 #define SETGPIOMODE     0x5510  //set gpio mode input = 0 output = 1 
 #define GETGPIOMODE     0x5511  //get gpio mode
 #define SETGPIOVALUE    0x5512  //set gpio value high = 1 low = 0 
@@ -764,73 +832,82 @@ struct gpio_param {
 };
 
 
-static int l_gpio_set(lua_State *L)
+/* set a gpio output
+ * first open the gpio filedescriptor with: int fd = open("/dev/gpio", O_RDWR);
+ * @param L[1]    - fd
+ * @param L[2]    - pin_offset (0..23)
+ * @param L[3]    - value: 0=low, 1=high
+ * @return: nil, <errorstring> | true
+ */
+static int l_ioctl_gpio_set( lua_State* L )
 {
-	int fd;
+	int fd = luaL_checkinteger(L, 1);
 	struct gpio_param gp;
-	int r;
+	gp.pin_offset = luaL_checkinteger(L, 2);
+	gp.pin_value = luaL_optint(L, 3, 0);
 
-	//gp.pin_offset = luaL_checknumber(L, 1) == 0 ? GPIO1 : GPIO3;
-	gp.pin_offset = luaL_checknumber(L, 1);
 	if (gp.pin_offset<1 || gp.pin_offset>24)
-	{
-		lua_pushboolean(L, 0);
-		lua_pushstring(L, "Incorrect gpio pin offset.");
-		return 2;
-	}
-	
+		BARF(L, "Incorrect gpio pin offset.");
+
 	gp.pin_mode = GPIO_OUT;
-	gp.pin_value = lua_tonumber(L, 2) ? GPIO_HIGH : GPIO_LOW;
-
-	//printf(__FILE__ "DEBUG: gpio pin offset = %d, setting to %d", gp.pin_offset, gp.pin_value);
-
-	fd = open("/dev/gpio", O_RDWR);
-	if(fd == -1) {
-		lua_pushboolean(L, 0);
-		lua_pushstring(L, strerror(errno));
-		return 2;
-	}
-
+	
+	int r;
+	
 	r = ioctl(fd, SETGPIOMODE, &gp);
 	if(r == -1) {
-		lua_pushboolean(L, 0);
+		lua_pushnil(L);
 		lua_pushstring(L, strerror(errno));
 		return 2;
 	}
 
 	r = ioctl(fd, SETGPIOVALUE, &gp);
 	if(r == -1) {
-		lua_pushboolean(L, 0);
+		lua_pushnil(L);
+		lua_pushstring(L, strerror(errno));
+		return 2;
+	}
+	
+	lua_pushboolean( L, 1 );
+	
+	return 1;
+}
+
+
+/* get a gpio input
+ * first open the gpio filedescriptor with: int fd = open("/dev/gpio", O_RDWR);
+ * @param L[1]    - fd
+ * @param L[2]    - pin_offset (0..23)
+ * @return: nil, <errorstring> | <get-value>
+ */
+static int l_ioctl_gpio_get( lua_State* L )
+{
+	int fd = luaL_checkinteger(L, 1);
+	struct gpio_param gp;
+	gp.pin_offset = luaL_checkinteger(L, 2);
+
+	if (gp.pin_offset<0 || gp.pin_offset>23) 
+		BARF(L, "Incorrect gpio pin offset.");
+	
+	gp.pin_mode = GPIO_IN;
+	int r;
+
+	r = ioctl(fd, GETGPIOMODE, &gp);
+	if(r == -1) {
+		lua_pushnil(L);
 		lua_pushstring(L, strerror(errno));
 		return 2;
 	}
 
-	close(fd);
-		
-	lua_pushboolean(L, 1);
-	return 1;
-}
-
-/* The next function reads a "struct input_event" from the file indicated by fd
-   It assumes there is data available.
-	@param L[1]   - fd : the filedescriptor from which input_event is to be read
-	@return       - nil | input_event.value
-*/
-static int l_read_input_event( lua_State *L )
-{
-	int kbd_fd = luaL_checkinteger(L, 1);
-
-	struct input_event event;
-	int ret = read(kbd_fd, &event, sizeof(struct input_event));
-	if( ret != sizeof(struct input_event) )
+	r = ioctl(fd, GETGPIOVALUE, &gp);
+	if(r == -1) {
 		lua_pushnil(L);
-	else
-		lua_pushnumber(L, event.value);
+		lua_pushstring(L, strerror(errno));
+		return 2;
+	}
 
+	lua_pushinteger( L, gp.pin_value );
 	return 1;
 }
-
-
 
 
 /***************************************************************************
@@ -842,6 +919,7 @@ static struct luaL_Reg sys_table[] = {
 	{ "meminfo",		l_meminfo },
 	{ "select",			l_select },
 	{ "hirestime",		l_hirestime },
+	{ "realtime",		l_realtime },
 	{ "sleep",			l_sleep },
 	{ "get_macaddr",	l_macaddr },
 	{ "open",       	l_open },
@@ -865,8 +943,11 @@ static struct luaL_Reg sys_table[] = {
 	{ "waitpid",		l_waitpid },
 	{ "exec",			l_exec },
 	{ "forkpty",		l_forkpty },
-	{ "gpio_set",		l_gpio_set },
 	{ "read_input_event", l_read_input_event },
+	{ "ioctl",          l_ioctl },
+	{ "ioctl_keypad",   l_ioctl_keypad },
+	{ "ioctl_gpio_set", l_ioctl_gpio_set },
+	{ "ioctl_gpio_get", l_ioctl_gpio_get },
 	{ NULL },
 };
 

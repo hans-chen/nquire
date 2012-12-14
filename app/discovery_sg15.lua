@@ -301,7 +301,7 @@ local function on_fd_read(event, self)
 
 	logf(LG_DMP, lgid, "saddr=%s, sport=%d", saddr, sport)
 	if data then 
-		logf(LG_DMP, lgid, "Received packed (first 8 bytes): " .. dump( data, 1 ) ) 
+		logf(LG_DMP, lgid, "Received packed (first 8 bytes): %s", dump( data, 1 ) ) 
 	end
 
 	if data then

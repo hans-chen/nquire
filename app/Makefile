@@ -1,16 +1,53 @@
 #
 # Copyright © 2007 All Rights Reserved.
 #
+# usage:
+# 
+# make clean|clobber|all|install|app.tar|{[RELEASE_TAG=- | RELEASE_TAG=mytag] dist}
+#
+# Without RELEASE_TAG the tag for a distribution will be "trunk"<buildnr>
+# No tag will be used when RELEASE_TAG=-
+# The major and minor from file version.mk will be used to version the distribution
+# Note that you can only build an official release when nothing is checked out
+#
+# eg:
+# make RELEASE_TAG=beta1 dist
+#
 
 NAME    := cit-app
-BUILD   := $(shell svnversion . | cut -d : -f 2)
-VERSION	:= 1.3.2
+BUILD   := $(shell svnversion -c . | cut -d : -f 2)
+# only use a major and a minor verion number
+# patch level numbering is not SG15 compatible!
+VERSION	:= 1.4
+LABEL := $(VERSION).$(BUILD)
+
+# Auto vars:
+
+SHELL = bash
+ifdef RELEASE_TAG
+# this is not allowed from a modified build:
+RELEASE_REJECT=$(shell if [[ "$(BUILD)" =~ .*M$$ ]]; then echo "YES";fi)
+ifeq "$(RELEASE_REJECT)" "YES"
+$(error You cann't make an official release from a modified build")
+else
+ifeq "$(RELEASE_TAG)" "-"
+	R_TAG = $(VERSION)
+else
+	R_TAG = $(VERSION).$(RELEASE_TAG)
+endif
+endif
+else
+LOC=$(shell if [[ "~/workspace/mbarc/trunk/src/validator2" =~ .*\/trunk\/.* ]]; then echo trunk; else echo tag_or_branch; fi)
+R_TAG = $(VERSION).$(LOC)$(BUILD)
+endif
 
 ###########################################################################
 # Modules 
 ###########################################################################
 
 PKGS			+= lua5.1 sdl freetype2
+
+SUBDIRS			+= test
 
 MODULES			+= sys.so
 LDFLAGS_sys.so	+= -lrt -lutil -lm -ldl 
@@ -19,13 +56,13 @@ MODULES			+= net.so
 MODULES			+= base64.so
 
 MODULES 		+= dpydrv.so
-LDFLAGS_dpydrv.so	+= -lrt -lungif -lSDL_image -lfreetype
+dpydrv.so: LDFLAGS += -lrt -lungif -lSDL_image -lfreetype
 
 MODULES			+= beepthread.so
 
 MODULES			+= mifare.so
-CFLAGS_mifare.so += -I../lib/rfid
-LDFLAGS_mifare.so += ../lib/rfid/libnlrf.a
+mifare.so : CFLAGS += -I../lib/rfid
+mifare.so : LDFLAGS += -Wl,-Bstatic ../lib/rfid/libnlrf.a -Wl,-Bdynamic
 
 LUA_SRC             = $(shell ls -1 *lua)
 
@@ -39,6 +76,9 @@ CFLAGS	+= -DVERSION=\"$(VERSION)\" -DBUILD=\"$(BUILD)\"
 CFLAGS  += -g -Wall -Werror -O3 
 CFLAGS 	+= $(ARCH_CFLAGS)
 CFLAGS	+= -fPIC
+ifdef DEBUG
+CFLAGS 	+= -DDEBUG
+endif
 
 LDFLAGS += -g -Wl,--export-dynamic
 LDFLAGS += $(ARCH_LDFLAGS)
@@ -65,65 +105,74 @@ CC 	= $(CROSS)gcc
 AR  = $(CROSS)ar
 LD 	= $(CROSS)ld
 STRIP 	= $(CROSS)strip
+#/opt/toolchain-newland/bin/arm-softfloat-linux-gnueabi-strip
 
 ###########################################################################
 # Rules
 ###########################################################################
 
-ifdef verbose
-E	:=
-P 	:= @true
-MAKE	:= $(MAKE)
-else
-E	:= @
-P	:= @echo
-MAKE	:= $(MAKE) -s
-endif
-
 .PRECIOUS: $(MODULES)
 
-all: $(MODULES) 
+all: $(SUBDIRS) $(MODULES) links
 
 .PHONY: $(SUBDIRS)
 $(SUBDIRS):
-	$(P) " [ SUB ] $@"
-	$(E) $(MAKE) -C $@
+	@echo "[SUBDIR $@]"
+	$(MAKE) -C $@
 
 %.o: %.c
-	$(P) " [ CC  ] $@"
-	$(E) $(CC) $(CFLAGS) -c $< -o $@ 
+	@echo "[$@]"
+	$(CC) $(CFLAGS) -c $< -o $@ 
 
 %.so: %.c
-	$(P) " [ MOD ] $@"
-	$(E) $(CC) -shared $(CFLAGS) $< -o $@ $(LDFLAGS) $(CFLAGS_$@) $(LDFLAGS_$@) 
-	$(E) chmod -x $@
+	@echo "[$@]"
+	$(CC) -shared $(CFLAGS) $< -o $@ $(LDFLAGS) $(CFLAGS_$@) $(LDFLAGS_$@) 
+	$(STRIP) $@
+	chmod -x $@
 
+.PHONY: dist install links clean clobber
 
-.PHONY: dist install
+# Note that this builds a release from app-binary!
+# When current changes should be includes you have to "make install" first
+dist: app.tar
+	@echo "[$@]"
+	tools/make_firmware $(R_TAG)
 
-DIST=/tmp/$(NAME)-$(VERSION).$(BUILD).tar
-$(DIST): Makefile install
-	cd $(INSTALL) && tar cf $@ --exclude=.svn *
-
-dist: MD5=$(shell md5sum $(DIST) | cut -d\  -f1 )
-dist: $(DIST)
-	cp $(DIST) $(NAME)-$(VERSION).$(BUILD)-$(MD5).image
-
+links: 
+	@echo "[$@]"
+	ln -sf tools/put .
+	ln -sf tools/install .
+	
 clean:	
-	$(P) " [CLEAN]"
-	$(E) rm -rf $(OBJS) $(MODULES) core binary dist doc
-	$(E) for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
+	@echo "[$@]"
+	-rm -rf $(OBJS) $(MODULES) core binary dist doc
+	for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
 
 clobber: clean
-	-rm -f *.image *~
-	
-install: $(MODULES)
-	rm -f $(INSTALL)/*lua $(INSTALL)/*.so $(INSTALL)/*.ttf $(INSTALL)/schema/*
-	cp *so $(INSTALL)
-	cp arial.ttf $(INSTALL)
-	cp schema/* $(INSTALL)/schema
-	cp img/* $(INSTALL)/img
+	@echo "[$@]"
+	-rm -f *.image *~ cit-db cit-discover cit-discover-sg15 cit-discover.sh 
+	-rm -f install put cit-test app.tar
+	for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
+
+clobber_install:
+	@echo "[$@]"
+	-rm -f $(INSTALL)/*lua $(INSTALL)/*.so $(INSTALL)/*.ttf $(INSTALL)/schema/* 
+	-rm -f $(INSTALL)/img/*.gif $(INSTALL)/img/*.jpg $(INSTALL)/img/*.png $(INSTALL)/img/keypad/*
+
+install: $(MODULES) clobber_install
+	@echo "[$@]"
+	cp *so $(INSTALL)/
+	cp arial.ttf $(INSTALL)/
+	chmod 751 reload_wlan_driver.sh
+	cp -a reload_wlan_driver.sh $(INSTALL)/
+	cp schema/*.schema $(INSTALL)/schema/
+	cp img/*.jpg img/*.png $(INSTALL)/img/
+	cp img/ftp/* $(INSTALL)/img/ftp/
 	for f in $(LUA_SRC); do luac -o $(INSTALL)/$$f $$f; done
+
+app.tar: Makefile
+	@echo "[$@]"
+	cd $(INSTALL) && tar cvf ../app/$@ --exclude=.svn *
 
 -include ../Debrules.inc
 

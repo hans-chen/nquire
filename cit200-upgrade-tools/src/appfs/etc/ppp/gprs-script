@@ -1,0 +1,60 @@
+# File:
+# /etc/ppp/gprs
+#
+# Description:
+# This file holds the serial cable and IrDA pppd options for GPRS phones
+# Tell the ppp-daemon to accept mangled data
+receive-all
+# Give some debug info
+debug
+kdebug 7
+# Print out all the option values which have been set.
+dump
+# Serial device to which terminal is connected;
+# with serial port (COM1 in Windows) use /dev/ttyS0
+# and with IrDA use /dev/ircomm0.
+#/dev/ircomm0 # IrDA
+/dev/ttyS1 # serial cable (NOTE: 这个为真正用的串口，比如/dev/ttyS0)
+# Serial port line speed
+115200
+# Turn off waiting of carrier detect or flow control signal
+# With IrDA it should be disabled with nocrtscts option.
+crtscts # serial cable
+#nocrtscts # IrDA
+# Ignore carrier detect signal from the modem
+local
+# To keep pppd on the terminal
+nodetach
+# Accept the peer's idea of our local IP address
+ipcp-accept-local
+# Accept the peer's idea of its (remote) IP address
+ipcp-accept-remote
+# IP addresses:
+# - accept peers idea of our local address and set address peer as 10.0.0.1
+# (any address would do, since IPCP gives 0.0.0.0 to it)
+# - if you use the 10. network at home or something and pppd rejects it,
+# change the address to something else
+0.0.0.0:0.0.0.0
+-chap
+#-pap
+# pppd must not propose any IP address to the peer!
+#noipdefault
+# No ppp compression
+novj
+novjccomp
+papcrypt
+nodeflate
+#No ppp magic number
+nomagic
+# no asyn cmap
+asyncmap 0
+# Add default route
+defaultroute
+noauth
+user foo
+#Auto get IP address
+usepeerdns
+# Connect script/
+connect 'chat -v -f /etc/ppp/gprs-connect-chat'
+# Disconnect script
+disconnect 'chat -v -f /etc/ppp/gprs-disconnect-chat'

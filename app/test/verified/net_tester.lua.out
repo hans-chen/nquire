@@ -1,0 +1,11 @@
+# *** Running ./net_tester.lua
+
+
+# *** Start test 'test_get_interface_ip'
+ip(eth0)=192.168.1.129, err=nil
+ip(none)=nil, err=Error requesting interface flags
+
+# *** Start test 'test_get_interface_mac'
+mac(eth0)=00:1b:38:8d:ef:6c, err=nil
+mac(wlan0)=00:13:e8:b4:e0:b3, err=nil
+mac(none)=nil, err=Error requesting mac-address

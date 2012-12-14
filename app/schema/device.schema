@@ -51,6 +51,22 @@ return group {
 		default = "-",
 	},
 
+	object { 
+		mode = "r",
+		id = "firmware",
+		label = "Firmware version",
+		type = "string",
+		default = "-",
+	},
+
+	object { 
+		mode = "r",
+		id = "hardware",
+		label = "Hardware version",
+		type = "string",
+		default = "-",
+	},
+
 	group {
 		id = "auth",
 		label = "Authentication",
@@ -70,12 +86,27 @@ return group {
 		},
 
 		object {
+			mode = "rw",
 			id = "password",
 			label = "Password",
-			type = "string",
-			default = "admin"
+			type = "password",
+			default = "",
 		},
 
+		object {
+			mode = "rw",
+			id = "password_shadow",
+			label = "",
+			type = "password",
+			default = "",
+		},
+
+		object {
+			id = "encrypted",
+			label = "",
+			type = "string",
+			default = "",
+		},
 	},
 
 	group {
@@ -113,6 +144,7 @@ return group {
 			id = "baudrate",
 			label = "Baudrate",
 			type = "enum",
+			config_type = "number",
 			default = "9600", 
 			range = "300,1200,2400,4800,9600,19200,38400,57600,115200"
 		}
@@ -138,6 +170,15 @@ return group {
 			type = "boolean",
 			default = "true",
 		},
+		
+		object {
+			id = "prevent_duplicate_scan_timeout",
+			label = "Duplicate scan timeout",
+			type = "enum",
+			config_type = "number",
+			default = "NOP",
+			range = "NOP,0.3,1,2,3,5,10,15",
+		},
 
 		object {
 			id = "version",
@@ -155,6 +196,14 @@ return group {
 			default = "Blinking",
 			range = "Blinking,Always ON,Always OFF",
 		},
+
+		object {
+			id = "default_illumination_leds",
+			label = "Default illumination LEDs",
+			type = "enum",
+			default = "On",
+			range = "On, Off",
+		},
 		
 		object {
 			id = "reading_sensitivity",
@@ -171,7 +220,7 @@ return group {
 			default = "Blinking",
 			range = "Blinking,Always ON,Sensor mode",
 		},
-
+		
 		object {
 			id = "1d_scanning_mode",
 			label = "Scanning mode",
@@ -377,15 +426,6 @@ return group {
 		id = "mifare",
 
 		object {
-			id = "has_hardware",
-			label = "Has GPRS hardware",
-			type = "enum",
-			default = "auto", -- "yes","no","auto"  : use only via scanner_rf.is_available()
-			range = "yes,no,auto",
-			mode = "r",
-		},
-
-		object {
 			id = "device",
 			label = "Device",
 			type = "string",
@@ -393,19 +433,27 @@ return group {
 		},
 
 		object {
-			id = "key",
-			label = "Access key",
+			mode = "r",
+			id = "modeltype",
+			label = "modeltype",
 			type = "string",
-			default = "\15\15\15\15\15\15\15\15\15\15\15\15",
-			options = "b", -- binary string: show non printable chars as hex escape codes
-			range = "12:12"
+			default = "",
+		},
+
+		object {
+			id = "key_A",
+			label = "Access key A",
+			type = "string",
+			default = "FFFFFFFFFFFF",
+			match = "^%x*$",
+			range = "12"
 		},
 
 		object {
 			id = "relevant_sectors",
 			label = "Sectors to read",
 			type = "string",
-			default = "1,3,5,15",
+			default = "1,15",
 			range = "1:40"
 		},
 		
@@ -413,8 +461,32 @@ return group {
 			id = "prevent_duplicate_scan_timeout",
 			label = "Duplicate scan timeout",
 			type = "enum",
+			config_type = "number",
 			default = "3",
 			range = "0.3,1,2,3,5,10,15",
+		},
+		
+		object {
+			id = "cardnum_format",
+			label = "Cardnum formatting",
+			type = "enum",
+			default = "hexadecimal",
+			range = "hexadecimal,binary",
+		},
+
+		object {
+			id = "send_cardnum_only",
+			label = "Send card number only",
+			type = "boolean",
+			default = "false",
+		},
+		
+		object {
+			id = "sector_data_format",
+			label = "Sector data format",
+			type = "enum",
+			default = "binary",
+			range = "binary,base 64,hex escapes",
 		},
 
 		group {
@@ -453,6 +525,121 @@ return group {
 
 	group {
 
+		label = "Touch keypad",
+		id = "touch16",
+
+		object { 
+			-- implemented by a 'get' watch, 
+			-- returning the contents of "/sys/class/input/event0/device/name"
+			mode = "r", 
+			id = "name",
+			label = "Device",
+			type = "string",
+			default = ""
+		},
+		
+		object {
+			id = "device",
+			label = "Device",
+			type = "string",
+			default = "/dev/event0"
+		},
+
+		object {
+			id = "prefix",
+			label = "Server message prefix",
+			type = "string",
+			default = "K",
+			range = "0:2",
+		},
+		
+		object {
+			id = "timeout",
+			label = "Touch keyboard timeout [seconds]",
+			type = "number",
+			default = "60",
+			range = "8:300",
+		},
+		
+		object {
+			id = "keyclick",
+			label = "Touch key click",
+			type = "enum",
+			range = "beep1,beep2,beep3",
+			default = "beep1",
+		},
+		
+		object {
+			id = "beep1",
+			type = "string",
+			default = "03a32",
+			range = "1:20",
+		},
+		object {
+			id = "beep2",
+			type = "string",
+			default = "03c100",
+			range = "1:20",
+		},
+		object {
+			id = "beep3",
+			type = "string",
+			default = "03g32",
+			range = "1:20",
+		},
+		
+		object {
+			id = "minimum_click_delay",
+			label = "Minimum time between click",
+			type = "enum",
+			range = "0.5,1,1.5,2,3",
+			default = "1"
+		},
+		
+
+		object {
+			id = "send_active_keys_only",
+			label = "Only send active key events to server",
+			type = "boolean",
+			default = "true",
+		},
+
+	},
+	
+	group {
+	
+		id = "gpio",
+		label = "GPIO",
+		
+		object {
+			id = "prefix",
+			label = "Server message prefix",
+			type = "string",
+			range = "0:2",
+			default = "I",
+		},
+		
+		object {
+			id = "method",
+			label = "Method",
+			type = "enum",
+			range = "On read GPIO,On change,Poll",
+			default = "On read GPIO"
+		},
+		
+		object {
+			id = "poll_delay",
+			label = "Poll speed (seconds)",
+			type = "enum",
+			range = "1,2,3,5,7,10",
+			default = "5"
+		},
+		
+	},
+
+
+	group {
+
 		id = "beeper",
 		label = "Beeper", 
 
@@ -467,6 +654,7 @@ return group {
 			label = "Beeper volume",
 			id = "volume",
 			type = "enum",
+			config_type = "number",
 			default = "4",
 			range = "0,1,2,3,4,5",
 		},
@@ -475,6 +663,7 @@ return group {
 			label = "Beeper type",
 			id = "beeptype",
 			type = "enum",
+			config_type = "number",
 			default = "1",
 			range = "1,2,3",
 		},
@@ -540,6 +729,7 @@ return group {
 			id = "contrast",
 			label = "Display contrast",
 			type = "enum",
+			config_type = "number",
 			default = "2",
 			range = "1,2,3,4",
 		},

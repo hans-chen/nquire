@@ -476,19 +476,10 @@ Messages from server to NQuire (display, beep, etc).
 </div>
 <h2 id="_protocol">2. Protocol</h2>
 <div class="sectionbody">
-<div class="para"><p>The server communication is done by UDP and/or TCP.
-The TCP connection can be in server mode or in client mode.
-In server mode the Nquire will listen to connections on the configured TCP port,
-whereas in client mode the quire will try to make the connection using the
-configured "remote ip address" and "tcp port".
-When there are multiple connections (server mode only), scanned barcode data will
-be sent to all connected servers.</p></div>
-<div class="para"><p>Depending on the configuration (webui), the barcode prefix will or will not be
-sent along with the barcode.</p></div>
-<div class="para"><p>Note that scanned mifare data is prefixed with <tt>MF</tt> followed by 4 bytes
-(binary data) containing the barcode id.</p></div>
-<div class="para"><p>Putting text on the nquire is done by a (downwards) SG15 compatible protocol:
-the Nquire is able to do more, so the protocol is extended:</p></div>
+<div class="para"><p>The server communication is done by UDP and/or TCP. The TCP connection can be in server mode or in client mode. In server mode the Nquire will listen to connections on the configured TCP port, whereas in client mode the quire will try to make the connection using the configured "remote ip address" and "tcp port". When there are multiple connections (server mode only), scanned barcode data will be sent to all connected servers and sent to the configured UDP server:port.</p></div>
+<div class="para"><p>Depending on the configuration (webui), the barcode prefix will or will not be sent along with the barcode.</p></div>
+<div class="para"><p>Note that scanned mifare data is prefixed with <tt>MF</tt> followed by 4 bytes (binary data) containing the barcode id.</p></div>
+<div class="para"><p>Putting text on the nquire is done by a (downwards) SG15 compatible protocol: the Nquire is able to do more, so the protocol is extended:</p></div>
 <div class="ilist"><ul>
 <li>
 <p>
@@ -497,8 +488,7 @@ The screen is bigger so "set pixel position" allows bigger values.
 </li>
 <li>
 <p>
-"select font set" is extended: values 0x32 to 0x40 represent fonts from
-        6px to 96px with steps of 6px.
+"select font set" is extended: values 0x32 to 0x40 represent fonts from 6px to 96px with steps of 6px.
 </p>
 </li>
 <li>
@@ -508,9 +498,188 @@ For testing purposes there is a <em>fake scan</em> escape code.
 </li>
 </ul></div>
 </div>
+<h2 id="_supported_sg15_compatible_escaped_codes">3. Supported SG15 compatible escaped codes</h2>
+<div class="sectionbody">
+<h3 id="_clear_screen">3.1. clear screen</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\x24</tt></pre>
+</div></div>
+<div class="para"><p>or</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\x25</tt></pre>
+</div></div>
+<h3 id="_set_cursor_position">3.2. set cursor position</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\x27</tt></pre>
+</div></div>
+<h3 id="_set_pixel_position">3.3. set pixel position</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\x2c</tt></pre>
+</div></div>
+<h3 id="_align_string_of_text">3.4. align string of text</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>Parameter:
+[0x30] = lt
+[0x31] = ct
+[0x32] = rt
+[0x33] = lm
+[0x34] = cm
+[0x35] = rm
+[0x36] = lb
+[0x37] = cb
+[0x38] = rb
+[0x39] = l.
+[0x3a] = c.
+[0x3b] = r.
+[0x3c] = .t
+[0x3d] = .m
+[0x3e] = .b</tt></pre>
+</div></div>
+<div class="para"><p>E.g. "blabla" in left top:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\x2e\x30blabla\x03</tt></pre>
+</div></div>
+<h3 id="_nop">3.5. NOP</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[0x40] = NOP</tt></pre>
+</div></div>
+<h3 id="_nop_2">3.6. NOP</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[0x41] = NOP</tt></pre>
+</div></div>
+<h3 id="_select_font_set">3.7. select font set</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[0x42] = "select font set",</tt></pre>
+</div></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>0x30 = small
+0x31 = large
+0x32 .. 0x40 = 6px,12px, 18px ...</tt></pre>
+</div></div>
+<h3 id="_reboot">3.8. reboot</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[0x5a] = reboot</tt></pre>
+</div></div>
+<h3 id="_enable_disable_scanning">3.9. enable/disable scanning</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[0x5b] = "enable/disable scanning",</tt></pre>
+</div></div>
+<h3 id="_enable_disable_backlight">3.10. enable/disable backlight</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[0x5c] = "enable/disable backlight",</tt></pre>
+</div></div>
+<h3 id="_sleep_wakeup_barcode_scanner">3.11. sleep/wakeup barcode scanner</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[0x5d] = "sleep/wakeup barcode scanner",</tt></pre>
+</div></div>
+<h3 id="_beep">3.12. beep</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[0x5e] = "beep",</tt></pre>
+</div></div>
+<h3 id="_get_firmware_version">3.13. get firmware version</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[0x5f] = "get firmware version",</tt></pre>
+</div></div>
+<h3 id="_get_firmware_version_in_sg15_format">3.14. get firmware version in SG15 format</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[0x60] = "get firmware version in SG15 format",</tt></pre>
+</div></div>
+<h3 id="_set_gpio_output">3.15. Set GPIO output</h3><div style="clear:left"></div>
+<div class="para"><p>Command: [0x7E]</p></div>
+<div class="para"><p>Parameter 1: OUT1 = 0x30 or <em>'0</em>', OUT2 = 0x31 or <em>'1</em>'</p></div>
+<div class="para"><p>Parameter 2: low = 0x30 or <em>'0</em>', high = 0x31 or <em>'1</em>'</p></div>
+<div class="para"><p>E.g. setting OUT2 to low:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\x7e\x31\x30
+
+or the equivalent:
+
+\x7e10</tt></pre>
+</div></div>
+<h3 id="_get_gpio_input">3.16. Get GPIO input</h3><div style="clear:left"></div>
+<div class="para"><p>Command: [0x7F]</p></div>
+<div class="para"><p>Parameter: IN1 = 0x30 or <em>'0</em>', IN2 = 0x31 or <em>'1</em>'</p></div>
+<div class="para"><p>E.g. requesting the state of IN1:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\x7f\x30</tt></pre>
+</div></div>
+<div class="para"><p>This send the value back using the following format:</p></div>
+<div class="para"><p>&lt;prefix&gt;&lt;pin&gt;&lt;value&gt;</p></div>
+<div class="para"><p>E.g. with the default prefix for IN1, value high:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>I01</tt></pre>
+</div></div>
+</div>
+<h2 id="_extra_escape_codes_nquire_specific">4. Extra escape codes, nquire specific</h2>
+<div class="sectionbody">
+<h3 id="_display_a_picture">4.1. display a picture</h3><div style="clear:left"></div>
+<div class="para"><p>Display a picture on the current pixel position. Just specify the filename, close with.</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\xf0filename.gif\x03</tt></pre>
+</div></div>
+<h3 id="_display_touchscreen_button_picture">4.2. display touchscreen button picture</h3><div style="clear:left"></div>
+<div class="para"><p>The shown picture is related to 1 or more touchscreen buttons.</p></div>
+<div class="para"><p>\xf2&lt;released.gif&gt;\x0d&lt;pressed.gif&gt;\x0d&lt;position by key-id&gt;&lt;coupled to key-id&gt;n \x03</p></div>
+<div class="para"><p>When "pressed.gif" is empty, the image of name-released will be inverted when pressed.</p></div>
+<div class="para"><p>The names of the images should not be too long and not contain spaces together they can have 64-16-3=45 charracters</p></div>
+<div class="para"><p>Touch screen position layout:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>0 1 2 3
+4 5 6 7
+8 9 a b
+c d e f</tt></pre>
+</div></div>
+<div class="para"><p>E.g. display image on position 5, and associate to key 5</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\xf21.gif\x0d\x0d55\x03</tt></pre>
+</div></div>
+<div class="para"><p>E.g. display image on position 6, and associate to key 6 and a</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\xf21.gif\x0d\x0d6a\x03</tt></pre>
+</div></div>
+<h3 id="_show_idle_message">4.3. show idle message</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\xf3</tt></pre>
+</div></div>
+<h3 id="_clear_text_layer">4.4. clear text layer</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\xf5</tt></pre>
+</div></div>
+<h3 id="_show_configuration">4.5. show configuration</h3><div style="clear:left"></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>\xfe</tt></pre>
+</div></div>
+</div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2009-12-21 21:26:44 CEST
+Last updated 2010-04-13 21:20:33 CEST
 </div>
 </div>
 </body>

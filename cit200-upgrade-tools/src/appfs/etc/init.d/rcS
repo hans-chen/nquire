@@ -1,0 +1,98 @@
+#!/bin/sh
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin:
+runlevel=S
+prevlevel=N
+umask 022
+export PATH runlevel prevlevel
+export LD_LIBRARY_PATH=/lib:/usr/lib:/appfs/lib
+#
+#       Trap CTRL-C &c only in this shell so we can interrupt subprocesses.
+#
+trap ":" INT QUIT TSTP
+
+/sbin/hwclock -s
+
+
+/bin/mount -a
+/bin/mkdir -p /var/lib
+/bin/mkdir -p /var/run
+/bin/mkdir -p /var/log
+/bin/mkdir -p /var/run/wpa_supplicant
+/bin/mkdir -p /var/lib/hwclock
+/bin/mkdir -p /var/lock
+ln -s /tmp /var/run
+hostname NEWLAND_CIT
+# Input modules
+#insmod /driver/qt2160.ko
+insmod /driver/usbcore.ko
+insmod /driver/ohci-hcd.ko
+insmod /driver/usb-storage.ko
+insmod /driver/usbhid.ko
+insmod /driver/rt2x00lib.ko
+insmod /driver/rt2x00usb.ko
+insmod /driver/rt73usb.ko
+insmod /driver/rt3070sta.ko
+insmod /driver/usb-datapipe.ko
+# load wifi bin
+/sbin/ifconfig wlan0 up &                                                  
+sleep 1
+echo 1 > /sys/class/firmware/1-1.2\:1.0/loading                            
+cat  /lib/firmware/rt73.bin > /sys/class/firmware/1-1.2\:1.0/data           
+echo 0 > /sys/class/firmware/1-1.2\:1.0/loading  
+/sbin/ifconfig wlan0 down  
+# mount sd
+#mount /dev/mmcblk0p1 /mnt/
+mount -o rw,umask=000,shortname=mixed /dev/mmcblk0p1 /mnt
+if [[ "$?" == "0" ]] ; then
+  mkdir -p /mnt/img /mnt/fonts
+  mkdir -p /home/ftp/img /home/ftp/fonts            
+  mount --bind /mnt/img /home/ftp/img                            
+  mount --bind /mnt/fonts /home/ftp/fonts      
+else                     
+  echo "Not found SD card,mount local partition:/dev/mtdblock/6"
+  mount -t jffs2 /dev/mtdblock/6 /mnt/
+  if [[ "$?" != "0" ]] ; then
+	 echo "mount /dev/mtdblock/6 fail"
+	 echo "flash_eraseall /dev/mtd/6"
+    /sbin/flash_eraseall -j /dev/mtd/6	
+	 echo "retry mount /dev/mtdblock/6"
+    mount -t jffs2 /dev/mtdblock/6 /mnt/
+  fi
+  if [[ "$?" == "0" ]] ; then
+	 echo "mount succ!"
+	 mkdir -p /home/ftp/img
+ 	 mkdir -p /mnt/img 
+	 mount --bind /mnt/img /home/ftp/img                            
+	 chown ftp:ftp /home/ftp/img
+	 chmod 777 /home/ftp/img
+  else
+	  echo "can't mount /dev/mtdlbock/6"
+  fi
+fi
+# server
+/sbin/klogd &
+/sbin/syslogd -C64 &
+/sbin/telnetd
+cd /etc/ && ln -sf vsftpd.conf.anonymous vsftpd.conf
+/bin/vsftpd &
+# touch version file: /etc/cit.ini
+cat > /etc/cit.ini << EOF
+[version]
+rootfs      = 1.4.3
+app         = 1.0
+usb_scan    = 1.0
+kernel      = 2.6.27.2
+hardware    = UNKNOW
+firmware		= 1.4.4
+[serial number]
+sn          = UNKNOW
+EOF
+if [[ "$?" == "0" ]] ; then
+    cd /bin/
+    ./cit_sn -r
+	 lua /usr/bin/cit_appversion 
+    cd /cit200
+    lua main.lua &
+else
+    exit 1
+fi

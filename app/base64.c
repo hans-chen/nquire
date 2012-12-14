@@ -152,6 +152,5 @@ int luaopen_base64(lua_State *L)
 
 
 /*
- * End
+ * vi: ft=c ts=4 sw=4 
  */
-

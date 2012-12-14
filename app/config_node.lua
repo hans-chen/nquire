@@ -1,6 +1,20 @@
 
 module("Config_node", package.seeall)
 
+-- schema config nodes should/can have the following indexes:
+--
+-- id                     the id of the node
+-- type                   one of "number", "string", "password", "boolean", "enum", 
+--                        "ip_address", "pattern"
+-- config_type            optional, "number", when the type in the .conf should not be quoted
+--                        e.g. when an enum represents a number
+-- label                  optional, this is the label in the webui
+-- default                optional, e.g. "123bf"
+-- match                  optional, e.g. "^%x*$"
+-- range                  optional, e.g. "1,5:8"
+-- size                   optional, this is the alternative size of the editbox in the webui
+
+
 local lgid="config_n"
 
 --
@@ -34,7 +48,8 @@ end
 
 local function set(node, value, now)
 	value = tostring(value)
-	if type_check(node.type, node.range, value) then
+	if type_check(node.type, node.range, value) and 
+	   ( node.match == nil or value:match(node.match) ) then
 		if node.value ~= value then
 			node.value = value
 			if node.cache then

@@ -1,0 +1,18 @@
+#!/bin/sh -e
+exec chat -vV\
+        ABORT BUSY\
+        ABORT DELAYED\
+        ABORT "NO ANSWER"\
+        ABORT "NO DIALTONE"\
+        ABORT VOICE\
+        ABORT ERROR\
+        ABORT RINGING\
+        TIMEOUT 3\
+        "" ATZ\
+        OK-\\k\\k\\k\\d+++ATH-OK ATE1\
+        TIMEOUT 30\
+        OK AT+CGDCONT=1,\"IP\",\"internet\",,0,0\
+        OK ATD*99***1#\
+        CONNECT \d\c\
+        "" ""
+	

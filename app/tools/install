@@ -8,6 +8,11 @@
 # Start main without ethernet network (re)configuration
 
 killall lua
+sleep 1
+
+if ! cd /cit200; then
+	exit
+fi
 
 if mount | grep workspace > /dev/null; then 
 
@@ -23,18 +28,41 @@ else
 		ifdown wlan0
 	fi
 
-	cp /home/ftp/*.lua /home/ftp/*so /home/ftp/*.ttf /home/ftp/install /cit200
+	#set -x
+	sync_file ( )
+	{
+		if ! test -f $2; then
+			echo "New file: $2"
+			cp -a $1 $2
+		else
+			if ! diff $1 $2 > /dev/null; then 
+				echo "Changed file: $2"
+				cp -a $1 $2
+			fi
+		fi
+	}
+		
+	# copy files that are different:
+	cd /home/ftp
+	mkdir app-tmp
+	cd app-tmp
+	tar xf ../app.tar
+	DIRS=`find . -type d`
+	cd /cit200
+	mkdir -p $DIRS
+	cd /home/ftp/app-tmp
+	for f in `find . -type f`; do 
+		sync_file "/home/ftp/app-tmp/$f" "/cit200/$f"
+	done
+	sync_file "/home/ftp/install" "/cit200/install" 
 	chmod +x /cit200/install
-	mkdir -p /cit200/schema/ && cp /home/ftp/schema/* /cit200/schema/
-	mkdir -p /cit200/img/    && cp /home/ftp/img/*    /cit200/img/
-
-	cd /cit200 && chown 1006:1006 -R *
-
+	cd /cit200
+	rm -rf /home/ftp/app-tmp
 fi
 
 if ! test "$1" == "-i"; then
 	sleep 2
 	set -x
-	lua main.lua -w -l 5 $1 $2 $3 $4 $5 2>&1 &
+	lua main.lua $1 $2 $3 $4 $5 2>&1 &
 fi
 

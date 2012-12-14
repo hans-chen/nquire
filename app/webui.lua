@@ -1,6 +1,9 @@
 
 module("Webui", package.seeall)
 
+local lgid = "webui"
+
+local hidden_password = "\001\001\001\001"
 
 local function draw_css(client)
 
@@ -169,7 +172,7 @@ function toggle(tf, group)
 }
 function set_visibility(tf, group)
 {
-    document.getElementById(group).style.display = (tf) ? "block" : "none"; 
+    document.getElementById(group).style.display = (tf) ? "" : "none"; 
 } 
 function enable_disable(tf, element) 
 { 
@@ -217,7 +220,7 @@ local function draw_node_value_data( client, node, ro, optarg )
 
 --			client:add_data("<input type='hidden' name='id' value=%q/>\n" % id)
 			if node.type == "boolean" and node.appearance=="checkbox" then
-				logf(LG_DBG,"webui","displaying checkbox " .. id .. " = " .. value)
+				logf(LG_DBG,lgid,"displaying checkbox %s = %s", id, value)
 				local is_checked = (value == "true") and "checked" or ""
 				client:add_data("<input type='hidden' name='default-%s' value='off'/>\n" % { id })
 				client:add_data("<input type='checkbox' name='set-%s' %s %s/>\n" % { id, optarg, is_checked })
@@ -233,29 +236,42 @@ local function draw_node_value_data( client, node, ro, optarg )
 					client:add_data("<option value=%q%s>%s</option>\n" % { item, sel, item })
 				end
 				client:add_data("</select>\n")
+			elseif node.type == "password" then
+				--client:add_data("<input type='password' name='set-%s' size='15' value=%q %s/>\n" % {id, value, optarg })
+				client:add_data("<input type='password' name='set-%s' size='15' value=%q %s/>\n" % {id, hidden_password, optarg })
 			else
 				if node.type == "ip_address" then
 					size = 15
+				elseif node.range then
+					size = 0
+					for c in node.range:gmatch("(%d+)") do
+						local n = tonumber(c)
+						if size<n then size=n end
+					end
+					if node.type == "number" then
+						size = 1+math.floor(math.log(size) / math.log(10))
+					end
 				else
 					size = 10
-				end
-				if node.range then
-					local tmp = node.range:match(":(%d+)")
-					if tmp then 
-						if node.type == "number" then
-							size = 1+math.floor(math.log(tmp) / math.log(10))
-						else
-							size = tmp
-						end
-					end
 				end
 				local maxlength = size
 				if node.options and node.options:find("b") then
 					--print("DEBUG: node[= " .. id .. "]='" ..  value .. "'")
 					
-					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s/>\n" % {id, maxlength*4, (node.size or size*4), binstr_to_escapes(value), optarg })
+					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s/>\n" % {id, maxlength*4, (node.size or size*4), binstr_to_escapes(value,0,0), optarg })
 				else
-					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value=%q %s/>\n" % {id, maxlength, (node.size or size), value, optarg })
+					-- show string as it is, we have to replace all '&' and '\'' 
+					-- charracter with their html escape codes
+					local v = binstr_to_escapes(value:gsub("[&']",
+							function (c) 
+								if c=="'" then 
+									return "&#39;" 
+								elseif c=="&" then
+									return "&#38;"
+								end 
+							end ), 31, 256)
+				
+					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s/>\n" % {id, maxlength, (node.size or size), v, optarg })
 				end
 			end
 
@@ -281,8 +297,8 @@ end
 
 
 
-local function draw_node(client, node, ro, optarg)
-	client:add_data("<tr>\n")
+local function draw_node(client, node, ro, optarg, tr_arg)
+	client:add_data("<tr " .. (tr_arg or "") .. ">\n")
 	draw_node_label(client, node)
 	draw_node_value(client, node, ro, optarg)
 	client:add_data("</tr>\n")
@@ -401,6 +417,7 @@ local function page_home(client, request)
 	draw_node(client, config:lookup("/dev/date"))
 	draw_node(client, config:lookup("/dev/scanner/version"))
 	draw_node(client, config:lookup("/network/macaddress"))
+	draw_node(client, config:lookup("/dev/hardware"))
 end
 
 local function display_by_default( yes_do )
@@ -416,23 +433,32 @@ local function page_network(client, request)
 	local itf_node = config:lookup("/network/interface")
 	local ift_value = itf_node:get()
 
-	if Network:wlan_is_available() or Network:gprs_is_available() then
+	local has_wlan = Network:wlan_is_available()
+	local has_gprs = Network:gprs_is_available()
+	local itf_config = config:get("/network/interface")
+
+	if has_wlan or has_gprs or itf_config~="ethernet" then
 --print("DEBUG: itf_node:get()=" .. ift_value)
 --print("DEBUG: itf_node.range=" .. itf_node.range)
 		box_start(client, "network", "Network interface")
-			local extra = "onclick=\"set_visibility(this.value==" .. 
-				(Network:wlan_is_available() and "'wifi','wifisettings'" or "'gprs','gprssettings'") .. ");" ..
+			if not has_wlan and not has_gprs and itf_config~="ethernet" then
+				client:add_data("<span class=label>WATCH OUT: " .. itf_config .. " hardware is not detected!</span>\n")
+			end
+			local extra = "onclick=\"set_visibility(this.value==" ..
+				(has_wlan and "'wifi','wifisettings'" or "'gprs','gprssettings'") .. ");" ..
 											"set_visibility(this.value!='gprs', 'dhcp_settings')\""
 --print("DEBUG: extra=".. extra)
-			if Network:gprs_is_available() then
+			if has_gprs or itf_config == "gprs" then
 				itf_node.range = "ethernet,gprs"
-			else
+			elseif has_wlan or itf_config == "wifi" then
 				itf_node.range = "ethernet,wifi"
+			else
+				itf_node.range = "ethernet"
 			end
 			draw_node(client, itf_node, false, extra)
 		box_end(client)
 
-		if Network:wlan_is_available() then
+		if has_wlan then
 			box_start(client, "wifi", "Wifi", "id='wifisettings' " .. 
 					display_by_default(ift_value=="wifi") )
 				draw_node(client, config:lookup("/network/wifi/essid"))
@@ -441,7 +467,7 @@ local function page_network(client, request)
 			box_end(client)
 		end
 
-		if Network:gprs_is_available() then
+		if has_gprs then
 			box_start(client, "gprs", "Gprs", "id='gprssettings' " ..  
 					display_by_default(ift_value=="gprs") )
 				draw_node(client, config:lookup("/network/gprs/pin"))
@@ -452,7 +478,7 @@ local function page_network(client, request)
 			box_end(client)
 		end
 	else
-		config:lookup("/network/interface"):set("ethernet")
+		--config:lookup("/network/interface"):set("ethernet")
 	end
 
 
@@ -468,10 +494,14 @@ local function page_network(client, request)
 	box_end(client)
 
 	box_start(client, "network", "NQuire protocol settings")
-		draw_node(client, config:lookup("/cit/udp_port"))
-		draw_node(client, config:lookup("/cit/tcp_port"))
-		draw_node(client, config:lookup("/cit/mode"))
-		draw_node(client, config:lookup("/cit/remote_ip"))
+		local mode = config:get("/cit/mode")
+		draw_node(client, config:lookup("/cit/udp_port"), false, "id='udp_port'" .. 
+				(mode:find("TCP") and " disabled" or "") )
+		draw_node(client, config:lookup("/cit/tcp_port"), false, "id='tcp_port'" .. 
+				(mode=="UDP" and " disabled" or "") )
+		draw_node(client, config:lookup("/cit/mode"), false, "onchange=\"enable_disable(this.value!='UDP','tcp_port');enable_disable(this.value!='TCP server' && this.value!='TCP client' && this.value!='TCP client on scan','udp_port');enable_disable(this.value!='TCP server','remote_ip') \"" )
+		draw_node(client, config:lookup("/cit/remote_ip"), false, "id='remote_ip'" .. 
+				(mode=="TCP server" and " disabled" or "") )
 	box_end(client)
 	
 	form_end(client)
@@ -570,80 +600,92 @@ local function page_scanner( client, request )
 	form_start(client)
 
 	box_start(client, "scanner", "Barcodes")
-	if scanner.type == "2d" then
-		draw_node(client, config:lookup("/dev/scanner/barcodes"), false,
-				"onclick='set_visibility(this.value==\"1D and 2D\",\"2d_codes\")'" )
+	if scanner.type == "em2027" then
+		local onof = "onclick='"
+		local n = 1;
+		for _,code in ipairs(scanner.enable_disable) do
+			if does_firmware_support( code ) and is_2d_code(code.name) then
+				onof = onof .. "set_visibility(this.value==\"1D and 2D\",\"2d_code_" .. n .. "\");"
+				n = n + 1
+			end
+		end
+		onof = onof .. "'"
+		
+		draw_node(client, config:lookup("/dev/scanner/barcodes"), false, onof )
 		draw_node(client, config:lookup("/dev/scanner/multi_reading_constraint"))
-
 	end
+	draw_node(client, config:lookup("/dev/scanner/prevent_duplicate_scan_timeout"))
+
 	draw_node(client, config:lookup("/dev/scanner/enable_barcode_id"))
+
+	client:add_data("<tr><td colspan='2'><hr/><td></tr>")
+
+	-- enable/disable scanning codes
+	for _,code in ipairs(scanner.enable_disable) do
+		if does_firmware_support( code ) and not is_2d_code(code.name) then
+			local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
+			if node then
+				logf(LG_DMP, lgid, "showing code %s", code.name)
+				draw_node(client, node)
+			else
+				logf(LG_DBG, lgid, "Code '%s' is no configuration item.", code.name)
+			end
+		end
+	end
+
+	if scanner.type == "em2027" then
+		local display_style = ""
+		if config:lookup("/dev/scanner/barcodes").value == "1D only" then
+			display_style = " style='display:none'"
+		end
+		local n = 1
+		for _,code in ipairs(scanner.enable_disable) do
+			if does_firmware_support( code ) and is_2d_code(code.name) then
+				local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
+				if node then
+					logf(LG_DMP, lgid, "showing code %s", code.name)
+					draw_node(client, node, nil, nil, ("id='2d_code_" .. tostring(n)) .. "'" .. display_style )
+					n = n + 1
+				else
+					logf(LG_WRN, lgid, "Code '%s' not found in the configuration", code.name)
+				end
+			end
+		end
+	end
+
 	box_end(client)
 
-	if scanner.type == "2d" then
+	if scanner.type == "em2027" then
 		box_start(client, "scanner", "Scanning modes Imager")
+		--draw_node(client, config:lookup("/dev/scanner/default_illumination_leds"))
 		draw_node(client, config:lookup("/dev/scanner/illumination_led"))
 		draw_node(client, config:lookup("/dev/scanner/reading_sensitivity"))
 		draw_node(client, config:lookup("/dev/scanner/aiming_led"))
 		box_end(client)
 	end
 
-	if scanner.type == "1d" then
+	if scanner.type == "em1300" then
 		box_start(client, "scanner", "Scanning modes")
+		draw_node(client, config:lookup("/dev/scanner/default_illumination_leds"))
 		draw_node(client, config:lookup("/dev/scanner/1d_scanning_mode"))
 		box_end(client)
 	end
 
-	-- enable/disbale scanning codes
-	box_start(client, "scanner", "Barcodes")
-
-	client:add_data("<table id='1d_codes'>")
-	for _,code in ipairs(scanner.enable_disable) do
-		if does_firmware_support( code ) and not is_2d_code(code.name) then
-			local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
-			if node then
-				logf(LG_DMP, "webui", "showing code " .. code.name)
-				draw_node(client, node)
-			else
-				logf(LG_DBG, "webui", "Code '" .. code.name .. "' is no configuration item.")
-			end
-		end
-	end
-	client:add_data("</table>")
-
-	if scanner.type == "2d" then
-		if config:lookup("/dev/scanner/barcodes").value == "1D only" then
-			client:add_data("<table id='2d_codes' style='display:none'>")
-		else
-			client:add_data("<table id='2d_codes'>")
-		end
-
-		for _,code in ipairs(scanner.enable_disable) do
-			if does_firmware_support( code ) and is_2d_code(code.name) then
-				local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
-				if node then
-					logf(LG_DMP, "webui", "showing code " .. code.name)
-					draw_node(client, node)
-				else
-					logf(LG_WRN, "webui", "Code '" .. code.name .. "' not found in the configuration")
-				end
-			end
-		end
-		client:add_data("</table>")
-	end
-	box_end(client)
-
 	if Scanner_rf:is_available() then
 		box_start(client, "scanner", "Mifare scanner")
-			draw_node(client, config:lookup("/dev/mifare/key"))
+			draw_node(client, config:lookup("/dev/mifare/key_A"))
 			draw_node(client, config:lookup("/dev/mifare/relevant_sectors"))
+			draw_node(client, config:lookup("/dev/mifare/cardnum_format"))
+			draw_node(client, config:lookup("/dev/mifare/send_cardnum_only"))
+			draw_node(client, config:lookup("/dev/mifare/sector_data_format"))
 			draw_node(client, config:lookup("/dev/mifare/prevent_duplicate_scan_timeout"))
 			draw_node(client, config:lookup("/dev/mifare/msg/access_violation/text"))
 			draw_node(client, config:lookup("/dev/mifare/msg/incomplete_scan/text"))
 		box_end(client)
 	end
 
-
 	form_end(client)
+	body_end(client);
 
 end
 
@@ -658,10 +700,11 @@ local function page_miscellaneous(client, request)
 	box_end(client)
 
 	box_start(client, "miscellaneous", "Authentication")
-	draw_node(client, config:lookup("/dev/auth/enable"),false,"onclick=\"enable_disable(value=='true', 'auth_username');enable_disable(value=='true', 'auth_password')\"")
+	draw_node(client, config:lookup("/dev/auth/enable"),false,"onclick=\"enable_disable(value=='true', 'auth_username');enable_disable(value=='true', 'auth_password');enable_disable(value=='true', 'auth_password_shadow')\"")
 	local extra = config:lookup("/dev/auth/enable").value=="true" and "" or " disabled";
 	draw_node(client, config:lookup("/dev/auth/username"), false, " id='auth_username'" .. extra)
 	draw_node(client, config:lookup("/dev/auth/password"), false, " id='auth_password'" .. extra)
+	draw_node(client, config:lookup("/dev/auth/password_shadow"), false, " id='auth_password_shadow'" .. extra)
 	box_end(client)
 	
 	box_start(client, "miscellaneous", "Programming barcode security")
@@ -675,6 +718,7 @@ local function page_miscellaneous(client, request)
 	draw_node(client, config:lookup("/cit/messages/idle/timeout"))
 	draw_node(client, config:lookup("/cit/messages/error/timeout"))
 	draw_node(client, config:lookup("/cit/codepage"))
+	draw_node(client, config:lookup("/cit/message_separator"))
 	box_end(client)
 
 	box_start(client, "miscellaneous", "Interaction")
@@ -683,6 +727,23 @@ local function page_miscellaneous(client, request)
 	draw_node(client, config:lookup("/dev/beeper/beeptype"))
 	draw_node(client, config:lookup("/cit/disable_scan_beep"))
 	box_end(client)
+
+	box_start(client, "miscellaneous", "GPIO")
+	draw_node(client, config:lookup("/dev/gpio/prefix"))
+	draw_node(client, config:lookup("/dev/gpio/method"),false,"onclick=\"enable_disable(this.value=='Poll','poll_delay')\"" )
+	local gpio_poll_delay_disabled = config:get("/dev/gpio/method")=="Poll" and "" or " disabled";
+	draw_node(client, config:lookup("/dev/gpio/poll_delay"),false," id='poll_delay'" .. gpio_poll_delay_disabled)
+	box_end(client)
+	
+	if config:get("/dev/touch16/name") ~= "" then
+		box_start(client, "miscellaneous", "Touch screen")
+		draw_node(client, config:lookup("/dev/touch16/prefix"))
+		draw_node(client, config:lookup("/dev/touch16/timeout"))
+		draw_node(client, config:lookup("/dev/touch16/keyclick"))
+		draw_node(client, config:lookup("/dev/touch16/minimum_click_delay"))
+		draw_node(client, config:lookup("/dev/touch16/send_active_keys_only"))
+		box_end(client)
+	end
 	
 	form_end(client)
 
@@ -700,9 +761,13 @@ local function page_log(client, request)
 		for l in f:lines() do
 			-- Jan  1 01:56:38 NEWLAND_CIT user.notice lua: inf webserver: 10.0.0.56: GET /bottom-left.jpg
 			local level, component, msg = l:match("lua: (%S+) (%S-): (.+)")
+			-- change above to this when logging should be with time string
+			-- also see log.lua (doing syslog)
+			--local time, level, component, msg = l:match("lua: (%d+:%d+:%d+%.%d+) (%S+) (%S-): (.+)")
 			if level then
 				client:add_data("<tr>")
 				client:add_data(" <td class=log-%s>%d</td>" % { level, line } )
+				--client:add_data(" <td class=log-%s>%s</td>" % { level, time } )
 				client:add_data(" <td class=log-%s>%s</td>" % { level, level } )
 				client:add_data(" <td class=log-%s>%s</td>" % { level, component } )
 				client:add_data(" <td class=log-%s>%s</td>" % { level, msg } )
@@ -794,11 +859,7 @@ end
 
 
 local function page_defaults(client, request)
-	logf(LG_INF, "webui", "Removing cit.conf to restore factory default settings")
-	local ok, err = os.execute("rm -f cit.conf")
-	if not ok then
-		logf(LG_WRN, "webui", "Could not remove cit.conf: %s", err)
-	end
+	cit:restore_defaults()
 	page_rebooting(client, request)
 end
 
@@ -809,71 +870,124 @@ end
 
 local function on_webserver(client, request)
 	
+	logf(LG_DMP, lgid, "request.method=%s, request.post_data=%s", request.method, (request.post_data or "nil") )
 	local applied_setting;
+	local retval = ""
 
-	-- Watch out: this only works as long as the pages do not post binary data 
-	if request.method=="POST" and request.post_data then
-		string.gsub(request.post_data, "([^&=]+)=([^&;]*)[&;]?", 
-			function(name, attr) 
-				request.param[webserver.url_decode(name)] = webserver.url_decode(attr) 
-				--print("DEBUG: webui.lua:on_webserver()() request.param[" .. webserver.url_decode(name) .. "]=" .. webserver.url_decode(attr) )
-			end
-		)
-	end
-
-	errors = {}
-	-- since a checkbox is only received when it is checked, the false value 
-	-- is faked with a hidden value of which the key starts with "default-" instead of "set-"
-	local keyvalues = {}
-	for key, val in pairs(request.param) do
-		--logf(LG_DBG,"webui","scanning request.param " .. key .. "=" .. val)
-		local id = key:match("^set%-(.+)$")
-		if id then
-			--logf(LG_DBG,"webui","Inserting " .. id .. "=" .. val)
-			keyvalues[id] = val
-		else
-			local cb_id = key:match("^default%-(.+)$")
-			if cb_id and not request.param["set-" .. cb_id] then
-				--logf(LG_DBG,"webui","Inserting " .. cb_id .. "=\"false\"")
-				keyvalues[cb_id] = "false"
-			end
-		end
-	end
-
-	-- now actualy set all values
-	for key, value in pairs(keyvalues) do
-		local node = config:lookup(key)
-		if node then 
-			if node.type=="boolean" and node.appearance=="checkbox" and value~="false" then
-				value="true"
-			end
-			if node:get() ~= value then
-				logf(LG_DBG,"webui","changing node " .. key .. " from '" .. node:get() .. "' to '" .. value .. "'")
-				local ok
-				if node.options and node.options:find("b") then
-					local binvalue = escapes_to_binstr( value )
-					--print("DEBUG: value='" .. value .. "', od(escapes_to_binstr( value ))=" .. od(binvalue) )
-					ok = node:set( escapes_to_binstr( value ) )
-				else
-					ok = node:set( value )
+	if not Upgrade.upgrade_busy then
+		-- Watch out: this only works as long as the pages do not post binary data 
+		if request.method=="POST" and request.post_data then
+			string.gsub(request.post_data, "([^&=]+)=([^&;]*)[&;]?", 
+				function(name, attr) 
+					request.param[webserver.url_decode(name)] = webserver.url_decode(attr) 
 				end
-				if not ok then 
-					errors[key] = true
-				else
-					applied_setting = true
+			)
+		end
+
+		errors = {}
+		-- since a checkbox is only received when it is checked, the false value 
+		-- is faked with a hidden value of which the key starts with "default-" instead of "set-"
+		local keyvalues = {}
+		for key, val in pairs(request.param) do
+			local id = key:match("^set%-(.+)$")
+			if id then
+				keyvalues[id] = escapes_to_binstr( val )
+			else
+				local cb_id = key:match("^default%-(.+)$")
+				if cb_id and not request.param["set-" .. cb_id] then
+					keyvalues[cb_id] = "false"
 				end
 			end
 		end
-	end
 
-	-- TODO: should this also be done when there are errors?
-	if applied_setting then
-		display:set_font( nil, 18, nil )
-		display:show_message("Applying", "settings")
-		evq:push("cit_idle_msg", nil, 4.0)
+		for key, value in pairs(keyvalues) do
+			logf(LG_DMP,lgid,"keyvalue['%s'] = '%s'", key, value)
+		end
+	
+		-- and special validation for the password
+		if keyvalues["/dev/auth/enable"] and keyvalues["/dev/auth/enable"]=="true" then
+
+			-- so this is the misc page with authentication enabled
+			local usr = keyvalues["/dev/auth/username"]
+			local pwd = keyvalues["/dev/auth/password"]
+			local pwd_shadow = keyvalues["/dev/auth/password_shadow"]
+
+			-- reject when just changed from authentication disabled or username is
+			-- changed and passwords did not change or differ
+			if (config:get("/dev/auth/enable") == "false" or usr ~= config:get("/dev/auth/username")) and
+					(pwd == hidden_password or pwd ~= pwd_shadow) or usr=="" or pwd == "" then
+				logf(LG_DBG,lgid,"password is not entered but authentication or user is changed.")
+				errors["/dev/auth/username"] = true
+				errors["/dev/auth/password"] = true
+				errors["/dev/auth/password_shadow"] = true
+				errors["/dev/auth/enable"] = true
+		
+			-- ignore when user and password are not changed:
+			-- this only happens direct after authorisation because the browser will 
+			-- re-send the page-request
+			elseif usr == config:get("/dev/auth/username") and
+					pwd == config:get("/dev/auth/password") then
+				keyvalues["/dev/auth/enable"] = nil
+				keyvalues["/dev/auth/username"] = nil
+				keyvalues["/dev/auth/password"] = nil
+				keyvalues["/dev/auth/password_shadow"] = nil
+				keyvalues["/dev/auth/encrypted"] = nil
+			
+			-- accept when passwords are entered:
+			elseif pwd ~= hidden_password then
+				local shadow, salt, crypted = encrypt_password( pwd )
+				keyvalues["/dev/auth/encrypted"] = escapes_to_binstr( crypted )
+			end
+		elseif keyvalues["/dev/auth/enable"] == "false" then
+			--keyvalues["/dev/auth/username"] = ""
+			keyvalues["/dev/auth/encrypted"] = ""
+			keyvalues["/dev/auth/password"] = ""
+			keyvalues["/dev/auth/password_shadow"] = ""
+		end
+
+		-- now actualy set all values
+		for key, value in pairs(keyvalues) do
+			local node = config:lookup(key)
+			if node then 
+				if node.type=="boolean" and node.appearance=="checkbox" and value~="false" then
+					value="true"
+				end
+				if errors[key] then
+					logf(LG_DBG,lgid,"Webui data entry error on field %s", key)
+				else
+					local prev_value = node:get()
+					if prev_value ~= value then
+						if not node:set( value ) then
+							logf(LG_WRN,lgid,"Error setting node %s from '%s' to '%s'", key, node:get(), value)
+							errors[key] = true
+						else
+							logf(LG_DBG,lgid,"changed node %s from '%s' to '%s'", key, prev_value, value)
+							applied_setting = true
+						end
+					end
+				end
+			end
+		end
+
+		-- TODO: should this also be done when there are errors?
+		if applied_setting then
+			logf(LG_DBG,lgid,"Applied settings")
+			-- notify other modules (touch16) before the screen is cleared
+			evq:push("apply_settings", nil, -1) 
+			display:set_font( nil, 18, nil )
+			display:show_message("Applying", "settings")
+			evq:push("cit_idle_msg", nil, 4.0)
+		end
+		
+		if keyvalues["/dev/auth/encrypted"] and keyvalues["/dev/auth/encrypted"]~="" then
+			-- so the password is changed, inform the webserver of this so 
+			-- the client has to authenticate:
+			logf(LG_DBG,lgid,"Requesting authorisation")
+			retval = "Authorization"
+		end
+
 	end
 	
-
 	local pagehandlers = {
 		top = page_top,
 		bottom = page_bottom,
@@ -892,65 +1006,24 @@ local function on_webserver(client, request)
 
 	local p = request.param.p
 	local handler
-	if p and pagehandlers[p] then
+	if Upgrade.upgrade_busy then
+		handler = page_rebooting
+	elseif p and pagehandlers[p] then
 		handler = pagehandlers[p]
 	else
 		handler = pagehandlers.main
 	end
 				
 	client:set_header("Content-Type", "text/html; charset=UTF-8")
+	client:set_header("Expires", "")
+	client:set_header("Cache-control", "no-cache, must-revalidate, proxy-revalidate")
 	
 	handler(client, request)
 
+	return retval
+
 end
 
-function on_upgrade_welcome_image()
-	local path_ftp_dir = "/home/ftp"
-
-	local upgrade_busy = false
-
-	local files, err = sys.readdir(path_ftp_dir)
-	if not files then
-		logf(LG_WRN, "webui", "Could not read directory %s: %s", path_ftp_dir, err)
-		return true
-	end
-
-	local now = os.time()
-
-	for _, file in ipairs(files) do
-
-		-- is this the file we are looking for?
-		if file == "welcome.gif" then
-	
-			logf(LG_DMP,"webui", "installing file %s", file)
-		
-			local filepath = path_ftp_dir .. "/" .. file
-		
-			-- Check if this is a regular file, not a directory or symlink
-			local stat = sys.lstat(filepath)
-			if stat.isreg then
-
-				-- Calculate how long the file has not been modified and limit the file size to 100k
-				local age = os.time() - stat.mtime
-				if age>5 then
-					if stat.size<100000 then
-						-- mv file
-						os.execute("rm -f /cit200/img/welcome.*")
-						os.execute("mv " .. filepath .. " /cit200/img/")
-						logf(LG_INF,"webui", "Installed %s", file)
-						evq:push( "cit_idle_msg", nil, 0 )
-					else
-						-- remove file and log an error
-						os.execute("rm -f " .. filepath)
-						logf(LG_WRN,"webui", "File %s to large for use as welcome image. max=100kB", file)
-					end
-					return true
-				end
-			end
-		end	
-	end
-	return true
-end
 
 function new()
 	webserver:register("/", on_webserver)
@@ -969,10 +1042,6 @@ function new()
 			end
 		end)
 	
-	-- regularly check for an uploaded welcome image
-	evq:register("upgrade_welcome_image", on_upgrade_welcome_image)
-	evq:push("upgrade_welcome_image", nil, 10.0)
-
 end
 
 -- vi: ft=lua ts=3 sw=3

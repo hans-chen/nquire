@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# tool to put files to a discovered nquire
+#
+# Only works when only 1 nquire is discovered or when
+# using the -a option to all discovered nquires
+# gif files are put in the img directory
+# ttf files are put in the fonts directory
+# other files are put in the ftp home directory
+#
+# depends on `nquire-discover` in the path
+#
+# usage: pcit [-a] <file>+
+
+# set -x
+
+nquire_ips=`nquire-discover -n=1`
+
+if test `echo "$nquire_ips" | wc -w` -eq 0; then
+	echo "No enquire found"
+elif test `echo "$nquire_ips" | wc -w` -gt 1; then
+	echo "More than 1 nquire found:"
+	echo $nquire_ips
+	if test "$1" != "-a"; then
+		echo "Use option -a when you want to set it to all nquires!"
+		exit 1
+	fi
+fi
+
+if test "$1" == "-a"; then
+	shift
+fi
+
+for CIT in $nquire_ips; do
+
+	echo "Sending file(s) to $CIT"
+	
+	let i=1
+	for f in $*; do
+		if test -f "$f"; then
+			if [[ "$f" =~ .*gif$ ]]; then
+				echo "$f to img/$f"
+				curl ftp://$CIT/img/ --upload-file "$f"
+			elif [[ "$f" =~ .*ttf$ ]]; then
+				echo "$f to img/$f"
+				curl ftp://$CIT/fonts/ --upload-file "$f"
+			else		
+				echo "$f"
+				curl ftp://$CIT/ --upload-file "$f"
+			fi
+		else
+			echo "Could not transmit file '$f' to $CIT"
+		fi
+	done
+	
+done

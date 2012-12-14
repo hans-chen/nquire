@@ -1,0 +1,146 @@
+# *** Running ./display_tester.lua
+
+
+# *** Start test 'test_dpydrv_new'
+
+# *** Start test 'test_dpydrv_open_close'
+
+# *** Start test 'test_set_font_color_background'
+
+# *** Start test 'test_clear_screen_1'
+Open driver
+Close driver
+
+# *** Start test 'test_clear_screen'
+Open driver
+..
+..	0
+XX
+XX	4
+Close driver
+
+# *** Start test 'test_image_clipping_and_transparency'
+Show an image just outside screen
+Open driver
+XX....XX
+XX....XX
+........
+....XX..
+..XX....
+..XXXX..
+XX....XX
+XX....XX	24
+Close driver
+
+# *** Start test 'test_text'
+Open driver
+w=12	h=12	x=12	y=0
+............
+.X.....X..X.
+.X.....X....
+.X.....X..X.
+.X.....X..X.
+.XXXXXXX..X.
+.X.....X..X.
+.X.....X..X.
+.X.....X..X.
+.X.....X..X.
+............
+............	31
+w=13	h=12	x=13	y=6
+X..X........
+XXXXX.......
+X..XX.......
+X..XX.......
+............
+............
+X.X.........
+X.XXXXXXXXX.
+X.X.XXXXX.X.
+X.X.XX.XX.X.
+......X.....
+............	41
+Close driver
+
+# *** Start test 'test_fonts'
+Open driver
+w=11	h=6	x=11	y=0
+XX.XXXX..
+.XX.X.X..
+XXX.X.X..
+.XXXX.X..
+.....X...
+.........
+.........
+.........	21
+Close driver
+Open driver
+w=22	h=12	x=22	y=0
+...XX...X.........
+..XX.X..X....X..X.
+..X.X.XXXXXX.X..X.
+.X.XX..X...X.X..X.
+...X.XX.X.X..X..XX
+..X...X.X....X..X.
+.XXXXX..X....X..X.
+...X.X..XX...X..X.
+...X.X.X.X...X..X.
+...XXX.X..X..X..X.
+...X..X....X......
+..................
+..................
+..................	69
+Close driver
+Open driver
+w=32	h=18	x=32	y=0
+...........................
+....X.X....X...............
+....X..X...X...............
+...X....X..X.......XX..XX..
+...X.....XXXXXXX...XX..XX..
+..XX.X...XX....X...XX..XX..
+..X.XX....X....X...XX..XX..
+....XXXX.X..X.X....XX..XX.X
+...XX..XX...X......XX..XXXX
+..XX.....X..X......XX..XXX.
+.XXXXXXXX...X......XX..XX..
+...X....X...XX.....XX..XX..
+...X....X...XX.....XX..XX..
+...X....X..X.X.....XX..XX..
+...XXXXXX..X..X....XX..XX..
+...X......X....X...XX..XX..
+...X.....XX.....X..........
+...........................
+...........................
+...........................	136
+Close driver
+Open driver
+w=44	h=24	x=44	y=0
+....................................
+.....X..X......XX...................
+.....XX.XX.....XX...................
+....XXX..XX....XX...................
+....XX....XX...XX...................
+...XXX....XX..XXX.........XX....XX..
+...XX..XX..XX.XXXXXXXXX...XX....XX..
+..XXX.XXX..X..XX.....XX...XX....XX..
+...X..XXX....XX.....XXX...XX....XX..
+.....XXXXXX.XXX.XX..XX....XX....XX..
+....XXX..XXX.X..XX.XX.....XX....XX.X
+....XXX....XX...XX........XX....XXXX
+...XXX......XX..XX........XX....XXXX
+.XXXX........X..XX........XX....XX..
+..XXXXXXXXXX....XX........XX....XX..
+....XX....XX....XXX.......XX....XX..
+....XX....XX...XXXX.......XX....XX..
+....XX....XX...XX.X.......XX....XX..
+....XX....XX...XX.XX......XX....XX..
+....XX....XX..XX...X......XX....XX..
+....XXXXXXXX.XX....XX.....XX....XX..
+....XX......XX......XX....XX....XX..
+....XX.....XX.........X.............
+....................................
+....................................
+....................................	256
+Close driver
+End

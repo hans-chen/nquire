@@ -15,6 +15,8 @@ Filetype=".image"
 
 #Install_path=$Now_path
 Install_path=$Now_path"/release"
+
+BuildVersion=""
 # usage
 usage()
 {
@@ -33,6 +35,7 @@ Options:
                             cit200.image include kernel,logo,rootfs.
     -e FILE             Pack the update kernel image of the usb scanner EM2027.
     -m FILE             Pack the update application image of the usb scanner EM2027.
+    -d FILE             Pack the update kernel image of the scanner EM1300.
     -v VERISON          the version of kernel or application.  Default vaule: 0.1
     -n NAME             the name of component in the name of image.
                         the default name of application  is "app".
@@ -45,7 +48,7 @@ Options:
     -h                  Show this usage guide.
 Note:
     output file format:
-    <product>-<component>-<version>-<md5sum>.image
+    <product>-<component>-<version>.<buildnr>-<md5sum>.image
 f.e:
     cit-kernel-0.2-7ec8feff9530018bbeb6ed47292078dd.image
     cit-app-0.2-91900cb5733b29855f9ee61d9578f6ba.image
@@ -77,6 +80,9 @@ it will create   cit-em2027kernel-3.05.024-120133fc25763fa3d2ccc1298461ba3a.imag
 	$Program_Name -m ./em2027_app.bin -v 3.01.013
 it will create   cit-em2027app-3.01.013-01cbab5177223bb4d4d71d0d6d9a7dae.image
 
+	$Program_Name -d ./em1300_kernel.bin -v 1.13.7
+it will create   cit-em1300kernel-1.13.7-0c7653ecdef58f4d18090f13ea809f46.image
+
 EOF
 }
 modify_name()
@@ -86,12 +92,12 @@ modify_name()
 		exit 1
 	fi 
 	Md5sum=`md5sum $Pack_path | awk '{print $1}'`
-	cp -a $Pack_path $Install_path/$Product-$Component-$Version-$Md5sum$Filetype
+	cp -a $Pack_path $Install_path/$Product-$Component-$Version.$BuildVersion-$Md5sum$Filetype
 	if [ ! $? -eq 0 ] ; then
 		echo "creat $Component image package error"
 	else
-		chmod 777 $Install_path/$Product-$Component-$Version-$Md5sum$Filetype
-		echo "creat $Component image package: $Install_path/$Product-$Component-$Version-$Md5sum$Filetype successful"
+		chmod 777 $Install_path/$Product-$Component-$Version.$BuildVersion-$Md5sum$Filetype
+		echo "creat $Component image package: $Install_path/$Product-$Component-$Version.$BuildVersion-$Md5sum$Filetype successful"
 	fi
 	exit 0
 }
@@ -99,6 +105,13 @@ modify_name()
 packd()
 {
     set -e 
+	 if [ $1 != "app" -a $1 != "firmware" ] ; then	 
+		BuildVersion=build.r`svn info $Pack_path | grep "Last Changed Rev:" | awk '{print $NF}'`
+		changes=`svn status $Pack_path | grep ^[!AMD] | wc -l`
+		if [ $changes != 0 ] ; then
+			BuildVersion=${BuildVersion}M
+		fi
+	fi
     case "$1" in
 		"em2027app")
 			modify_name
@@ -108,6 +121,10 @@ packd()
 			modify_name
 			exit 0
             ;;
+		"em1300kernel")
+			modify_name
+			exit 0
+				;;
         "kernel")
             modify_name
 			exit 0
@@ -117,6 +134,7 @@ packd()
 			exit 0
             ;;
         "firmware")
+				BuildVersion=build.r`svnversion -c $Now_path | cut -d : -f 2`
             modify_name
 			exit 0
             ;;
@@ -146,12 +164,13 @@ packd()
             fi
 
             Md5sum=`md5sum $Install_path/app.tar | awk '{print $1}'`
-            cp -a $Install_path/app.tar $Install_path/$Product-$Component-$Version-$Md5sum$Filetype
+				BuildVersion=build.r`svnversion -c $Now_path/../app-binary | cut -d : -f 2`
+            cp -a $Install_path/app.tar $Install_path/$Product-$Component-$Version.$BuildVersion-$Md5sum$Filetype
             if [ ! $? -eq 0 ] ; then
                 echo "creat application image package error"
             else
-                chmod 777 $Install_path/$Product-$Component-$Version-$Md5sum$Filetype
-                echo "creat application image package: $Install_path/$Product-$Component-$Version-$Md5sum$Filetype successful"
+                chmod 777 $Install_path/$Product-$Component-$Version.$BuildVersion-$Md5sum$Filetype
+                echo "creat application image package: $Install_path/$Product-$Component-$Version.$BuildVersion-$Md5sum$Filetype successful"
             fi
             rm $Install_path/app.tar -f
 			exit 0
@@ -168,7 +187,7 @@ if [ $# -lt 2 ] ; then
     exit 1
 fi
 # TODO Add long command line options
-while getopts "k:s:hv:n:r:f:l:e:m:" opt ; do
+while getopts "k:s:hv:n:r:f:l:e:m:d:" opt ; do
     case "$opt" in
         k)
             # kernel image
@@ -212,6 +231,11 @@ while getopts "k:s:hv:n:r:f:l:e:m:" opt ; do
 			# em2027 applicatioin
 			Pack_path=$OPTARG
 			Component="em2027app"
+			;;
+		d)
+			# em1300 kernel
+			Pack_path=$OPTARG
+			Component="em1300kernel"
 			;;
         h)
             usage

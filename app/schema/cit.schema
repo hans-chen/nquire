@@ -8,7 +8,7 @@ return group {
 		label = "Font codepage",
 		type = "enum",
 		default = "ibm852",
-		range = "ibm852,ibm866,ibm874,ibm1250,ibm1251,ibm1252,ibm1254,ibm1257,utf-8"
+		range = "ibm851,ibm852,ibm866,ibm874,ibm1250,ibm1251,ibm1252,ibm1253,ibm1254,ibm1257,utf-8"
 	},
 
 	object {
@@ -32,7 +32,7 @@ return group {
 		label = "Mode",
 		type = "enum",
 		default = "server",
-		range = "server,client"
+		range = "server,client,UDP,TCP server,TCP client,TCP client on scan"
 	},
 
 	object {
@@ -53,8 +53,25 @@ return group {
 		id = "programming_mode_timeout",
 		label = "Programming mode timeout",
 		type = "enum",
+		config_type = "number",
 		range = "10,15,20,30,45,60",
 		default = "15"
+	},
+	
+	object {
+		id = "loglevel",
+		label = "Logging level",
+		type = "number",
+		default = "3",
+		range = "1:5",
+	},
+
+	object {
+		id = "message_separator",
+		label = "Scan message separator",
+		type = "enum",
+		default = "LF",
+		range = "LF,CR,CRLF",
 	},
 
 	group {
@@ -69,6 +86,7 @@ return group {
 				id = "small",
 				label = "Font size small",
 				type = "enum",
+				config_type = "number",
 				default = "18",
 				range = "18,24",
 			},
@@ -77,6 +95,7 @@ return group {
 				id = "large",
 				label = "Font size large",
 				type = "enum",
+				config_type = "number",
 				default = "28",
 				range = "28,32",
 			},

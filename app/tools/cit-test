@@ -7,35 +7,45 @@
 UDP_PORT=9000
 TCP_PORT=9101
 
+EURO_UTF8='€' # same as \xe2\x82\xac
+EURO_IBM852='\x80'
+EURO=${EURO_IBM852}
+
+if test -f .cit.ip; then 
+	ADDRESS="`cat .cit.ip`"
+else
+	ADDRESS="cit"
+fi
+
 test_1()
 {
     cat 1>&2 << !EOF!
-Testing normal operation, left aligned
-Required: utf8
+Testing normal operation with clean text and
+line-breaks \r and \n, returning to pos 0 on next line
 The display should show:
 ------------------------
 Mineral water
-1 lt
-
+1 Ltr
+!!! Profiteer !!!
 
 
                   € 0.98
 ------------------------
 !EOF!
-	echo -en "\e\x42\x30"				# Font size 0
-	echo -en "\e\x24"					# Clear screen
-	echo -en "Mineral water"			# Text
-	echo -en "\n"						# Carriage return
-	echo -en "1 Ltr"					# Text
-	echo -en "\e\x42\x31"				# Font size 1
-	echo -en "\e\x2e\x38€ 0.98\x03"		# Align text right bottom
+	echo -en "\e\x42\x30"					# Font size 0
+	echo -en "\e\x24"						# Clear screen
+	echo -en "\e\x42\x30"           		# font size small
+	echo -en "Mineral water\x03"			# Text
+	echo -en "\n1 Ltr\x03"					# nextline + Text
+	echo -en "\r!!!  Profiteer  !!!!\x03"   # nextline + Text
+	echo -en "\e\x42\x31"					# Font size big
+	echo -en "\e\x2e\x38${EURO} 0.98\x03"	# Align text right bottom
 }
 
 test_2()
 {
     cat 1>&2 << !EOF!
 Testing normal operation, centered aligned
-Required: imb852
 The display should show ("Special offer" in font big):
 ------------------------
    Coca Cola 0.33Ltr
@@ -50,7 +60,7 @@ The display should show ("Special offer" in font big):
 	echo -en "\e\x24"							# Clear the screen
 	echo -en "\e\x2e\x31Coca Cola 0.33Ltr\x03" 	# Text center - top
 	echo -en "\e\x2c\x30\x45"					# Set pixel position (0,21)
-	echo -en "\e\x2e\x3a\x80 2.69 (Crate)\x03"	# Align text to horizontal center
+	echo -en "\e\x2e\x3a${EURO} 2.69 (Crate)\x03"	# Align text to horizontal center
 	echo -en "\e\x42\x31"						# Font size 1
 	echo -en "\e\x2e\x37Special Offer !\x03"	# Text bottom center
 }
@@ -60,14 +70,13 @@ test_3()
     cat 1>&2 << !EOF!
 Testing alignment
 ------------------------
-lt         ct    xt   rt
+lt      xt ct         rt
 
-ly Y       cy         ry
+ly Y    X  cy         ry
+lm      xm cm         rm
 
-lm         cm    xm   rm
-
-                 X
-lb         cb    xb   rb
+                 
+lb      xb cb         rb
 ------------------------
 !EOF!
 	echo -en "\e\x42\x30"				# Set font
@@ -82,16 +91,16 @@ lb         cb    xb   rb
 	echo -en "\e\x2e\x37cb\x03" 		# Centre bottom
 	echo -en "\e\x2e\x38rb\x03" 		# Right bottom
 	
-	echo -en "\e\x2c\xd0\x84X\x03"		# Write x at (
-	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2c\x50\x40X\x03"		# Write x at (
+	echo -en "\e\x2c\x50\x40"			# Set pixel position (
 	echo -en "\e\x2e\x3cxt\x03" 		# Left keep x
-	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2c\x50\x40"			# Set pixel position (
 	echo -en "\e\x2e\x3dxm\x03" 		# Centre keep x
-	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2c\x50\x40"			# Set pixel position (
 	echo -en "\e\x2e\x3exb\x03" 		# right keep x
 
-	echo -en "\e\x2c\x44\x44Y\x03"		# Write Y at (20,20)
-	echo -en "\e\x2c\x44\x44"			# Set pixel position (20,20)
+	echo -en "\e\x2c\x40\x40Y\x03"		# Write Y at (20,20)
+	echo -en "\e\x2c\x40\x40"			# Set pixel position (20,20)
 	echo -en "\e\x2e\x39ly\x03" 		# Left keep y
 	echo -en "\e\x2e\x3Acy\x03" 		# Centre keep y
 	echo -en "\e\x2e\x3Bry\x03" 		# right keep y
@@ -117,8 +126,9 @@ test_5()
 Testing fake barcode scan
 The display should should the error message (please ask for assistance)
 And the received parcode should be "A1234" == 
+(this only works when the application is started in debug mode (commandline -D)
 !EOF!
-	echo -en "\e\xffA1234\x03"				# Fake barcode scan
+	echo -en "\e\xff\x30A1234\x03"				# Fake barcode scan
 }
 
 test_6()
@@ -221,8 +231,48 @@ Play a beep
 	echo -en "\e\x5e"					# Beep
 }
 
+test_14()
+{
+    cat 1>&2 << !EOF!
+Testing greek letters in utf8:
+------------------------
+βιβλος γενεσεως ιησου
+------------------------
+!EOF!
+	echo -en "\e\x42\x30"						# Font size 0
+	echo -en "\e\x24"							# Clear the screen
+	echo -en "\e\x2e\x31βιβλος γενεσεως ιησου\x03" 	# Text center - top
+}
 
-test_13 ()
+test_15()
+{
+    cat 1>&2 << !EOF!
+Testing special german charracters (utf8)
+------------------------
+őŐűŰúÚ
+------------------------
+!EOF!
+	echo -en "\e\x42\x30"						# Font size 0
+	echo -en "\e\x24"							# Clear the screen
+	echo -en "\e\x2e\x31őŐűŰúÚ\x03" 	# Text center - top
+}
+
+test_16()
+{
+    cat 1>&2 << !EOF!
+Testing special greek charracters (ibm1253)
+------------------------
+
+------------------------
+!EOF!
+	echo -en "\e\x42\x30"						# Font size 0
+	echo -en "\e\x24"							# Clear the screen
+	echo -en "\e\x2e\x31\xb6\xa8\xa5\x03" 	# Text center - top
+	
+	
+}
+
+test_gpio_OUT1_low ()
 {
 	# Eddy GPIO 1/Output		GPIO1-->PC16 (offset:1)
 	# Eddy GPIO 3/Output		GPIO3-->PC18 (offset:3)
@@ -234,38 +284,54 @@ test_13 ()
 	#											High level enable ;	Low level disable
 
     cat 1>&2 << !EOF!
-Set gpio 0 low
+Set gpio OUT1 low
 !EOF!
 	
-	echo -en "\e\x7e00"			# GPIO 0 low
+	echo -en "\e\x7e00"
 }
 
 
-test_14 ()
+test_gpio_OUT1_high ()
 {
     cat 1>&2 << !EOF!
-Set gpio 0 high
+Set gpio OUT1 high
 !EOF!
-	echo -en "\e\x7e01"			# GPIO 0 high
+	echo -en "\e\x7e01"
 }
 
-test_15 ()
+test_gpio_OUT2_low ()
 {
     cat 1>&2 << !EOF!
-Set gpio 1 low
+Set gpio OUT2 low
 !EOF!
-	echo -en "\e\x7e10"			# GPIO 1 low
+	echo -en "\e\x7e10"
 }
 
-test_16 ()
+test_gpio_OUT2_high ()
 {
     cat 1>&2 << !EOF!
-Set gpio 1 high
+Set gpio OUT2 high
 !EOF!
-	echo -en "\e\x7e11"			# GPIO 1 high
+	echo -en "\e\x7e11"
 }
 
-test_17 ()
+test_gpio_IN1 ()
+{
+    cat 1>&2 << !EOF!
+Get gpio IN1
+!EOF!
+	echo -en "\e\x7f0"
+}
+
+test_gpio_IN2 ()
+{
+    cat 1>&2 << !EOF!
+Get gpio IN2
+!EOF!
+	echo -en "\e\x7f1"
+}
+
+test_sleep ()
 {
     cat 1>&2 << !EOF!
 Set scanner in sleep mode (should only works with scanners
@@ -275,7 +341,7 @@ from production batch 1 and than only when using the ethernet interface)
 	echo -en "\e\x5d\x30"               # scanner sleep
 }
 
-test_18 ()
+test_wakeup ()
 {
     cat 1>&2 << !EOF!
 Wake up scanner from sleep mode
@@ -296,6 +362,14 @@ Expect: "SG15V01.03" ==
 test_20 ()
 {
     cat 1>&2 << !EOF!
+Required: Utf 8 
+Expect:
+--------------------
+Cheese
+500 gr
+
+              € 5.69
+--------------------
 !EOF!
 
 	echo -en "\e\x42\x30"
@@ -304,7 +378,7 @@ test_20 ()
 	echo -en "500 gr"
 	echo -en "\e\x42\x31"
 	echo -en "\e\x2e\x38"
-	echo -en "€ 5.69\x03"
+	echo -en "${EURO} 5.69\x03"
 }
 
 test_21 ()
@@ -312,6 +386,13 @@ test_21 ()
     cat 1>&2 << !EOF!
 Test right bottom alignement for chinese charracters
 Required: utf8
+Expect:
+---------------------
+
+
+
+             欢迎光临
+---------------------
 !EOF!
 	echo -en "\e\x25"
 	echo -en "\e\x2e\x38" # right bottom
@@ -323,6 +404,13 @@ test_22 ()
     cat 1>&2 << !EOF!
 Test small and big chinese font
 Required: utf8
+Expect
+---------------------
+汽水
+500ml
+
+               2.5元
+---------------------
 !EOF!
 	echo -en "\e\x42\x30" # font size small
 	echo -en "\e\x25"     # clear screen
@@ -343,7 +431,7 @@ Expect on display:
   blabla line1 part 2 blabla
   
     line2 part 1
-    line2 part 2 blabla
+line2 part 2 blabla
   
 ------------------------------
 !EOF!
@@ -351,7 +439,7 @@ Expect on display:
 	echo -en "\e\x25"     # clear screen
 	echo -en "\e\x42\x30" # font size small
 	echo -en "\e\x2e\x31Line1 part 1\nblabla line1 part 2 blabla\x03" # Center top
-	echo -en "\e\x2753"    # charracter position at 5,3
+	echo -en "\e\x2752"    # charracter position at 5,3
 	echo -en "Line2 part 1\nline2 part 2 blabla\x03"
 	echo -en "\e\x2e\x38Line3 part 1\nline3 part 2 blabla\x03" # right bottom
 }
@@ -368,7 +456,7 @@ Expect on display:
   blabla line1 part 2 blabla
   
     line2 part 1
-    line2 part 2 blabla
+line2 part 2 blabla
   
 ------------------------------
 !EOF!
@@ -376,7 +464,7 @@ Expect on display:
 	echo -en "\e\x25"     # clear screen
 	echo -en "\e\x42\x30" # font size small
 	echo -en "\e\x2e\x31Line1 part 1\x0dblabla line1 part 2 blabla\x03"	# Center top
-	echo -en "\e\x2753"    # charracter position at 5,3
+	echo -en "\e\x2752"    # charracter position at 5,3
 	echo -en "Line2 part 1\x0dline2 part 2 blabla\x03"
 	echo -en "\e\x2e\x38Line3 part 1\x0dline3 part 2 blabla\x03" # right bottom
 }
@@ -391,21 +479,20 @@ Should work independent of font-set
 Testing SG15 and unix line-breaks in the same testcase
 Expect on display:
 ------------------------------
+  Line 1 part 1
+line 1 part 2
 
-   Line 1 part 1
-   line 1 part 2
-  
-       Line 1 part 1
-       line 1 part 2
+       Line 2 part 1
+line 2 part 2
   
 ------------------------------
 !EOF!
 
 	echo -en "\e\x25"     # clear screen
 	echo -en "\e\x42\x30" # font size small
-	echo -en "\e\x2c\x3a\x45"					# Set pixel position (10,21)
+	echo -en "\e\x2c\x34\x34"					# Set pixel position (4,4)
 	echo -en "Line1 part 1\nline1 part 2\x03"
-	echo -en "\e\x2c\x5a\x75"					# Set pixel position (42,21)
+	echo -en "\e\x2c\x50\x50"					# Set pixel position (20,20)
 	echo -en "Line2 part 1\x0dline2 part 2\x03"
 }
 
@@ -418,8 +505,7 @@ Just positioning 4,2 (char pos)
 
 
     Line 1 part 1
-    line 1 part 2
-
+line 1 part 2
   
 ------------------------------
 !EOF!
@@ -556,6 +642,107 @@ Test custom font size (very small and VERY BIG)
 }
 
 
+test_32 ()
+{
+    cat 1>&2 << !EOF!
+Watson bug: \0 charracters instead of '\x03'
+!EOF!
+	echo -en "\e\x25" 				# clear screen
+	echo -en "\e\x2e\x3812345"      # 
+	echo -en "\0\0\0\0\0\0\0\0"     # 
+	
+}
+
+
+test_33 ()
+{
+    cat 1>&2 << !EOF!
+Image test. Displayed images should be clickable
+!EOF!
+	echo -en "\e\x25" 				# clear screen
+
+	echo -en "\e\xf2anim.gif\r\r33\x03"
+
+	echo -en "\e\xf21.gif\r\r44\x03"
+	echo -en "\e\xf22.gif\r\r55\x03"
+	echo -en "\e\xf23.gif\r\r66\x03"
+	echo -en "\e\xf2ok.gif\r\r77\x03"
+	
+	echo -en "\e\xf24.gif\r\r88\x03"
+	echo -en "\e\xf25.gif\r\r99\x03"
+	echo -en "\e\xf26.gif\r\raa\x03"
+	echo -en "\e\xf2cancel.gif\r\rbb\x03"
+	
+	echo -en "\e\xf27.gif\r\rcc\x03"
+	echo -en "\e\xf28.gif\r\rdd\x03"
+	echo -en "\e\xf29.gif\r\ree\x03"
+	echo -en "\e\xf20.gif\r\rff\x03"
+	
+	echo -en "\e\x2e\x30This is text\x0dlt2\x03"
+}
+
+test_34 ()
+{
+    cat 1>&2 << !EOF!
+Image test: back to idle mode, use after test_33 to break keyboard input
+!EOF!
+	echo -en "\e\xf3"
+}
+
+test_35 ()
+{
+    cat 1>&2 << !EOF!
+Image test. 1 image in each corner
+!EOF!
+	echo -en "\e\x25" 				# clear screen
+	echo -en "\e\xf01.gif\x03"
+
+	echo -en "\e\x2c\xe4\x30"
+	echo -en "\e\xf02.gif\x03"
+
+	echo -en "\e\x2c\xe4\x90"
+	echo -en "\e\xf03.gif\x03"
+
+	echo -en "\e\x2c\x30\x90"
+	echo -en "\e\xf04.gif\x03"
+	
+	echo -en "\e\x2c\x68\x58"
+	echo -en "\e\xf0anim.gif\x03"
+}
+
+test_36 ()
+{
+    cat 1>&2 << !EOF!
+Turn backlight off
+!EOF!
+	echo -en "\e\x5c\x30"
+}
+
+test_37 ()
+{
+    cat 1>&2 << !EOF!
+Turn backlight on
+!EOF!
+	echo -en "\e\x5c\x31"
+}
+
+test_38 ()
+{
+    cat 1>&2 << !EOF!
+Flicker backlight
+!EOF!
+	echo -en "\e\x5c\x30\e\x5c\x31"
+}
+
+test_crash()
+{
+    cat 1>&2 << !EOF!
+Simulate a crash
+This should be catched and logged
+!EOF!
+	echo -en "\e\xfd"
+}
+
 test_utf8()
 {
     cat 1>&2 << !EOF!
@@ -563,7 +750,7 @@ Change to utf8 using fake barcode scan.
 !EOF!
 	echo -en "\e\xffF%#\$^*%\x03"					# Fake barcode scan: enter programming mode
 	sleep 3
-	echo -en "\e\xffF020705\x03"						# program settings
+	echo -en "\e\xffF020705\x03"					# program settings
 	sleep 4
 	echo -en "\e\xffF/cit/codepage = utf8\x03"		# Fake barcode scan
 	sleep 1
@@ -586,9 +773,15 @@ Change to utf8 using fake barcode scan.
 if test -z "$1" -o "$1" = "-h" -o "$1" = "--help";
 then
 
-	echo "cit-test -h|{<ip adres> <test id>+}"
+	echo "cit-test -h|{[-udp][-tcp][-imb852][-utf8] [-a <ip address>] <test id>}+"
 	echo "Send a certain string to the cit"
 	echo "Output is done to port 9000 for TCP"
+	echo " -udp        use udp messages"
+	echo " -tcp        use tcp messages (default)"
+	echo " -utf8       use utf8 euro sign charracter"
+	echo " -ibm852     use imb852 euro sign charracter (default)"
+	echo " -a address  the address or name of the nquire (when ommitted, the"
+	echo "             contents of .cit.ip is used)"
 	echo "Test id's:"
 	echo " 1           Mineral water"
 	echo " 2           Coca Cola"
@@ -599,12 +792,14 @@ then
 	echo "10           show config"
 	echo "11           test sloppy formatting without end of string (=\x03) chars"
 	echo "12           beep"
-	echo "13           GPIO 0 high"
-	echo "14           GPIO 0 low"
-	echo "15           GPIO 1 high"
-	echo "16           GPIO 1 low"
-	echo "17           scanner sleep"
-	echo "18           scanner wakeup"
+	echo "OUT1_low     Set gpio OUT1"
+	echo "OUT1_high    Set gpio OUT1"
+	echo "OUT2_low     Set gpio OUT2"
+	echo "OUT2_high    Set gpio OUT2"
+	echo "IN1          read gpio IN1"
+	echo "IN2          read gpio IN2"
+	echo "sleep        scanner sleep"
+	echo "wakeup       scanner wakeup"
 	echo "19           SG15 firmware version"
 	echo "20           utf8 font"
 	echo "21           chinese"
@@ -625,26 +820,29 @@ then
 	exit
 
 else
-
-	if test "$1" = "-u"; then
-		PORT=$UDP_PORT
-		UDP=$1
-		shift
-	else
-		PORT=$TCP_PORT
-	fi
-
-	ADDRESS=$1
-	shift
-
+	PORT=$TCP_PORT
 	while test -n "$1"; do
-		test_$1 | nc -w1 $UDP ${ADDRESS} ${PORT}
-		shift
-		if test -n "$1"; then
+		if test "$1" = "-udp"; then
+			PORT=$UDP_PORT
+			UDP="-u"
+		elif test "$1" = "-tcp"; then
+			PORT=$TCP_PORT
+			UDP=
+		elif test "$1" = "-utf8"; then
+			EURO=${EURO_UTF8}
+		elif test "$1" = "-ibm852"; then
+			EURO=${EURO_IBM852}
+		elif test "$1" = "-a"; then
+			shift
+			ADDRESS=$1
+			echo "$ADDRESS" > .cit.ip
+		else 
 			echo ------------------------------------------------------------------
-			echo "test $1"
+			echo "test $1 on ${ADDRESS}:${PORT}"
+			test_$1 | nc -w1 $UDP ${ADDRESS} ${PORT}
 			sleep 1
 		fi
+		shift
 	done
 fi
 

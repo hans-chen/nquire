@@ -18,13 +18,35 @@
 <div class="contents">
 <h1>cit200/gpio-driver.c File Reference</h1><table border="0" cellpadding="0" cellspacing="0">
 <tr><td></td></tr>
-<tr><td colspan="2"><br><h2>Classes</h2></td></tr>
-<tr><td class="memItemLeft" nowrap align="right" valign="top">struct &nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="struct__GPIO__PARAM.html">_GPIO_PARAM</a></td></tr>
+<tr><td colspan="2"><br><h2>Defines</h2></td></tr>
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g5c2d9d80dfb5ce81d5aebc0e619efdd0">RDY_LED_ON</a>&nbsp;&nbsp;&nbsp;0x5506</td></tr>
 
-<tr><td colspan="2"><br><h2>Typedefs</h2></td></tr>
-<tr><td class="memItemLeft" nowrap align="right" valign="top">typedef <a class="el" href="struct__GPIO__PARAM.html">_GPIO_PARAM</a>&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g362859937ceebd8fe2ae100cb62d9831">GPIO_PARAM</a></td></tr>
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g01874d469540d65afe670745cea7de74">RDY_LED_OFF</a>&nbsp;&nbsp;&nbsp;0x5507</td></tr>
 
-<tr><td class="mdescLeft">&nbsp;</td><td class="mdescRight">GPIO param struct.  <a href="group__GPIO__DRIVER__HOW__TO.html#g362859937ceebd8fe2ae100cb62d9831"></a><br></td></tr>
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#gde470dd43b63132015ef6076f530895d">SCAN1D_LED_ON</a>&nbsp;&nbsp;&nbsp;0x5518</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#gc87a80bb8d206bf5f7c1154c84db884d">SCAN1D_LED_OFF</a>&nbsp;&nbsp;&nbsp;0x5517</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g8279e48997ecb0998175ad16721924a5">SET_GATEOUT1_HIGH</a>&nbsp;&nbsp;&nbsp;0x5519</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g600eb52eadb1492193345e2733441b6d">SET_GATEOUT1_LOW</a>&nbsp;&nbsp;&nbsp;0x5520</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g3769a699089bef855fa5726b8a900315">SET_GATEOUT2_HIGH</a>&nbsp;&nbsp;&nbsp;0x5521</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g6a337568e7973756a49caa300e4d1894">SET_GATEOUT2_LOW</a>&nbsp;&nbsp;&nbsp;0x5522</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g150813a6caaea9bb4a807211aa4e735e">GET_GATEIN3_VALUE</a>&nbsp;&nbsp;&nbsp;0x5523</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#gad2ecf03f5c5751351297f8a627c0ce0">GET_GATEIN4_VALUE</a>&nbsp;&nbsp;&nbsp;0x5524</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g72888b08bc4e549e34532bd891bacb32">SET_5V_POWER_HIGH</a>&nbsp;&nbsp;&nbsp;0x5525</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g9a532e887fed115266a1d43c2273178e">SET_5V_POWER_LOW</a>&nbsp;&nbsp;&nbsp;0x5526</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g14c16dd4f73c71d580cfd9baf457cfab">SET_GPRS_ON</a>&nbsp;&nbsp;&nbsp;0x5527</td></tr>
+
+<tr><td class="memItemLeft" nowrap align="right" valign="top">#define&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g821c3dacec3edbda21a3e0f6ad01037c">SET_GPRS_OFF</a>&nbsp;&nbsp;&nbsp;0x5528</td></tr>
+
 <tr><td colspan="2"><br><h2>Functions</h2></td></tr>
 <tr><td class="memItemLeft" nowrap align="right" valign="top">int&nbsp;</td><td class="memItemRight" valign="bottom"><a class="el" href="group__GPIO__DRIVER__HOW__TO.html#g4b88b4f73d4a6becc39f2fd4e766e294">eddy_gpio_open</a> (struct inode *inode, struct file *file_p)</td></tr>
 

@@ -222,3 +222,6 @@ int luaopen_beepthread(lua_State *L)
 	return 1;             
 }
 
+/*
+ * vi: ft=c ts=4 sw=4 
+ */

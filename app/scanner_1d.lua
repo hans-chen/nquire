@@ -15,42 +15,56 @@ local function on_fd_scanner(event, scanner)
 		return
 	end
 
-	-- tryout for faster beep (this is followed by an error beep when the barcode is invalid)
-	beeper:beep_ok()
-	
 	local data = sys.read(scanner.fd, 256)
 
 	if data then
 		scanner.scanbuf = scanner.scanbuf .. data
 
-		local t1, t2 = scanner.scanbuf:match("(.-)[\r\n](.*)") 
+		local t1, t2 = scanner.scanbuf:match("(.-)[\r\n](.*)")
 		logf(LG_DMP,lgid,"Scanbuf:\n%s", dump( scanner.scanbuf, 10 ) )
-		if t1 then
+		if t1 and #t1==0 then
+			logf( LG_DBG,lgid, "Skipping empty scan data" )
+			scanner.scanbuf = t2 or ""
+		elseif t1 and #t1>0 then
 			local barcode = t1
 			scanner.scanbuf = t2 or ""
 			
-			logf(LG_DBG, lgid, "Scanned barcode '%s'", barcode)
+			local dup_scan_timeout = tonumber( config:get("/dev/scanner/prevent_duplicate_scan_timeout") )
+			--print("DEBUG: dup_scan_timeout = " .. (dup_scan_timeout or "nil"))
+			if dup_scan_timeout == nil or
+					scanner.last_barcode ~= barcode or
+					sys.hirestime() - scanner.last_barcode_time > dup_scan_timeout then
+				
+				scanner.last_barcode = barcode
+				scanner.last_barcode_time = sys.hirestime()
 
-			-- Barcode is complete. Fixup the barcode type prefix to be the
-			-- compatible format
+				beeper:beep_ok()
+			
+				logf(LG_DBG, lgid, "Scanned barcode '%s'", barcode)
 
-			local prefix_in, barcode = barcode:match("(.)(.+)")
-			local prefix_out = nil
+				-- Barcode is complete. Fixup the barcode type prefix to be the
+				-- compatible format
 
-			for _, i in ipairs(prefixes) do
-				if prefix_in ~= nil and prefix_in == i.prefix_1d then
-					logf(LG_DBG, lgid, "Scanned %q barcode type", i.name)
-					prefix_out = i.prefix_out
-					break
+				local prefix_in, barcode = barcode:match("(.)(.+)")
+				local prefix_out = nil
+
+				for _, i in ipairs(prefixes) do
+					if prefix_in ~= nil and prefix_in == i.prefix_1d then
+						logf(LG_DBG, lgid, "Scanned %q barcode type", i.name)
+						prefix_out = i.prefix_out
+						break
+					end
 				end
-			end
 
-			if not prefix_out then
-				logf(LG_DBG, lgid, "Scanned unknown barcode type")
-				prefix_out = "?"
-			end
+				if not prefix_out then
+					logf(LG_DBG, lgid, "Scanned unknown barcode type")
+					prefix_out = "?"
+				end
 
-			evq:push("scanner", { result = "ok", barcode = barcode, prefix=prefix_out })
+				evq:push("scanner", { result = "ok", barcode = barcode, prefix=prefix_out })
+			else
+				logf(LG_DBG,lgid,"Duplicate barcode %s scanned and ignored", barcode)
+			end
 		end
 	else
 		logf(LG_DBG,"event but no data received from scanner device")
@@ -70,7 +84,7 @@ local function flush( scanner, n )
 		end
 	until not buf or #buf == 0
 
-	logf(LG_DMP,  lgid, "< " .. data)
+	logf(LG_DMP,  lgid, "< %s", data)
 	return data
 end
 
@@ -89,7 +103,7 @@ local function read( scanner )
 	
 	buff = buff .. scanner:flush( )
 	
-	logf(LG_DMP, lgid, "Scanner returned " .. buff)
+	logf(LG_DMP, lgid, "Scanner returned '%s'", buff)
 	return buff
 end
 
@@ -155,7 +169,7 @@ local function activate_scanning_mode( scanner, mode )
 	elseif mode=="Sensor mode" then
 		data, retval = scanner:cmd( "#99900113;", mode )
 		--	scanner:cmd( "#99900104;", "Restart" )
--- TODO: verify this (99900152 is NOT fast sensor mode):
+		-- TODO: verify this (99900152 is NOT fast sensor mode):
 		if retval then
 			data, retval = scanner:cmd( "#99900152;", "High sensitivity" )
 		end
@@ -171,7 +185,11 @@ end
 --
 local function open(scanner)
 
-	scanner:close()
+	if scanner.fd then
+		logf(LG_WRN, lgid, "Scanner already opened: not initializing scanner")
+		return
+	end
+
 	led:set("yellow","flash")
 
 	scanner.device = "/dev/ttyS1"
@@ -197,6 +215,13 @@ local function open(scanner)
 		return
 	end
 	
+	-- The retry is necessary because of an em1300 firmware bug which is not solved yet.
+    -- When a settings failes it will probably succeed the next time or it is succeeded
+	-- but gives (incorrect) an error back
+    -- The patch is to retry and ignore errors the last time.
+	local max_retry = 4
+	local fatal = false
+
 	local data, good = scanner:cmd( "#99900301;", "Query the hardware version")
 	if good then 
 		local version = data:match("{(.+);")
@@ -205,57 +230,92 @@ local function open(scanner)
 		end
 	end
 	
-	if good then 
-		data, good = scanner:cmd( "#99900030;", "All settings to factory default")
+	if good or scanner.retry_counter>=max_retry then 
+		data, lgood = scanner:cmd( "#99900030;", "All settings to factory default")
+		good = lgood and good
 	end
 	
-	if good then 
-		data, good = scanner:cmd( "#99904020;", "Disable User Prefix")
+	if good or scanner.retry_counter>=max_retry then 
+		data, lgood = scanner:cmd( "#99904020;", "Disable User Prefix")
+		good = lgood and good
 	end
 	
-	if good then 
-		data, good = scanner:cmd( "#99904111;", "Enable Stop Suffix")
+	if good or scanner.retry_counter>=max_retry then 
+		data, lgood = scanner:cmd( "#99904111;", "Enable Stop Suffix")
+		good = lgood and good
 	end
 	
-	if good then 
-		data, good = scanner:cmd( "#99904112;#99900000;#99900015;#99900020;", "Program Stop Suffix 0x0d")
+	if good or scanner.retry_counter>=max_retry then 
+		data, lgood = scanner:cmd( "#99904112;#99900000;#99900015;#99900020;", "Program Stop Suffix 0x0d")
+		good = lgood and good
 	end
 	
-	if good then 
-		data, good = scanner:cmd( "#99904041;", "Allow Code ID Prefix")
+	if good or scanner.retry_counter>=max_retry then 
+		data, lgood = scanner:cmd( "#99904041;", "Allow Code ID Prefix")
+		good = lgood and good
 	end
 
-	if good then 
+	if good or scanner.retry_counter>=max_retry then 
 		--Blinking,Always ON,Sensor mode
-		data, good = scanner:activate_scanning_mode( config:get("/dev/scanner/1d_scanning_mode") )
+		data, lgood = scanner:activate_scanning_mode( config:get("/dev/scanner/1d_scanning_mode") )
+		good = lgood and good
 	end
 	
 	-- disable/enable barcodes when this needed
 	for _,code in ipairs(enable_disable_HR100) do
 		local id = code.name
 		local node = config:lookup("/dev/scanner/enable-disable/" .. id )
-		if node and good then
+		if node and ( good or scanner.retry_counter>=max_retry ) then
 			if node:get()=="false" and code.off then
-				data, good = scanner:cmd("#" .. code.off .. ";", "disable scanning code " .. id)
+				data, lgood = scanner:cmd("#" .. code.off .. ";", "disable scanning code " .. id)
+				good = lgood and good
 			elseif node:get()=="true" and code.on then
-				data, good = scanner:cmd("#" .. code.on .. ";", "enabling scanning code " .. id)
+				data, lgood = scanner:cmd("#" .. code.on .. ";", "enabling scanning code " .. id)
+				good = lgood and good
 			end
 		end
 	end
-	if good then 
-		led:set("yellow","on")
-	end
 
-	-- end programming
 	if not scanner:switch_to_normal_mode( ) then 
-		return 
+		logf(LG_WRN,lgid,"Could not switch to normal mode")
+		good=false
+		fatal = true
 	end
 
-	if good then
-		logf(LG_INF, lgid, "Successfully detected and configured 1D scanner.")
+	if not good then
+		if scanner.retry_counter<max_retry then
+			logf(LG_WRN, lgid, "Errors during scanner configuration.")
+		
+			led:set("yellow","blink")
+			scanner.retry_counter = scanner.retry_counter + 1
+			logf(LG_WRN, lgid, "Retry configure in 3 seconds")
+			evq:push("reinit_scanner", scanner, 3)
+		elseif fatal then
+			logf(LG_WRN, lgid, "Fatal error during scanner configuration.")
+		else
+			logf(LG_INF, lgid, "Ready configuring 1D scanner.")
+			led:set("yellow","on")
+			scanner.retry_counter = 0
+			gpio:scan_1d_led( true )
+			if config:get("/dev/scanner/default_illumination_leds") == "On" then
+				gpio:set_pin(11, 0)
+			else
+				gpio:set_pin(11, 1)
+			end
+		end
 	else
-		logf(LG_WRN, lgid, "Errors during scanner configuration: Scanner might not work.")
+		logf(LG_INF, lgid, "Successfully detected and configured 1D scanner.")
+		-- end programming
+		led:set("yellow","on")
+		scanner.retry_counter = 0
+		gpio:scan_1d_led( true )
+		if config:get("/dev/scanner/default_illumination_leds") == "On" then
+			gpio:set_pin(11, 0)
+		else
+			gpio:set_pin(11, 1)
+		end
 	end
+	
 end
 
 
@@ -265,6 +325,7 @@ end
 
 local function close(scanner, quick)
 	if scanner.fd then
+		gpio:scan_1d_led( false )
 		if not quick then scanner:disable() end
 		evq:fd_del(scanner.fd)
 		evq:unregister("fd", on_fd_scanner, scanner)
@@ -305,7 +366,7 @@ local function disable(scanner)
 end
 
 local function barcode_on_off( scanner, name, on_off, wait_for_ack )
-	-- not implemented (required for consystency with 2d scanner)
+	-- not implemented (required for consistency with 2d scanner)
 end
 
 function is_available()
@@ -321,14 +382,21 @@ end
 
 function new()
 
+	if not Scanner_1d.is_available() then
+		return nil
+	end
+
 	local scanner = {
 
 		-- data
 		fd = nil,
 		device = nil,
 		scanbuf = "",
-		type = "1d",
+		type = "em1300",
 		enable_disable = enable_disable_HR100,
+		retry_counter = 0,
+		last_barcode = "",
+		last_barcode_time = 0,
 
 		-- scanner independent methods
 		open = open,
@@ -349,10 +417,17 @@ function new()
 		barcode_on_off = barcode_on_off,
 	}
 
-	scanner:open()
+	config:add_watch("/dev/scanner", "set", function (e) evq:push( "reinit_scanner" ) end)
+	evq:register("reinit_scanner", function (e,s) s:close() s:open() end, scanner)
 
-	config:add_watch("/dev/scanner", "set", function() scanner:open() end, scanner)
-	evq:register("reinit_scanner", function() scanner:open() end, scanner)
+	evq:register( "input", 
+		function( event, scanner )
+			if event.data.msg == "disable" then
+				scanner:close()
+			elseif event.data.msg == "enable" then
+				scanner:open()
+			end
+		end, scanner )
 
 	return scanner
 

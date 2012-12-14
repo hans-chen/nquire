@@ -1,0 +1,22 @@
+/dev/ttyS1 9600
+connect /etc/ppp/gprs-connect-chat
+disconnect /etc/ppp/gprs-disconnect-chat
+crtscts 
+updetach
+hide-password
+defaultroute
+usepeerdns
+holdoff 3
+ipcp-accept-local
+lcp-echo-failure 8
+lcp-echo-interval 3
+noauth
+noipdefault
+novj
+novjccomp
+nodeflate
+nobsdcomp
+persist
+lcp-echo-interval 3
+lcp-echo-failure 12
+	

@@ -30,13 +30,11 @@ else
 fi
 
 make clean
-make
-
-ftp -i $CIT << EOF
-anonymous
-mkdir img
-mkdir schema
-mput *.lua *.so arial.ttf schema/* img/* install
-bye
-EOF
+rm -f app.tar
+#make DEBUG=ON mifare.so
+make base64.so beepthread.so dpydrv.so net.so sys.so mifare.so
+make install
+make app.tar
+curl ftp://$CIT/ --upload-file app.tar
+curl ftp://$CIT/ --upload-file install
 

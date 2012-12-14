@@ -6,6 +6,8 @@
 module("Webserver", package.seeall)
 
 
+local lgid = "webserver"
+
 -- 
 -- Handle request from client. This function parses the incoming request and
 -- calls the handler function matching the given path. The handler function is
@@ -33,7 +35,7 @@ module("Webserver", package.seeall)
 -- return: remaining next_buf
 local function handle_request(client, method, uri, headers, next_buf)
 
-	logf(LG_DMP,"webserver","handle_request(client.address=%s, method='%s',uri='%s')", client.address, method or "nil", uri or "nil")
+	logf(LG_DMP,lgid,"handle_request(client.address=%s, method='%s',uri='%s')", client.address, method or "nil", uri or "nil")
 
 	local request = {
 		method = method,
@@ -60,7 +62,7 @@ local function handle_request(client, method, uri, headers, next_buf)
 		)
 	end
 
-	logf(LG_DBG, "webserver", "path=%s, query=%s", path, query)
+	logf(LG_DBG, lgid, "path=%s, query=%s", path, query)
 
 	-- Parse request headers
 
@@ -75,7 +77,8 @@ local function handle_request(client, method, uri, headers, next_buf)
 			local auth = string.match(request.header["Authorization"], "Basic (.+)")
 			if auth then
 				local username, password = base64.decode(auth):match("(.-):(.+)")
-				if username == config:get("/dev/auth/username") and password == config:get("/dev/auth/password") then
+				if username == config:get("/dev/auth/username") and 
+						validate_password( config:get("/dev/auth/encrypted"), password) then
 					request.auth_ok = true
 				end
 			end
@@ -104,18 +107,23 @@ local function handle_request(client, method, uri, headers, next_buf)
 				client.cache_time = -30758400;  -- 1 year ago 
 				client.resp_data = {}
 				client.resp_header = {}
-				local ok, err = safecall(handler.fn, client, request, handler.fndata)
+				local ok, retval = safecall(handler.fn, client, request, handler.fndata)
 
 				-- Check if handler executed OK
 
 				if ok then
-					response.result = "200 OK"
-					response.data = table.concat(client.resp_data)
-					response.header = client.resp_header
-					response.header["Expires"] = os.date("%a, %d %b %Y %H:%M:%S GMT", os.time() + client.cache_time)
+					if retval=="Authorization" then
+						request.auth_ok = false
+						logf(LG_DBG,lgid,"Honering authorisation")
+					else
+						response.result = "200 OK"
+						response.data = table.concat(client.resp_data)
+						response.header = client.resp_header
+						--response.header["Expires"] = os.date("%a, %d %b %Y %H:%M:%S GMT", os.time() + client.cache_time)
+					end
 				else
 					response.result = "500 Error"
-					response.data = "<h1>Error</h1>\nAn error occured while handling the request:<br><pre>" .. err
+					response.data = "<h1>Error</h1>\nAn error occured while handling the request:<br><pre>" .. retval
 				end
 				
 			end
@@ -127,7 +135,8 @@ local function handle_request(client, method, uri, headers, next_buf)
 			response.result = "404 Not found"
 			response.data = "<h1>Not found</h1>\nThe requested URL %s was not found on this server." % request.path
 		end
-	else
+	end
+	if not request.auth_ok then
 		response.result = "401 Authorization Required"
 		response.header["WWW-Authenticate"] = "Basic realm=\"Please authenticate\""
 		response.data = "<h1>Authorization required</h1>\n"
@@ -155,7 +164,7 @@ local function handle_request(client, method, uri, headers, next_buf)
 
 	if response.header["Connection"] == "Close" then
 		client:close()
-		logf(LG_DBG, "webserver", "Client closed, no keepalive")
+		logf(LG_DBG, lgid, "Client closed, no keepalive")
 	end
 
 	return next_buf
@@ -172,12 +181,12 @@ local function on_fd_client(event, client)
 		return
 	end
 
-	local data = client:recv()
+	local data, err = client:recv()
 
 	-- Check if remote connection closed
 	
 	if not data then
-		logf(LG_DBG, "webserver", "Client closed connection")
+		logf(LG_DBG, lgid, "%s", (err or "recv error"))
 		client:close()
 		return
 	end
@@ -203,20 +212,22 @@ local function on_fd_client(event, client)
 			--print("DEBUG: uri=" .. (uri or "null"))
 			--print("DEBUG: headers=\n" .. dump(headers or "null"))
 
+			logf(LG_INF,lgid,"http request: '%s'", uri)
+
 			if method=="GET" then
 				next_buf = handle_request(client, method, uri, headers, next_buf)
 			elseif method=="POST" then
 				local content_length = headers:match("Content[-]Length:%s+(%d+)")+0
-				logf(LG_DMP, "webserver", "Content-Length=%d", content_length)
-				logf(LG_DMP, "webserver", "#next_buf=%d", #next_buf)
+				logf(LG_DMP, lgid, "Content-Length=%d", content_length)
+				logf(LG_DMP, lgid, "#next_buf=%d", #next_buf)
 				if content_length and content_length>#next_buf then
 					-- TODO: test this exception from normal operation
-					logf(LG_DMP, "webserver", "Not all data received. Next time better")
+					logf(LG_DMP, lgid, "Not all data received. Next time better")
 					break
 				end
 				next_buf = handle_request(client, method, uri, headers, next_buf)
 			else
-				logf(LG_WRN,"webserver", "Could not handle http request [[%s]]", buf)
+				logf(LG_WRN,lgid, "Could not handle http request [[%s]]", buf)
 			end
 			client.buf = next_buf
 		else
@@ -240,7 +251,7 @@ local function on_fd_server(event, webserver)
 
 	local fd, address = net.accept(webserver.fd)
 
-	logf(LG_DBG, "webserver", "New connection from %s", address)
+	logf(LG_DBG, lgid, "New connection from %s", address)
 
 	local client = {
 
@@ -289,14 +300,14 @@ local function start(webserver)
 			port = try_port
 			break 
 		else
-			logf(LG_WRN, "webserver", "Bind to port 80 failed: %s", err)
+			logf(LG_WRN, lgid, "Bind to port 80 failed: %s", err)
 		end
 	end
 	net.listen(s, 5)
 	webserver.fd = s
 	evq:fd_add(webserver.fd)
 	evq:register("fd", on_fd_server, webserver)
-	logf(LG_INF, "webserver", "HTTP server listening on port %q", port)
+	logf(LG_INF, lgid, "HTTP server listening on port %q", port)
 end
 
 
@@ -311,7 +322,7 @@ local function stop(webserver)
 	evq:unregister("fd", on_fd_server, webserver)
 	evq:fd_del(webserver.fd)
 	net.close(webserver.fd)
-	logf(LG_INF, "webserver", "HTTP server stopped")
+	logf(LG_INF, lgid, "HTTP server stopped")
 end
 
 
@@ -369,6 +380,16 @@ function new()
 		url_decode = url_decode,
 		url_encode = url_encode,
 	}
+
+	-- close all http client connections:
+	evq:register( "network_reconfigure", 
+		function (node,webserver)
+			logf(LG_DBG,lgid,"Closing all http client connections because network settings changed.")
+			for client, _ in pairs(webserver.client_list) do
+				client:close()
+			end
+		end, webserver)
+
 
 	return webserver
 

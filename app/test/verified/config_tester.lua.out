@@ -1,0 +1,84 @@
+# *** Running ./config_tester.lua
+
+[wrn] config    391:config.lua  : No config file found. Using defaults.
+
+# *** Start test 'config:set_config_item('/group1/number1 = 3')'
+Before:
+/group1/number1 = "5"
+After:
+/group1/number1 = "3"
+
+# *** Start test 'config:set_config_item('/group1/enum1 = "three"')'
+Before:
+/group1/enum1 = "two"
+After:
+/group1/enum1 = "three"
+
+# *** Start test 'config:set_config_item('/group1/enum1 = "one" ; /group1/string1 = "blabla"')'
+Before:
+/group1/enum1 = "three"
+/group1/string1 = "abcd"
+After:
+/group1/enum1 = "one"
+/group1/string1 = "blabla"
+
+# *** Start test 'config:set_config_item('/group1/enum1 = "two" /group1/string1 = "blat"')'
+Before:
+/group1/enum1 = "one"
+/group1/string1 = "blabla"
+After:
+/group1/enum1 = "two"
+/group1/string1 = "blat"
+
+# *** Start test 'config:set_config_item('/group1/string1 = "a\bc"')'
+Before:
+/group1/string1 = "blat"
+After:
+/group1/string1 = "a\bc"
+
+# *** Start test 'config:set_config_item('/group1/string1 = "\xabq"')'
+Before:
+/group1/string1 = "a\bc"
+After:
+/group1/string1 = "«q"
+
+# *** Start test 'config:set_config_item('/group1/string1 = "\xaq"')'
+Before:
+/group1/string1 = "«q"
+After:
+/group1/string1 = "\xaq"
+
+# *** Start test 'config:set_config_item('/group1/string1 = "a\"b"')'
+Before:
+/group1/string1 = "\xaq"
+After:
+/group1/string1 = "a"b"
+
+# *** Start test 'config:set_config_item('/group1/string1 = "\n"')'
+Before:
+/group1/string1 = "a"b"
+After:
+/group1/string1 = "
+"
+
+# *** Start test 'save_db'
+Configfile:
+
+# Settings
+
+
+# group one
+
+/group1/enum1 = "two"
+/group1/number1 = 3
+/group1/string1 = "\n"
+
+# End
+
+
+before set: bla
+after set, now pop:
+on_group1_string1, data=mydata, value=blabla
+before set: direct
+on_group1_string1, data=mydata, value=direct
+after set

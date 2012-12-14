@@ -1,0 +1,12 @@
+#!/bin/sh -x
+
+PROVIDER=$1
+
+echo "PROVIDER=$PROVIDER"
+echo "\$@=$@"
+
+if [ -z "$PROVIDER" ]; then
+PROVIDER=gprs
+fi
+
+exec /usr/bin/pppd call $PROVIDER

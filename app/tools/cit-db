@@ -1,5 +1,7 @@
 #!/usr/local/bin/lua
 
+package.path='../?.lua'
+
 require "net"
 require "sys"
 require "misc"

@@ -1,0 +1,57 @@
+#!/bin/bash
+
+case $1 in
+851)
+	label="ibm851"
+	codepage="IBM851"
+	;;
+1253)
+	label="ibm1253"
+	codepage="CP1253"
+	;;
+*)
+	echo "Usage: generate-codepage <nr>"
+	echo "	nr=1	ibm1253"
+	exit 
+esac
+
+rm -f chr.tmp
+let count=1
+
+echo -en "\t['$label'] = {\n"
+
+for ((i=32; i<256; i=i+1)); 
+do
+
+	if test $count -eq 1; then
+		echo -en "\t\t"
+	fi
+	fill=""
+	if test $i -lt 16; then	fill="0"; fi
+	n=$fill"`echo 'ibase=10;obase=16;'$i | bc`"
+	#echo "coding char \\x$n"
+	echo -en "\x$n" > chr.tmp
+	utfchar="`iconv --from-code $codepage --to-code UTF8 chr.tmp 2> /dev/null`"
+	if test "$utfchar" == ""; then
+		utfchar="�"
+	fi
+	if test "$utfchar" == "\\"; then
+		utfchar="\\\\"
+	fi
+	if test "$utfchar" == "'"; then
+		utfchar="\\'"
+	fi
+	echo -n "[0x$n] = '$utfchar', "
+	
+	#echo "count=$count"
+	if test $count -eq 8; then
+		echo -en "\n"
+		count=0
+	fi
+	let count=count+1
+	
+done
+
+echo -e "\t},"
+
+rm -f chr.tmp

@@ -4,6 +4,7 @@
 
 module("Scanner_hid", package.seeall)
 
+local lgid = "scanner"
 
 ------------------------------------------------------------------------
 -- External scanner_hid in HID keyboard emulation
@@ -22,6 +23,7 @@ local function on_fd_scanner(event, scanner)
 	local data = sys.read(scanner.fd, 256)
 
 	if data then
+		logf(LG_DMP,lgid,"read: '%s'", data)
 		scanner.scanbuf = scanner.scanbuf .. data
 
 		local t1, t2 = scanner.scanbuf:match("(.-)[\r\n](.*)") 
@@ -29,7 +31,7 @@ local function on_fd_scanner(event, scanner)
 			local barcode = t1
 			scanner.scanbuf = t2 or ""
 			
-			logf(LG_DBG, "scanner", "Scanned barcode '%s'", barcode)
+			logf(LG_DBG, lgid, "Scanned barcode '%s'", barcode)
 
 			-- Barcode is complete. Fixup the barcode type prefix to be the
 			-- compatible format
@@ -38,15 +40,15 @@ local function on_fd_scanner(event, scanner)
 			local prefix_out = nil
 
 			for _, i in ipairs(prefixes) do
-				if prefix_in == i.prefix_2d then
-					logf(LG_DBG, "scanner", "Scanned %q barcode type", i.name)
+				if prefix_in == i.prefix_hid then
+					logf(LG_DBG, lgid, "Scanned %q barcode type", i.name)
 					prefix_out = i.prefix_out
 					break
 				end
 			end
 
 			if not prefix_out then
-				logf(LG_DBG, "scanner", "Scanned unknown barcode type")
+				logf(LG_DBG, lgid, "Scanned unknown barcode type")
 				prefix_out = "?"
 			end
 
@@ -105,7 +107,6 @@ end
 --
 
 function new(device, baudrate)
-	
 
 	local scanner_hid = {
 
@@ -119,7 +120,15 @@ function new(device, baudrate)
 		close = close,
 	}
 
-	scanner_hid:open()
+	evq:register( "input", 
+		function (event, scanner_hid)
+			if event.data.msg == "disable" then
+				scanner_hid:close()
+			elseif event.data.msg == "enable" then
+				scanner_hid:open()
+			end
+		end,
+		scanner_hid)
 
 	return scanner_hid
 

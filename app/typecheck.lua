@@ -7,6 +7,7 @@
 local function num_is_in_range(range, num)
 	if not range then return true end
 	num = tonumber(num)
+	if not num then return false end
 	for part in range:gmatch("([^,]+)") do
 		local min,max = part:match("(.+):(.+)")
 		if min and max then
@@ -29,12 +30,17 @@ end
 local type_checker = {
 
 	number = function(range, val)
-		return num_is_in_range(range, tonumber(val))
+		return num_is_in_range(range, val)
 	end,
 
 	string = function(range, val)
 		local len = #val
 		return num_is_in_range(range, len)
+	end,
+
+	password = function(range, val)
+		local len = #val
+		return true
 	end,
 
 	boolean = function(range, val)

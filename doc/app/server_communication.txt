@@ -19,26 +19,191 @@ Note that discovery can also be done using the SG15 compatebility.
 
 == Protocol == 
 
-The server communication is done by UDP and/or TCP.
-The TCP connection can be in server mode or in client mode.
-In server mode the Nquire will listen to connections on the configured TCP port,
-whereas in client mode the quire will try to make the connection using the 
-configured "remote ip address" and "tcp port".
-When there are multiple connections (server mode only), scanned barcode data will
-be sent to all connected servers.
+The server communication is done by UDP and/or TCP. The TCP connection can be in server mode or in client mode. In server mode the Nquire will listen to connections on the configured TCP port, whereas in client mode the quire will try to make the connection using the configured "remote ip address" and "tcp port". When there are multiple connections (server mode only), scanned barcode data will be sent to all connected servers and sent to the configured UDP server:port.
 
-Depending on the configuration (webui), the barcode prefix will or will not be 
-sent along with the barcode.
+Depending on the configuration (webui), the barcode prefix will or will not be sent along with the barcode.
 
-Note that scanned mifare data is prefixed with `MF` followed by 4 bytes 
-(binary data) containing the barcode id.
+Note that scanned mifare data is prefixed with `MF` followed by 4 bytes (binary data) containing the barcode id.
 
-Putting text on the nquire is done by a (downwards) SG15 compatible protocol: 
-the Nquire is able to do more, so the protocol is extended:
+Putting text on the nquire is done by a (downwards) SG15 compatible protocol: the Nquire is able to do more, so the protocol is extended:
 
  -	The screen is bigger so "set pixel position" allows bigger values.
- -	"select font set" is extended: values 0x32 to 0x40 represent fonts from
-	6px to 96px with steps of 6px.
+ -	"select font set" is extended: values 0x32 to 0x40 represent fonts from	6px to 96px with steps of 6px.
  -	For testing purposes there is a 'fake scan' escape code.
 
+== Supported SG15 compatible escaped codes ==
+
+=== clear screen ===
+-----
+\x24
+-----
+
+or
+
+-----
+\x25
+-----
+
+=== set cursor position ===
+-----
+\x27
+-----
+=== set pixel position ===
+-----
+\x2c
+-----
+=== align string of text ===
+
+	Parameter:
+	[0x30] = lt
+	[0x31] = ct
+	[0x32] = rt
+	[0x33] = lm
+	[0x34] = cm
+	[0x35] = rm
+	[0x36] = lb
+	[0x37] = cb
+	[0x38] = rb
+	[0x39] = l.
+	[0x3a] = c.
+	[0x3b] = r.
+	[0x3c] = .t
+	[0x3d] = .m
+	[0x3e] = .b
+
+E.g. "blabla" in left top:
+-----
+\x2e\x30blabla\x03
+-----
+
+=== NOP ===
+	[0x40] = NOP
+
+=== NOP ===
+	[0x41] = NOP
+
+=== select font set ===
+	[0x42] = "select font set",
+		
+		0x30 = small
+		0x31 = large
+		0x32 .. 0x40 = 6px,12px, 18px ...
+
+=== reboot ===
+	[0x5a] = reboot
+
+=== enable/disable scanning ===
+	[0x5b] = "enable/disable scanning",
+
+=== enable/disable backlight ===
+	[0x5c] = "enable/disable backlight",
+
+=== sleep/wakeup barcode scanner ===
+	[0x5d] = "sleep/wakeup barcode scanner",
+
+=== beep ===
+	[0x5e] = "beep",
+
+=== get firmware version ===
+	[0x5f] = "get firmware version",
+
+=== get firmware version in SG15 format ===
+	[0x60] = "get firmware version in SG15 format",
+
+=== Set GPIO output ===
+
+Command: [0x7E]
+	
+Parameter 1: OUT1 = 0x30 or ''0'', OUT2 = 0x31 or ''1''
+
+Parameter 2: low = 0x30 or ''0'', high = 0x31 or ''1''
+	
+E.g. setting OUT2 to low:
+------
+\x7e\x31\x30
+
+or the equivalent:
+
+\x7e10
+------
+
+=== Get GPIO input ===
+
+Command: [0x7F]
+
+Parameter: IN1 = 0x30 or ''0'', IN2 = 0x31 or ''1''
+
+E.g. requesting the state of IN1:
+
+------
+\x7f\x30
+------
+
+This send the value back using the following format:
+
+<prefix><pin><value>
+
+E.g. with the default prefix for IN1, value high:
+
+------
+I01
+------
+
+
+== Extra escape codes, nquire specific ==
+	
+=== display a picture ===
+
+Display a picture on the current pixel position. Just specify the filename, close with.
+
+-----
+\xf0filename.gif\x03
+-----
+	
+=== display touchscreen button picture ===
+
+The shown picture is related to 1 or more touchscreen buttons.
+
+\xf2<released.gif>\x0d<pressed.gif>\x0d<position by key-id><coupled to key-id>n \x03
+
+
+When "pressed.gif" is empty, the image of name-released will be inverted when pressed.
+
+The names of the images should not be too long and not contain spaces together they can have 64-16-3=45 charracters
+
+Touch screen position layout:
+
+-----
+0 1 2 3
+4 5 6 7
+8 9 a b
+c d e f
+-----
+
+E.g. display image on position 5, and associate to key 5
+
+-----
+\xf21.gif\x0d\x0d55\x03
+-----
+
+E.g. display image on position 6, and associate to key 6 and a
+
+-----
+\xf21.gif\x0d\x0d6a\x03
+-----
+
+=== show idle message ===
+-----
+\xf3
+-----
+	
+=== clear text layer ===
+-----
+\xf5
+-----
+
+=== show configuration ===
+-----
+\xfe
+-----
 

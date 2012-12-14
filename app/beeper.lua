@@ -14,21 +14,26 @@ module("Beeper", package.seeall)
 
 local lgid = "beeper"
 
+local	cnf = "/dev/beeper/device"
+
 --
 --- Initialize beeper device.
 --
--- This function looks up the beeper device from the config file, opens
--- and initialize the device
+-- This function opens and initialize the device
 --
 -- @param beeper beeper object
 
-local function init(beeper)
-	local device = config:get("/dev/beeper/device")
+local function init(beeper,cnf)
+	local device = config:get(cnf)
 	logf(LG_DBG, lgid, "Opening beeper on device %s", device)
-	beeper.beepthread, err = beepthread.new(device)
-	if not beeper.beepthread then
+	local beepthread, err = beepthread.new(device)
+	if not beepthread then
 		logf(LG_WRN, lgid, "Can't open beeper %s: %s", device, err)
+		return nil
 	end
+	
+	beeper.beepthread = beepthread
+	return true
 end
 
 
@@ -120,9 +125,9 @@ function new()
 		beep_error = beep_error,
 	}
 
-	beeper:init()
+	beeper:init(cnf)
 
-	config:add_watch("/dev/beeper/device", "set", 
+	config:add_watch(cnf, "set", 
 		function(node, beeper)
 			if beeper.beepthread then
 				beeper.beepthread:free()

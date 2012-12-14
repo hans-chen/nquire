@@ -10,22 +10,33 @@
  * @file		nlrf.h
  * @ingroup		nlrf_api
  *
- * @version		1.0.0
+ * @version		1.1.0
  * @author		Lin Yuning
- * @date		2009-07-21
+ * @date		2010-02-02
  */
 
 #ifndef _NLRF_H_
 #define _NLRF_H_
 
-#define NLRF_ERR_NODEV			1
-#define NLRF_ERR_SETTTY			2
-#define NLRF_ERR_BACKUPTTY		3
-#define NLRF_ERR_RESTORETTY		4
-#define NLRF_ERR_SEND			5
-#define NLRF_ERR_RECV			6
-#define NLRF_ERR_INVALID		7
-#define NLRF_ERR_IGNORE_ME		8
+enum {
+	NLRF_OK = 0,
+	NLRF_ERR_NODEV,
+	NLRF_ERR_NOCARD,
+	NLRF_ERR_WRONGKEY,
+	NLRF_ERR_CARDORKEY,
+	NLRF_ERR_IGNORE_ME,
+	NLRF_ERR_INVALID,
+	NLRF_ERR_SETTTY,
+	NLRF_ERR_BACKUPTTY,
+	NLRF_ERR_RESTORETTY,
+	NLRF_ERR_UNKNOWN,
+};
+
+enum {
+	NLRF_MODEL_V1,
+	NLRF_MODEL_V2,
+	NLRF_MODEL_UNKNOWN,
+};
 
 #define NLRF_CARDNUM_LENGTH		4
 #define NLRF_KEY_LENGTH			12
@@ -79,8 +90,8 @@ int nlrf_close(int fd);
  * @param[in]	fd			file descriptor returned by function nlrf_open
  * @param[out]	info		card information
  * @retval		0						success
- * @retval		-NLRF_ERR_SEND			send command failed
- * @retval		-NLRF_ERR_RECV			receive response failed
+ * @retval		-NLRF_ERR_NODEV			device is not ready
+ * @retval		-NLRF_ERR_NOCARD		no card detected
  */
 int nlrf_querycardinfo(int fd, struct nlrf_cardinfo *info);
 
@@ -91,7 +102,7 @@ int nlrf_querycardinfo(int fd, struct nlrf_cardinfo *info);
  *
  * @param[in]	fd			file descriptor returned by function nlrf_open
  * @retval		0						success
- * @retval		-NLRF_ERR_SEND			send command failed
+ * @retval		-NLRF_ERR_NODEV			device is not ready
  */
 int nlrf_send_querycardinfo(int fd);
 
@@ -103,8 +114,7 @@ int nlrf_send_querycardinfo(int fd);
  * @param[in]	fd			file descriptor returned by function nlrf_open
  * @param[out]	info		card information
  * @retval		0						success
- * @retval		-NLRF_ERR_IGNORE_ME		"no card" response received (ignore it)
- * @retval		-NLRF_ERR_INVALID		receive response failed
+ * @retval		-NLRF_ERR_INVALID		device is not in query mode
  */
 int nlrf_fetch_querycardinfo(int fd, struct nlrf_cardinfo *info);
 
@@ -118,8 +128,8 @@ int nlrf_fetch_querycardinfo(int fd, struct nlrf_cardinfo *info);
  * @param[in]	length		password length
  * @retval		0						success
  * @retval		-NLRF_ERR_INVALID		invalid parameter
- * @retval		-NLRF_ERR_SEND			send command failed
- * @retval		-NLRF_ERR_RECV			receive response failed
+ * @retval		-NLRF_ERR_NODEV			device is not ready
+ * @retval		-NLRF_ERR_IGNORE_ME		just ignore it and resend nlrf_send_querycardinfo (For Model V1)
  * @attention	call this function before read/write card
  */
 int nlrf_chkkey(int fd, const unsigned char *key, int length);
@@ -138,9 +148,11 @@ int nlrf_chkkey(int fd, const unsigned char *key, int length);
  * @param[in]	length		password length
  * @retval		0						command send success
  * @retval		-NLRF_ERR_INVALID		invalid parameter
- * @retval		-NLRF_ERR_SEND			send command failed
- * @retval		-NLRF_ERR_RECV			receive response failed
- * @attention	each sector has different access password
+ * @retval		-NLRF_ERR_NODEV			device is not ready
+ * @retval		-NLRF_ERR_WRONGKEY		wrong access key
+ * @retval		-NLRF_ERR_NOCARD		no card detected
+ * @retval		-NLRF_ERR_CARDORKEY		no card or wrong access key (For Model V1)
+ * @attention	each sector has individual access password
  */
 int nlrf_setkey(int fd, int sector, const unsigned char *oldkey,
 		const unsigned char *newkey, int length);
@@ -158,9 +170,10 @@ int nlrf_setkey(int fd, int sector, const unsigned char *oldkey,
  * @param[in]	length		data length
  * @retval		0						success
  * @retval		-NLRF_ERR_INVALID		invalid parameter
- * @retval		-NLRF_ERR_SEND			send command failed
- * @retval		-NLRF_ERR_RECV			receive response failed
- * @attention	will block on unset/bad access password, please remove card from card reader and wait 3+ seconds
+ * @retval		-NLRF_ERR_NODEV			device is not ready
+ * @retval		-NLRF_ERR_WRONGKEY		wrong access key
+ * @retval		-NLRF_ERR_NOCARD		no card detected
+ * @retval		-NLRF_ERR_CARDORKEY		no card or wrong access key (For Model V1)
  */
 int nlrf_readblock(int fd, int sector, int block, unsigned char *data,
 		int length);
@@ -178,11 +191,24 @@ int nlrf_readblock(int fd, int sector, int block, unsigned char *data,
  * @param[in]	length		data length
  * @retval		0						success
  * @retval		-NLRF_ERR_INVALID		invalid parameter
- * @retval		-NLRF_ERR_SEND			send command failed
- * @retval		-NLRF_ERR_RECV			receive response failed
- * @attention	will block on unset/bad access password, please remove card from card reader and wait 3+ seconds
+ * @retval		-NLRF_ERR_NODEV			device is not ready
+ * @retval		-NLRF_ERR_WRONGKEY		wrong access key
+ * @retval		-NLRF_ERR_NOCARD		no card detected
+ * @retval		-NLRF_ERR_CARDORKEY		no card or wrong access key (For Model V1)
  */
 int nlrf_writeblock(int fd, int sector, int block, const unsigned char *data,
 		int length);
+
+/**
+ * @fn			int nlrf_get_modeltype(int fd);
+ * @ingroup		nlrf_api
+ * @brief		get model type
+ *
+ * @param[in]	fd			file descriptor returned by function nlrf_open
+ * @retval		NLRF_MODEL_V1			Model V1(Old Model)
+ * @retval		NLRF_MODEL_V2			Model V2(New Model)
+ * @retval		NLRF_MODEL_UNKNOWN		No Device / Unknown Model
+ */
+int nlrf_get_modeltype(int fd);
 
 #endif

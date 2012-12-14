@@ -1,0 +1,11 @@
+# *** Running ./base64_tester.lua
+
+
+# *** Start test 'test_encode_decode1'
+'123%\' =encode=> 'MTIzAiVc' =decode=> '123%\'
+
+# *** Start test 'test_encode_decode2'
+'<enter/>' =encode=> 'PGVudGVyLz4=' =decode=> '<enter/>'
+'<enter pwd='MySecret'/>' =encode=> 'PGVudGVyIHB3ZD0nTXlTZWNyZXQnLz4=' =decode=> '<enter pwd='MySecret'/>'
+'<exit/>' =encode=> 'PGV4aXQvPg==' =decode=> '<exit/>'
+'<reconnect/>' =encode=> 'PHJlY29ubmVjdC8+' =decode=> '<reconnect/>'

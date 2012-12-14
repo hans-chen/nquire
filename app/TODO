@@ -1,2 +1,13 @@
-As of nov 2009, all todo is traced in the trac:
+As of nov 2009, issues are traced in the trac using normal trac tickes.
 https://server.mbarc.nl/newland/nquire/trac
+
+Extra:
+
+ * (almost) everything should be tested by automated test-scripts
+ * refactoring: cit.lua needs to get an explicit state machine
+ * refactoring: touch16.lua all dependencies to cit.lua should be removed
+ * refactoring: end of changing settings should be explicit 
+                (not just some timeout as it is now)
+ * refactoring: it should be better to use an external http server (add little)
+ * refactoring: configuring the internal scanners should be done asynchroneous.
+ 

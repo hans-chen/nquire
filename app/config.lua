@@ -93,9 +93,9 @@ local function load_db(config, fname_db)
 
 	local fd, err = io.open(fname_db, "r")
 	if not fd then
-		logf(LG_WRN, lgid, "Could not open config db %s: %s", config.fname_db, err)
 		return
 	end
+	logf(LG_INF, lgid, "Loading config file %s", fname_db)
 
 	for l in fd:lines() do
 		config:set_config_item( l:gsub("\r$","") )
@@ -103,34 +103,62 @@ local function load_db(config, fname_db)
 
 	fd:close()
 
-	local s = sys.lstat(config.fname_db)
+	local s = sys.lstat(fname_db)
 	config.mtime = s.mtime
+
+	return true
 end
 
 --
 -- set a config item from a cit.conf formatted line
+-- TODO: Note that, because this line can also be read from a barcode, it can
+-- actually contain multiple definitions like:
+-- /nodename = "value x" /group/name2 = y
+-- or:
+-- /nodename = "value x" ; /group/name2 = y
 --
 local function set_config_item( config, l )
 
 	if l:match("^#") then 
 		return 
 	end
-
-	local fid, value = l:match("(%S+)%s*=%s*(.*)")
-	if fid and value then
-		local node = config:lookup(fid)
-		if node then
-			local vvalue = node.options and node.options:find("b") and escapes_to_binstr( value ) or value
-			if type_check(node.type, node.range, vvalue) then
-				node:set(vvalue)
-			else
-				logf(LG_WRN,lgid,"Incorrect type for node %s with value '%s'", fid, vvalue )
-			end
+	while l and #l>0 do
+		local fid, rest = l:match("[;%s]*(%S+)%s*=%s*(.*)")
+		local next_tv = ""
+		if not fid then
+			logf(LG_WRN,lgid,"Could not read line '%s'" , l )
+			return
 		else
-			logf(LG_WRN,lgid,"Unrecognized node %s", fid )
+			local node = config:lookup(fid)
+			if node then
+				local is_string = node.options and node.options:find("b") or 
+						node.type == "enum" and (not node.config_type or node.config_type ~= "number") or 
+						node.type == "string" or 
+						node.type == "password" or 
+						node.type == "pattern" 
+				local value
+				value, next_tv = fetch_value( rest, is_string )
+				--logf(LG_DMP,lgid,"read: l='%s', fid='%s', value='%s', rest='%s'" , l, fid or "nil", value or "nil", (next_tv or "nil"))
+				if value then
+					local vvalue = value
+					if node.options and node.options:find("b") or node.type == "string" then
+						vvalue = escapes_to_binstr( value, "\"" )
+					end
+					if type_check(node.type, node.range, vvalue) then
+						node:set(vvalue)
+					else
+						logf(LG_WRN,lgid,"Incorrect type for node %s with value '%s'", fid, vvalue )
+					end
+				else
+					logf(LG_WRN,lgid,"Could not read value for node %s", fid)
+				end
+			else
+				logf(LG_WRN,lgid,"Unrecognized node %s", fid )
+			end
 		end
+		l = next_tv
 	end
-
+	
 end
 
 --
@@ -139,7 +167,7 @@ end
 
 local function save_db(config, fname_db)
 
-	logf(LG_DBG, lgid, "Saving configuration to %s", config.fname_db)
+	logf(LG_DBG, lgid, "Saving configuration to %s", fname_db)
 
 	local function s(fd, node, prefix)
 			
@@ -148,7 +176,10 @@ local function save_db(config, fname_db)
 			if node:has_data() then
 				local prefix2 = prefix:gsub("^%.", "")
 				if node.options and node.options:find("b") then
-					fd:write(prefix2 .. "/" .. node.id .. " = " .. binstr_to_escapes(node.value) .. "\n")
+					fd:write(prefix2 .. "/" .. node.id .. " = \"" .. binstr_to_escapes(node.value,nil,nil,"\"") .. "\"\n")
+				elseif node.type == "string" or (node.type == "enum" and node.config_type ~= "number") or node.type == "password" or node.type == "pattern" then
+					-- TODO: check whether this also works with high utf8 charracters
+					fd:write(prefix2 .. "/" .. node.id .. " = \"" .. binstr_to_escapes(node.value, 32, 256, "\"" ) .. "\"\n")
 				else
 					fd:write(prefix2 .. "/" .. node.id .. " = " .. node.value .. "\n")
 				end
@@ -170,7 +201,7 @@ local function save_db(config, fname_db)
 	local fname_tmp = fname_db .. ".tmp"
 	local fd, err = io.open(fname_tmp, "w")
 	if not fd then
-		logf(LG_WRN, "Could not write to config db %s: %s", fname_tmp, err)
+		logf(LG_WRN,lgid, "Could not write to config db %s: %s", fname_tmp or "nil", err or "nil")
 		return
 	end
 
@@ -183,16 +214,17 @@ local function save_db(config, fname_db)
 
 	-- Rename temporary file to new file name (atomic)
 	
-	local ok, err = os.rename(fname_tmp, config.fname_db)
+	local ok, err = os.rename(fname_tmp, fname_db)
 	if not ok then
-		logf(LG_WRN, lgid, "Could not rename %s to %s: %s", fname_tmp, config.fname_db, err)
+		logf(LG_WRN, lgid, "Could not rename %s to %s: %s", fname_tmp, fname_db, err)
 	end
 	
 	-- Create a copy of the configuration in /home/ftp to allow backup/restore
 	
-	os.execute("rm -f /home/ftp/%s" % config.fname_db)
-	os.execute("cp %s /home/ftp/" % config.fname_db)
-	os.execute("chown ftp.ftp /home/ftp/%s" % config.fname_db)
+	os.execute("rm -f /home/ftp/%s" % fname_db)
+	os.execute("cp -a %s /home/ftp/" % fname_db)
+	os.execute("chown ftp.ftp /home/ftp/%s" % fname_db)
+	os.execute("chmod 664 /home/ftp/%s" % fname_db)
 
 	-- Remember the mtime of the config file for automatic reloading
 	
@@ -302,14 +334,16 @@ local function on_config_timer(event, config)
 
 	-- Check mtime of config file in /home/ftp
 	
-	local s = sys.lstat("/home/ftp/cit.conf")
+	local s = sys.lstat("/home/ftp/" .. config.fname_db)
 
 	if s and s.mtime > config.mtime then
 		logf(LG_DBG, lgid, "FTP Config file was modified, rereading")
-		config:load_db("/home/ftp/cit.conf")
+		config:load_db("/home/ftp/" .. config.fname_db)
 		config:save_db(config.fname_db)
 	end
 
+	-- rescedule the event:
+	return true
 end
 
 
@@ -342,11 +376,26 @@ function new(fname_schema, fname_db)
 		add_watch = add_watch,
 	}
 
+	-- load defaults:
 	config.db = config:load_schema(fname_schema)
-	config:load_db(config.fname_db)
+
+	-- than load config from file:
+	-- first try to load the 'reset configfile'
+	if not config:load_db("/mnt/" .. config.fname_db) then
+		-- than try to load the configfile made just before an upgrade:
+		if config:load_db("/mnt/" .. config.fname_db .. ".bkup") then
+			os.remove("/mnt/" .. config.fname_db .. ".bkup")
+		else
+			-- than try to load the work-configfile:
+			if not config:load_db(config.fname_db) then
+				logf(LG_WRN, lgid, "No config file found. Using defaults.")
+			end
+		end
+	end
 	config:save_db(config.fname_db)
 
-	evq:register("timer_1hz", on_config_timer, config)
+	evq:register("config_timer", on_config_timer, config)
+	evq:push("config_timer", nil, 1.0)
 
 	config:add_watch("//", "set", 
 		function(node, config)

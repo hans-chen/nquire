@@ -1,0 +1,168 @@
+= Nquire touchscreen =
+Maarten van Dootingh <maarten@vdtai.nl>
+
+Revision history
+
+`-------`-----------------------`-------------------------------------------------------------
+v1.0 	Januari 2010            New
+v1.1    April 2 2010            Documenting implicit exclusion of external scanner
+----------------------------------------------------------------------------------------------
+
+This document describes the requirements and design for how the NQuire 
+application should handle the touchscreen functionality.
+
+== Context ==
+
+=== Customer ===
+
+Some customers require a possebility to interact with the NQuire. An example of 
+this could be an application of the NQuire in a casino for upgrading a value 
+card.
+
+Choosen is to have a touchscreen for this. The NQuire should still remain a
+dumb device, knowning knothing of the application it serves. This means it 
+will only offer the possibility to use the touchscreen. The actual application
+giving the touch-screen-input meaning, is to be in the customers server.
+
+=== Hardware ===
+
+The touchscreen is a hardware option on the NQuire. 
+This touchscreen has a capacitive matrix of 4x4 touch-area ('keys').
+The firmware is extended with an extra device: +/dev/event0+
+
+This device spawns +struct input_event+ formatted data.
+
+== Requirements ==
+
+R.kp.1 - The server should be able to be notified of all touch-key-press events.
+
+R.kp.2 - It shall be possible to have a grafical touch-key visualisation.
+
+R.kp.2.1 - A touch key can be related to an image (gif)
+
+R.kp.2.2 - A key-press event is to be visualised.
+
+R.kp.2.2.2 - It shall be possible to relate a different image to the released
+	as to the pressed state of a touch-key.
+	
+R.kp.2.3 - It shall be possible to relate one image to more than 1 touch-key.
+
+R.kp.2.3.1 - Images are of arbitray size (uploaded images can be smaller or bigger than 1 touch-key).
+
+R.kp.2.3.2 - An image is visualised the moment a relation is made.
+
+R.kp.2.3.3 - There shall be a timeout on the touchscreen visualisation, counting
+	from the last key-press or layout-update.
+	
+R.kp.2.3.3.1 - The timeout shall be configurable (and can be indefinite).
+
+R.kp.2.3.4 - All clients (udp/tcp) shall be notified of the timeout-event.
+
+R.kp.2.3.5 - The screen shall be blanked upon a timeout. 
+	The normal +welcome+ text is displayed after the idle-timeout +cit.conf /cit/messages/idle/timeout+
+
+R.kp.2.5 - The following default images shall be available: 
+
+R.kp.2.5.1 - 1 key-size button images: 
+	0.gif        a.gif       cross.gif
+	1.gif        b.gif       mul.gif
+	2.gif        c.gif	     div.gif       
+	3.gif        d.gif       add.gif       
+	4.gif        e.gif       sub.gif
+	5.gif        f.gif       assign.gif
+	6.gif        info.gif    down.gif
+	7.gif        cancel.gif  up.gif     
+	8.gif        cr.gif      right.gif     
+	9.gif        ok.gif      left.gif
+	reset.gif    ok_sign.gif
+	
+R.kp.2.6 - It shall be possible to upload alternate images.
+
+R.kp.2.6.1 - Image names should not contain spaces or a path
+
+R.kp.2.6.3 - The upload client is responsible for correct format of the image
+
+R.kp.2.6.4 - Only gif images will be used by the nquire
+
+R.kp.2.6.4.1 - It is possible to use animated gif images
+
+R.kp.2.6.4.2 - The images should be 2 colors: white={r=255,g=255,b=255} 
+	and black={r=0,g=0,b=0}. Pure blue={r=0,g=0,b=255} is interpreted as 
+	transparent color.
+
+R.kp.3 - It shall be possible to write text 'over' the touch-screen layout
+	using escape commands.
+	
+=== Constraints ===
+
+ * It is not possible to use an external scanner on an nquire with a touchscreen.
+	This is a driver contraint: the touchscreen outputs via
+	stdin as well as the external scanner. Both datastreams will be mixed, which
+	will give inconclusive results 
+	Therefore external scanner input is ignored when a touchscreen is detected.
+	
+
+=== Unclear ===
+
+ Q1: What to do when a image is not available for positioning?
+ A1: The command is simply ignored
+
+== Design ==
+
+=== Escape command interface ===
+
+
+The following extra escape commands are to be implemented:
+
+ * +\xf0 <image name> \x03+ : show image
+ .. position image with \x2c (set pixel position)
+ .. only gif images allowed
+ * +\xf2 <name released> \x0d <name pressed> \x0d <pos key-id> <coupled to key-id>n \x03+ : relate image to touch-key
+ .. When only 1 key is coupled, usually <pos key-id> == <coupled to key-id>
+ .. the +name+ the name of the gif-image without the +.gif+ extension.
+ .. it is possible to couple an image to more than 1 touch-key, simply by specifying more than 1 key-id.
+ .. positions range from [0..f], starting left top:
+------
+           0  1  2  3
+           4  5  6  7
+           8  9  a  b
+           c  d  e  f
+------
+ * +\xf3+ : show welcome text
+ .. This forces the welcome tekst to be shown without delay.
+ .. All touch-key to image bindings are released.
+ * +\xf5+ : clear text layer only (images stay on the screen)
+
+=== Image upload ===
+
+Images can be uploaded with ftp.
+For this, the folder 'img' is available when the ftp-user is logged in.
+Image upload is only available when an sd-card is inserted.
+The images are directly stored on the sd-card (mount --bind). As such, the
+ size of the sd-card limits the number of images.
+
+When no sd card is present, it is decided that it should still be possible to
+store a small amount of images. For this, a small seperate partition is created
+which is mounted instead of the sd-card to /home/ftp/img. (it is not possible to
+just use the remaining space of the jffs2 partition because an ftp-user 
+could than potiontially crash the system by uploading files until no space is 
+left on the jffs2 partition since that is the same partition as occupied by OS 
+and application files).
+
+Note that there can be se serious performance degradation when there are a lot 
+of images (thousends?). The ftp-user is responsible for managing those images.
+
+=== Touch-key-press event messages ===
+
+-------
+packet := prefix value <CR>
+prefix := "K"
+value  := { {'0' .. 'f'} [<filename of image>] } | 'T'
+-------
+
+Note that:
+
+ * the prefix is configurable in the webui.
+ * the value always sends the touched key, followed by the filename of the image
+   when an image was coupled to it. A 'T' is send on a timeout.
+ * When a touch-key is pressed without having an image coupled to it (and +/dev/touch16/send_active_keys_only = true+), then only the prefix followed by the key-value is send.

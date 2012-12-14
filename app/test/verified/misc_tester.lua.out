@@ -1,0 +1,70 @@
+# *** Running ./misc_tester.lua
+
+
+# *** Start test 'test_binstr_to_escapes'
+dump(s)=00000  1f 20 7f 80     . .: binstr_to_escapes(s)='\x1f \x80'
+dump(s)=00000  2f 30 3f 40     /0?@: binstr_to_escapes(s)='\x2f0?\x40'
+dump(s)=00000  22     ": binstr_to_escapes(s)='\"'
+dump(s)=00000  07     .: binstr_to_escapes(s)='\x07'
+dump(s)=00000  08     .: binstr_to_escapes(s)='\x08'
+dump(s)=00000  63     c: binstr_to_escapes(s)='c'
+dump(s)=00000  65     e: binstr_to_escapes(s)='e'
+dump(s)=00000  0c     .: binstr_to_escapes(s)='\x0c'
+dump(s)=00000  0a     .: binstr_to_escapes(s)='\n'
+dump(s)=00000  0d     .: binstr_to_escapes(s)='\x0d'
+dump(s)=00000  09     .: binstr_to_escapes(s)='\x09'
+dump(s)=00000  0b     .: binstr_to_escapes(s)='\x0b'
+dump(s)=00000  5c     \: binstr_to_escapes(s)='\'
+dump(s)=00000  5c 5c 51     \\Q: binstr_to_escapes(s)='\\\Q'
+dump(s)=00000  5c 5c     \\: binstr_to_escapes(s)='\\\'
+dump(s)=00000  5c 0a     \.: binstr_to_escapes(s)='\\\n'
+dump(s)=00000  61 0a 62     a.b: binstr_to_escapes(s)='a\nb'
+dump(s)=00000  6e 5c 78 6d     n\xm: binstr_to_escapes(s)='n\xm'
+dump(s)=00000  6e 5c 78 31 6d     n\x1m: binstr_to_escapes(s)='n\x1m'
+dump(s)=00000  6e 5c 78 31 32 6d     n\x12m: binstr_to_escapes(s)='n\\x12m'
+dump(s)=00000  5c 78     \x: binstr_to_escapes(s)='\x'
+dump(s)=00000  5c 78 31     \x1: binstr_to_escapes(s)='\x1'
+dump(s)=00000  5c 78 31 32     \x12: binstr_to_escapes(s)='\\x12'
+dump(s)=00000  74 65 78 74 3d 22 62 6c 61 22     text="bla": binstr_to_escapes(s)='text=\"bla\"'
+
+# *** Start test 'test_escapes_to_binstr'
+s='\xn': dump(escapes_to_binstr(s))=00000  5c 78 6e     \xn
+s='\xan': dump(escapes_to_binstr(s))=00000  5c 78 61 6e     \xan
+s='\x18n': dump(escapes_to_binstr(s))=00000  18 6e     .n
+s='\a': dump(escapes_to_binstr(s))=00000  5c 61     \a
+s='\b': dump(escapes_to_binstr(s))=00000  5c 62     \b
+s='\c': dump(escapes_to_binstr(s))=00000  5c 63     \c
+s='\e': dump(escapes_to_binstr(s))=00000  5c 65     \e
+s='\f': dump(escapes_to_binstr(s))=00000  5c 66     \f
+s='\n': dump(escapes_to_binstr(s))=00000  0a     .
+s='\r': dump(escapes_to_binstr(s))=00000  5c 72     \r
+s='\t': dump(escapes_to_binstr(s))=00000  5c 74     \t
+s='\v': dump(escapes_to_binstr(s))=00000  5c 76     \v
+s='\': dump(escapes_to_binstr(s))=00000  5c     \
+s='\\': dump(escapes_to_binstr(s))=00000  5c     \
+translate back fails
+s='\\\n': dump(escapes_to_binstr(s))=00000  5c 0a     \.
+s='a\nb': dump(escapes_to_binstr(s))=00000  61 0a 62     a.b
+
+# *** Start test 'test_fetch_value'
+s='abc', v='abc', r='nil'
+String: s='abc def', v='abc def', r='nil'
+s='abc def', v='abc', r=' def'
+String: s='"abc def"', v='abc def', r='nil'
+String: s='abc "def"', v='abc "def"', r='nil'
+String: s=' abc "def"', v='abc "def"', r='nil'
+s='1 ; /a = bla', v='1', r=' ; /a = bla'
+String: s=' " abc def " ; /b = 42 ', v=' abc def ', r=' ; /b = 42 '
+
+# *** Start test 'test_find_file'
+Search 'Makefile' in '': ./Makefile
+Search 'Makefile' in 'img': img/Makefile
+Search 'Makefile' in 'img:.': img/Makefile
+Search 'Makefile' in '.:img': ./Makefile
+Search 'anim1.gif' in 'img': img/anim1.gif
+Search 'anim1.gif' in '.:img': img/anim1.gif
+Search 'anim1.gif' in 'nonexistdir:img:.': img/anim1.gif
+Search 'anim1.gif' in 'img:.': img/anim1.gif
+Search 'nonexist' in '': nil
+Search 'anim1.gif' in '.:verified': nil
+Search 'anim1.gif' in '.:nonexistdir': nil

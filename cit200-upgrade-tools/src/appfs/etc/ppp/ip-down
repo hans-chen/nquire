@@ -1,0 +1,10 @@
+#!/bin/sh
+
+RESOLV=/etc/resolv.conf
+
+if test -f $RESOLV.org; then
+	if grep 'gprs-dns' $RESOLV > /dev/null; then
+		mv $RESOLV.org $RESOLV
+	fi
+fi
+

@@ -119,24 +119,33 @@ end
 -- Constructor
 --
 
-function new()
+local function init(versioninfo)
 
 	-- Read serial number and rfs version from ini file
 	
 	local serial = get_ini_key(path_ini_file, "serial number", "sn")
 	local rfs_version = get_ini_key(path_ini_file, "version", "rootfs")
+	local firmware_version = get_ini_key(path_ini_file, "version", "firmware")
+	local hardware_version = get_ini_key(path_ini_file, "version", "hardware")
 
 	-- Store in db
 	
 	config:lookup("/dev/serial"):setraw(serial)
 	config:lookup("/dev/rfs_version"):setraw(rfs_version)
+	config:lookup("/dev/firmware"):setraw(firmware_version)
+	config:lookup("/dev/hardware"):setraw(hardware_version)
 
 	-- 'set' watch on db for setting device serial number
 
 	config:add_watch("/dev/serial", "set", on_set_serial)
 
-	return network
 end
 	
+function new()
+	local self = {
+		init = init
+	}
+	return self
+end
 
 -- vi: ft=lua ts=3 sw=3 

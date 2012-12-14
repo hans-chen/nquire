@@ -1,0 +1,38 @@
+= Nquire test document =
+Maarten van Dootingh <maarten@vdtai.nl>
+
+Revision history
+
+`-------`-----------------------`-------------------------------------------------------------
+v1.0 	March 29 2010           Innitial document
+v1.1    Jun 9 2010              CHnaged purpose of document
+----------------------------------------------------------------------------------------------
+
+== NQuire test manual == 
+
+=== Introduction ===
+
+The actual test-document is a word document.
+This document is more meant as a 'toolbox' for testing, providing test-barcode,
+etc.
+
+== Test barcodes ==
+
+=== 2_5-Industrial ===
+
+image:img/2_5-Industrial.png["2_5-Industrial",height=70]
+
+=== 2_5-Matrix ===
+
+image:img/2_5-Matrix.png["2_5-Matrix (?)",height=70]
+
+=== 2_5-Standard ===
+
+image:img/2_5-Standard.png["2_5-Standard",height=70]
+
+=== interleaved_2of5 ===
+
+image:img/interleaved_2of5.png["interleaved_2of5",height=70]
+
+
+

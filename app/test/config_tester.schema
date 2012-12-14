@@ -1,0 +1,34 @@
+return group { 
+
+	label = "Settings",
+	id = "setting",
+
+	group {
+		id = "group1",
+		label = "group one",
+		
+		object {
+			id = "enum1",
+			label = "Variabele 1",
+			type = "enum",
+			default = "two",
+			range = "one,two,three"
+		},
+
+		object {
+			id = "number1",
+			label = "number 1",
+			type = "number",
+			default = "5",
+			range = "1:10",
+		},
+	
+		object {
+			id = "string1",
+			label = "string 1",
+			type = "string",
+			default = "abcd",
+			range = "1:6",
+		},
+	},
+}

@@ -22,6 +22,9 @@ local level_info = {
  	[LG_DMP] = { "dmp", "\027[1;30m", 7 },
 }
 
+function set_loglevel( level )
+	logf_level = tonumber(level)
+end
 
 function logf_init(level, to_syslog, to_stderr)
 	logf_level = tonumber(level)
@@ -59,15 +62,13 @@ function _logf(level, class, file, line, msg)
 		-- Log to console
 		
 		logf_busy = true
-		local msec = sys.hirestime()
-		msec = (msec - math.floor(msec)) * 1000
+		local sec,min,hour = sys.realtime()
 		
 		if logf_to_stderr then
 			local longmsg = "%-8.8s %4d:%-12.12s: %s" % { class, line, file, msg }
 			local isatty = sys.isatty()
-			io.write( "%s.%03d %s[%s] %s%s\n" % {
-				os.date("%H:%M:%S"),
-				msec,
+			io.write( "%02d:%02d:%06.3f %s[%s] %s%s\n" % {
+				hour,min,sec,
 				isatty and levelcolor or "", 
 				levelstr, 
 				longmsg,
@@ -79,15 +80,15 @@ function _logf(level, class, file, line, msg)
 
 		if logf_to_syslog then
 			local longmsg = "%s %s: %s" % { levelstr, class, msg }
+			--longmsg = ("%02d:%02d:%06.3f " % { hour,min,sec }) .. longmsg
 			sys.syslog(levelsyslog, longmsg)
 		end
 
 	end
 
-	-- Push log event for warnings
-	
-	evq:push("log", { level=level, class=class, msg = msg} )
-
+	-- Push log event for warnings (cannot not: not dependency to evq allowed)
+	-- TODO: find out why this was here? It seems to have no function
+	--evq:push("log", { level=level, class=class, msg = msg} )
 	
 	-- Fatal messages abort the application.
 	
@@ -114,6 +115,5 @@ function logf(level, class, msg, ...)
 	_logf(level, class, file, line ,msg)
 
 end
-
 
 -- vi: ft=lua ts=3 sw=3

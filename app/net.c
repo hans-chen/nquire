@@ -8,15 +8,22 @@
 #include <stdarg.h>
 #include <sys/select.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 #include <assert.h>
 #include <errno.h>
 #include <netinet/tcp.h>
+#include <netinet/in.h>
+#include <netinet/ether.h>
+#include <net/if.h>
 
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#include <netdb.h>
 
+#include "misc.h"
 
 static int l_socket(lua_State *L)
 {
@@ -50,7 +57,16 @@ static int l_socket(lua_State *L)
 	}
 }
 
-
+/* connect socket to server (tcp sockets only)
+* In contrast with the c-api, this call adds name resolve when required.
+* @param l[1]   socket descriptor
+* @param l[2]   ipv4 address or server-name
+* @param l[3]   port
+* @return 0=ok | 
+ *        1=operation in progress |
+ *        -1=try again later, <error string> |
+ *        -2=error, <error string>
+*/
 static int l_connect(lua_State *L)
 {
 	int fd;
@@ -64,18 +80,66 @@ static int l_connect(lua_State *L)
 	port = luaL_checknumber(L, 3);
 
 	memset(&sa, 0, sizeof(sa));
-	sa.sin_family = AF_INET;
-	sa.sin_addr.s_addr = inet_addr(addr);
+	
+	struct hostent *he = gethostbyname(addr);
+	if( he == 0 )
+	{
+		switch( h_errno )
+		{
+		case HOST_NOT_FOUND: 
+			lua_pushinteger(L, -2);
+			lua_pushstring(L, "Host not found."); 
+			break;
+		//case NO_ADDRESS: 
+		case NO_DATA:
+			lua_pushinteger(L, -2);
+			lua_pushstring(L, "The requested name is valid but does not have an IP address."); 
+			break;
+		case NO_RECOVERY: 
+			lua_pushinteger(L, -2);
+			lua_pushstring(L, "A non-recoverable name server error occurred."); 
+			break;
+		case TRY_AGAIN: 
+			lua_pushinteger(L, -1);
+			lua_pushstring(L, "A temporary error occurred on an authoritative name server.  Try again later"); 
+			break;
+		default:
+			lua_pushinteger(L, -2);
+			lua_pushstring(L, "Unspecified name-resolve error"); 
+			break;
+		}
+		
+		return 2;
+	}	
+	TRACE("he->h_name = %s", he->h_name );
+	sa.sin_family = he->h_addrtype; //AF_INET;
+	if( sa.sin_family != AF_INET )
+	{
+		lua_pushnil(L);
+		lua_pushstring(L, "Only AF_INET sockets (ipv4) supported.");
+		return 2;
+	}
+	
+	TRACE("name = %s, addr = %u.%u.%u.%u", he->h_name, (unsigned char)he->h_addr[0], (unsigned char)(he->h_addr[1]), (unsigned char)he->h_addr[2], (unsigned char)he->h_addr[3] );
+	sa.sin_addr.s_addr = *((in_addr_t *)(he->h_addr));//inet_addr(he->h_addr);
 	sa.sin_port = htons(port);
 	
 	r = connect(fd, (struct sockaddr *)&sa, sizeof(sa));
-	if(r < 0) {
-		lua_pushnil(L);
-		lua_pushstring(L, strerror(errno));
-		return 2;
+	if( r<0 )
+	{
+		if( errno == EINPROGRESS ){
+			lua_pushinteger(L, 1);
+			return 1;
+		}
+		else
+		{
+			lua_pushinteger(L, -2);
+			lua_pushstring(L, strerror(errno));
+			return 2;
+		}
 	}
 
-	lua_pushboolean(L, 1);
+	lua_pushinteger(L, 0);
 	return 1;
 }
 
@@ -165,15 +229,11 @@ static int l_accept(lua_State *L)
 
 static int l_send(lua_State *L)
 {
-	int fd;
-	const char *buf;
-	size_t buflen;
-	int r;
-	
-	fd = luaL_checknumber(L, 1);
-	buf = luaL_checklstring(L, 2, &buflen);
+	int fd = luaL_checknumber(L, 1);
+	size_t buflen=0;
+	const char *buf = luaL_checklstring(L, 2, &buflen);
 
-	r = send(fd, buf, buflen, 0);
+	int r = send(fd, buf, buflen, 0);
 	if(r < 0) {
 		lua_pushnil(L);
 		lua_pushstring(L, strerror(errno));
@@ -216,31 +276,41 @@ static int l_sendto(lua_State *L)
 	return 1;
 }
 
-
+/* l_recv
+* @param L[1]	filedescriptor
+* @param L[2]	maxlen of bytes to read
+* @param L[3]	peek (optional) nil, 0 (false), 1 (true)
+* @return n, err	n can be 0 in which case there was no data, when n==nil then err is the errortext
+*/
 static int l_recv(lua_State *L)
 {
-	int fd;
-	char *buf;
-	int maxlen;
-	int r;
+	int fd = luaL_checknumber(L, 1);
+	int maxlen = luaL_checkint(L, 2);
+	int flags = luaL_optint(L, 3, 0) == 0 ? 0 : MSG_PEEK;
+	TRACE("(fd=%d, maxlen=%d, flags=%d)", fd, maxlen, flags);
 
-	fd = luaL_checknumber(L, 1);
-	maxlen = luaL_checkint(L, 2);
-
-	buf = malloc(maxlen);
+	char *buf = malloc(maxlen);
 	if(! buf) {
 		lua_pushnil(L);
 		lua_pushstring(L, strerror(errno));
 		return 2;
 	}
 
-	r = recv(fd, buf, maxlen, 0);
-	if(r < 0) {
+	memset( buf, 0, maxlen );
+	int r = recv(fd, buf, maxlen, flags);
+	if( r == -1 && errno == EAGAIN )
+		r = 0;
+	else if( r <= 0 )
+	{
 		free(buf);
 		lua_pushnil(L);
-		lua_pushstring(L, strerror(errno));
+		if( r < 0 )
+			lua_pushstring(L, strerror(errno));
+		else
+			lua_pushstring(L, "Peer disconnect");
 		return 2;
 	}
+	TRACE("chars = %d", r);
 
 	lua_pushlstring(L, buf, r);
 	free(buf);
@@ -303,6 +373,7 @@ const char *optname[] = {
 	"IP_ADD_MEMBERSHIP",	/* 3 */
 	"IP_MULTICAST_TTL",	/* 4 */
 	"SO_ERROR",		/* 5 */
+	"SO_KEEPALIVE", /* 6 */
 	NULL
 };
 
@@ -368,6 +439,10 @@ static int l_setsockopt(lua_State *L)
 			valint = luaL_checknumber(L, 3);
 			r = setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, (void *)&valint, sizeof valint);
 			break;
+		case 6:
+			valint = luaL_checknumber(L, 3);
+			r = setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &valint, sizeof(valint));
+			break;
 		default:
 			r = 0;
 	}
@@ -382,7 +457,98 @@ static int l_setsockopt(lua_State *L)
 	}
 }
 
+// get the ip address associated to an interface
+// This is better than using 'ifconfig' and parsing the output because:
+//   - it will not 'hang' on driver load problems (wifi)
+//   - it does not depend on a certain output format
+static int l_get_interface_ip(lua_State *L)
+{
+	const char* interface = luaL_checkstring(L, 1);
 
+	int fd;
+	struct ifreq ifr;
+
+	fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	/* Only IPv4 IP address */
+	ifr.ifr_addr.sa_family = AF_INET;
+
+	/* attach to interface (eth0, wlan0, gprs, ...) */
+	strncpy(ifr.ifr_name, interface, IFNAMSIZ-1);
+
+	if (ioctl(fd, SIOCGIFFLAGS, &ifr) < 0) 
+	{
+		close(fd);
+        lua_pushnil(L);
+        lua_pushstring(L, "Error requesting interface flags" );
+        return 2;
+    }
+    
+    if ((ifr.ifr_flags & IFF_UP) == 0 )
+    {
+		close(fd);
+	    lua_pushnil(L);
+	    return 1;
+	}
+
+	if (ioctl(fd, SIOCGIFADDR, &ifr) < 0)
+	{
+		close(fd);
+        lua_pushnil(L);
+        lua_pushstring(L, "Error requesting ip address of interface" );
+        return 2;
+    }
+
+	close(fd);
+
+	/* display result */
+	const char* ips = inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr);
+	lua_pushstring(L, ips );
+
+	return 1;
+}
+
+// get the mac-address of an interface
+static int l_get_interface_mac(lua_State *L)
+{
+	const char* interface = luaL_checkstring(L, 1);
+
+	int fd;
+	struct ifreq ifr;
+
+	fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	/* Only IPv4 IP address */
+	ifr.ifr_addr.sa_family = AF_INET;
+
+	/* attach to interface (eth0, wlan0, gprs, ...) */
+	strncpy(ifr.ifr_name, interface, IFNAMSIZ-1);
+
+	if (ioctl(fd, SIOCGIFHWADDR, &ifr) < 0) 
+	{
+		close(fd);
+        lua_pushnil(L);
+        lua_pushstring(L, "Error requesting mac-address" );
+        return 2;
+    }
+
+	close(fd);
+
+	/* display result */
+	char mac[18];
+	memset( mac, 0, sizeof(mac) );
+	snprintf(mac, 18, "%02x:%02x:%02x:%02x:%02x:%02x",
+            (unsigned)(unsigned char)(ifr.ifr_hwaddr.sa_data[0]),
+            (unsigned)(unsigned char)(ifr.ifr_hwaddr.sa_data[1]),
+            (unsigned)(unsigned char)(ifr.ifr_hwaddr.sa_data[2]),
+            (unsigned)(unsigned char)(ifr.ifr_hwaddr.sa_data[3]),
+            (unsigned)(unsigned char)(ifr.ifr_hwaddr.sa_data[4]),
+            (unsigned)(unsigned char)(ifr.ifr_hwaddr.sa_data[5]) );
+
+	lua_pushstring(L, mac );
+
+	return 1;
+}
 
 /***********************************************************************
 * Lua interfacing
@@ -402,6 +568,8 @@ static struct luaL_Reg net_table[] = {
 	{ "close",	l_close },
 	{ "setsockopt", l_setsockopt },
 	{ "getsockopt", l_getsockopt },
+	{ "get_interface_ip", l_get_interface_ip },
+	{ "get_interface_mac", l_get_interface_mac },
 	{ NULL },
 };
 
@@ -412,6 +580,7 @@ int luaopen_net(lua_State *L)
 	return 1;
 }
 
+
 /*
- * End
+ * vi: ft=c ts=4 sw=4 
  */

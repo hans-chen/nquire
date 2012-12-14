@@ -14,10 +14,12 @@
 
 module("Upgrade", package.seeall)
 
+local lgid = "upgrade"
 
 local path_upgrade_dir = "/home/ftp"
 local path_upgrade_script = "/bin/target_unpack_tar.sh"
 local max_age_cleanup = 5 * 60
+local the_config_file = ""
 
 local component_list = {
 	kernel = { option = "-k" },
@@ -25,20 +27,33 @@ local component_list = {
 	rootfs = { option = "-r" },
 	logo = { option = "-l" },
 	firmware = { option = "-f" },
+	em2027kernel = { option = "-e", scanner_type="em2027" },
+	em2027app = { option = "-m", scanner_type="em2027" },
+	em1300kernel = { option = "-d", scanner_type="em1300" },
 }
 
+-- This is used in the webui of the nquire!
 upgrade_busy = false
+local upgrade_file = nil
+
+local function remove_file( f )
+	local ok, err = os.remove(f)
+	if not ok then
+		logf(LG_WRN, lgid, "Could not erase %s: %s", f, err)
+	end
+	return ok
+end
 
 local function on_upgrade_timer()
 
 	local files, err = sys.readdir(path_upgrade_dir)
 	if not files then
-		logf(LG_WRN, "upgrade", "Could not read directory %s: %s", path_upgrade_dir, err)
+		logf(LG_WRN, lgid, "Could not read directory %s: %s", path_upgrade_dir, err)
 		return true
 	end
 
 	if upgrade_busy then
-		logf(LG_INF, "upgrade", "Upgrade in progress")
+		logf(LG_INF, lgid, "Upgrade in progress")
 		return
 	end
 
@@ -64,9 +79,11 @@ local function on_upgrade_timer()
 
 			if product and component and version and md5sum and age > 5 then
 
-				if component_list[component] then
+				if component_list[component] and 
+						(component_list[component].scanner_type==nil or
+						 scanner.type:match(component_list[component].scanner_type)) then
 				
-					logf(LG_INF, "upgrade", "Found %s image file %s, veryfing md5 sum", component, file)
+					logf(LG_INF, lgid, "Found %s image file %s, verifying md5 sum", component, file)
 
 					-- Calculate MD5 checksum
 
@@ -78,56 +95,66 @@ local function on_upgrade_timer()
 						if tmp then real_md5sum = tmp end
 						fd:close()
 					else
-						logf(LG_WRN, "upgrade", "Could not calculate md5 sum: %s", err)
+						logf(LG_WRN, lgid, "Could not calculate md5 sum: %s", err)
 					end
 
 					-- Checksum ok, start upgrade
 
 					if md5sum == real_md5sum then
-						logf(LG_INF, "upgrade", "MD5 sum verified and correct, initiating upgrade")
-						scanner:disable()
+						logf(LG_INF, lgid, "MD5 sum verified and correct, initiating upgrade")
 				
 						local cmd = "/bin/target_unpack_tar.sh %s %s" % { component_list[component].option, file } 
-						logf(LG_DBG, "upgrade", "Running command %q", cmd);
+						logf(LG_DBG, lgid, "Running command %q", cmd);
 	
 						display:set_font( nil, 18, nil )
 						display:show_message("Upgrading", "firmware", "", "DON'T", "DISCONNECT", "THE POWER")
-						logf(LG_INF, "upgrade", "Starting upgrade")
+						display:update()
+						
+						-- close all inputs (-1 means immediate!)
+						evq:push("input",{msg="disable"},-1)
+						
+						logf(LG_INF, lgid, "Starting upgrade")
 
 						upgrade_busy = true
-
+						os.execute("cp -f /cit200/" .. the_config_file .. " /mnt/" .. the_config_file .. ".bkup")
+						upgrade_file = file
 						runbg(cmd, function(rv)
 							if rv == 0 then
 								os.execute("sync")
 								sys.sleep(2)
-								logf(LG_INF, "upgrade", "Upgrade successfull")
+								logf(LG_INF, lgid, "Upgrade successfull")
 								display:set_font( nil, 18, nil )
 								display:show_message("", "Upgrade ok", "", "rebooting")
-								os.remove(file)
 								os.execute("reboot")
 							else
-								logf(LG_WRN, "upgrade", "Upgrade failed")
+								remove_file( "/mnt/" .. the_config_file .. ".bkup" )
+								remove_file( upgrade_file )
+								logf(LG_WRN, lgid, "Upgrade failed")
+								evq:push("upgrade:failed",{errstr="Checksum mismatch, file " .. upgrade_file})
+								upgrade_file = nil
 								upgrade_busy = false
+								evq:push("input",{msg="enable"})
 							end
 
 						end)
 
 					else
-						logf(LG_WRN, "upgrade", "Checksum mismatch (%s != %s), can not upgrade", md5sum, real_md5sum)
+						logf(LG_WRN, lgid, "Checksum mismatch (%s != %s), can not upgrade", md5sum, real_md5sum)
+						evq:push("upgrade:failed",{errstr="Checksum mismatch, file " .. component})
+						remove_file( file )
 					end
 
 				else
-					logf(LG_WRN, "upgrade", "Unknown component %q, can not upgrade", component)
+					logf(LG_WRN, lgid, "Unknown component %q, can not upgrade", component)
+					evq:push("upgrade:failed",{errstr="Unknown component " .. component})
+					remove_file( file )
 				end
 
-				-- Check the file is older then 5 minutes. If so, clean it up
+				-- Check if the file is older then 5 minutes. If so, clean it up
 
 				if age > max_age_cleanup then
 					logf(LG_INF, "Found stale file %s which is older then %d seconds, cleaning up", file, max_age_cleanup)
-					local ok, err = os.remove(file)
-					if not ok then
-						logf(LG_WRN, "Could not erase %s: %s", file, err)
-					end
+					remove_file( file )
 				end
 			end
 		end
@@ -141,10 +168,13 @@ end
 -- Constructor
 --
 
-function new(device, baudrate)
+function new(device, baudrate, config_file)
+
+	the_config_file = config_file
+	
+	logf(LG_INF,lgid,"Start upgrade service (config file: %s)", the_config_file)
 
 	-- Register a periodic timer to check for upgrades
-	
 	evq:register("upgrade_timer", on_upgrade_timer)
 	evq:push("upgrade_timer", nil, 10.0)
 

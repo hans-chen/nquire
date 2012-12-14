@@ -29,7 +29,7 @@
 　　　　　　a simple test method:	echo 100 &gt; /sys/class/display/display0/contrast 
 　　　　get_contrast:　　　get contrast 
 　　　　　　a simple test method:　cat /sys/class/display/display0/contrast 
- 	</pre></div> <dl class="user" compact><dt><b>frambuffer interface</b></dt><dd><div class="fragment"><pre class="fragment"><span class="keyword">static</span> <span class="keyword">struct </span>fb_ops uc1698fb_ops = {
+	</pre></div> <dl class="user" compact><dt><b>frambuffer interface</b></dt><dd><div class="fragment"><pre class="fragment"><span class="keyword">static</span> <span class="keyword">struct </span>fb_ops uc1698fb_ops = {
         .owner          = THIS_MODULE,
         .fb_write               = uc1698fb_write,
         .fb_fillrect    = uc1698fb_fillrect,

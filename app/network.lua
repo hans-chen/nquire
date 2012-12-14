@@ -9,6 +9,9 @@ local lgid = "network"
 local led_status = "off"
 local carrier_status = nil
 local upping_network = false
+local again = false
+local wlan_signal_strength = nil
+local config_is_changed = false
 
 --
 -- Open a file, or die with a fatal error message when failed
@@ -48,7 +51,7 @@ local function configure_ethernet(network)
 		fd:write("  netmask " .. config:get("/network/ip/netmask") .. "\n")
 		fd:write("  gateway " .. config:get("/network/ip/gateway") .. "\n")
 	end
-	fd:write("  pre-up killall udhcpc; true\n")
+	fd:write("  pre-up while killall udhcpc; do sleep .1; done; true\n")
 	fd:write("\n")
 	fd:close()
 
@@ -69,10 +72,6 @@ end
 --
 
 local function configure_wifi(network)
-
-	if not Network:wlan_is_available() then
-		return
-	end
 
 	logf(LG_DBG, lgid, "Configuring wifi connection")
 	
@@ -117,10 +116,9 @@ local function configure_wifi(network)
 		fd:write("  netmask " .. config:get("/network/ip/netmask") .. "\n")
 		fd:write("  gateway " .. config:get("/network/ip/gateway") .. "\n")
 	end
-	fd:write("  pre-up killall udhcpc; true\n")
-	fd:write("  pre-up killall wpa_supplicant; true\n")
+	fd:write("  pre-up while killall udhcpc wpa_supplicant; do sleep .1; done; true\n")
 	fd:write("  pre-up wpa_supplicant -B -iwlan0 -c/tmp/wpa_supplicant.conf\n")
-	fd:write("  pre-down killall wpa_supplicant; true\n")
+	fd:write("  post-down while killall wpa_supplicant; do sleep .1; done; true\n")
 
 	fd:write("\n")
 	fd:close()
@@ -143,17 +141,13 @@ end
 
 local function configure_gprs(network)
 	
-	if not Network:gprs_is_available() then
-		return
-	end
-
 	logf(LG_DBG, lgid, "Configuring GPRS connection")
 	
 	-- /etc/interfaces section
 	local fd = open_or_die(network.fname_interfaces, "a")
 	fd:write(string.format([[
 iface gprs inet ppp
-  pre-up killall udhcpc; true
+  pre-up while killall udhcpc; do sleep .1; done; true
   provider gprs
   post_up /etc/ppp/ip-up
   pre-down /etc/ppp/ip-down
@@ -327,21 +321,28 @@ local function configure(network)
 	fd:close()
 
 	configure_ethernet(network)
-	configure_gprs(network)
 	configure_wifi(network)
+	configure_gprs(network)
 
 end
 
 
 -- return true for carrier up, false for down, or nil for unknown
 local function get_carrier_status()
-	local status = io.input ( "/sys/class/net/eth0/carrier" ):read(1)
-	if status == nil then
-		return nil
+	local fd_status = io.input ( "/sys/class/net/eth0/carrier" )
+	if fd_status then
+		local status = fd_status:read(1)
+		fd_status:close()
+		if status == nil then
+			return nil
+		else
+			return status == "1"
+		end
 	else
-		return status == "1"
+		return nil
 	end
 end
+
 
 local function get_macaddress(node)
 	local serial = sys.get_macaddr("eth0")
@@ -350,13 +351,18 @@ end
 
 
 local function get_current_ip_addr()
-	local fd = io.popen("/sbin/ifconfig")
-	local ipaddr = nil
-	if fd then
-		ipaddr = fd:read("*all"):match("inet addr:(%S+)")
-		fd:close()
+
+	local convert_to_itf = { ["ethernet"] = "eth0", ["wifi"]="wlan0", ["gprs"]="gprs" }
+	local itf = convert_to_itf[config:get("/network/interface")]
+
+	local ip, err = net.get_interface_ip( itf )
+	
+	if err then
+		logf(LG_DMP,lgid,"Interface %s: %s", itf, err)
 	end
-	return ipaddr
+	--logf(LG_DMP,lgid,"ip('%s')=%s", itf, (ip or "nil"))
+	return ip
+	
 end
 
 
@@ -367,20 +373,22 @@ local function up(network)
 
 	local cmd = ""
 
-	-- Don't update network configuration if we're running from NFS
-    -- Watch out: this is actually debug code!
-	local mounts = io.open("/proc/mounts"):read("*a")
-	if mounts:match("root / nfs") then
-		logf(LG_WRN, lgid, "Root filesystem is on NFS, not configuring network")
+	if upping_network then
+		logf(LG_WRN,lgid, "Double upping network: delayed")
+		again = true
+		os.execute("killall udhcpc wpa_supplicant ifup")
 		return
+	end
+	again = false
+
+	if config_is_changed then
+		configure( network )
+		config_is_changed=false
 	end
 
 	local interface = config:get("/network/interface")
-	if		interface == "wifi" and Network:wlan_is_available() or
-			interface == "gprs" and Network:gprs_is_available() or 
-			interface == "ethernet" then
-		logf(LG_INF, lgid, "Upping network on %s", interface )
-	else
+	if		interface == "wifi" and not Network:wlan_is_available() or
+			interface == "gprs" and not Network:gprs_is_available() then
 		logf(LG_WRN, lgid, "No hardware for network on interface %s", interface )
 		beeper:beep_error()
 		return
@@ -400,23 +408,25 @@ local function up(network)
 		cmd = cmd .. "ifdown gprs; "
 	end
 
-	cmd = cmd .. "sleep 5;"
+	cmd = cmd .. "sleep 1;"
 
 	if interface == "ethernet" then
 		if not opt.n then
-			cmd = cmd .. "ifup -f eth0"
+			cmd = cmd .. "ifup eth0"
 		end
 	elseif interface == "wifi" then
-		cmd = cmd .. "ifup -f wlan0"
+		cmd = cmd .. "ifup wlan0"
 	elseif interface == "gprs" then
-		cmd = cmd .. "sleep 5; ifup gprs"
+		cmd = cmd .. "sleep 2; ifup gprs"
 	else
 		logf(LG_WRN, lgid, "Unknown interface '%s'. Not starting network.", interface)
 		return
 	end
 
 	if network.is_up then
-		evq:push("network_down")
+		-- network_down with delay = -1 (don't queue, handle direct) so things can be
+		-- done (e.g. closing tcp connections) before the network is really down.
+		evq:push("network_down", nil, -1)
 		network.is_up = false
 	end
 	led:set("blue", "flash")
@@ -425,23 +435,25 @@ local function up(network)
 
 	--print("DEBUG: Up() stack=" .. debug.traceback())
 	
-	if upping_network then
-		logf(LG_WRN,lgid, "ERROR: double upping network")
-	end
-
 	logf(LG_DMP, lgid, "Running %q", cmd)
 	upping_network = true
 	runbg(cmd, 
 		function(status,network)
 			if status ~= 0 then
 				logf(LG_WRN, lgid, "An error occured configuring the network: %d", status)
+				again = true
 			else
 				local ip = get_current_ip_addr() or "?.?.?.?"
-				logf(LG_INF, lgid, "Configured network successfully: %s", ip)
-				network.is_up = true
-				evq:push("network_up")
+				logf(LG_INF, lgid, "Configured network successfully: %s", ip)		
+				if not again then
+					network.is_up = true
+					evq:push("network_up")
+				end
 			end
 			upping_network = false
+			if again then
+				up(network)
+			end
 		end,
 		function(data,network)
 			logf(LG_DMP, lgid, "ifup> %s", data)
@@ -460,17 +472,66 @@ local function get_current_ip(node)
 	end
 end
 
+local prev_signalstrength = -256
+local function get_wlan_signal_strength( itf )
+	local fd = io.open("/proc/net/wireless")
+	if not fd then
+		logf(LG_WRN, lgid, "Could not open /proc/net/wireless")
+		return nil
+	end
+	local ss = tonumber(fd:read("*all"):match(itf .. ":%s+%d+%s+%d+.%s*(%-?%d+)"))
+	fd:close()
+	
+	if ss and ss~=prev_signalstrength then
+		logf(LG_DMP,lgid,"%s signal strength=%d", itf, ss)
+		prev_signalstrength=ss
+	end
+	return tonumber(ss)
+end
 
--- TODO: implement an event based solution
 local function on_check_network_status_timer( event, nw )
 	local new_led_status = "flash"
 	local current_carrier_status = get_carrier_status()
 	local interface = config:get("/network/interface")
 	local current_ip_addr = get_current_ip_addr()
 	
-	if nw.is_up and current_ip_addr and (interface ~= "ethernet" or current_carrier_status == true) then
-		new_led_status = "on"
+	if nw.is_up and current_ip_addr then
+		if	interface == "ethernet"  then
+			if not upping_network and 
+					carrier_status ~= current_carrier_status and 
+					carrier_status ~= nil then
+				if current_carrier_status then
+					logf(LG_INF, lgid, "Carrier restored")
+				else
+					logf(LG_WRN, lgid, "Network error: Carrier lost (network re-init or cable failure)")
+				end
+			end
+			if current_carrier_status == true then
+				new_led_status = "on"
+			end
+		elseif interface == "wifi" then
+			new_wlan_signal_strength = get_wlan_signal_strength( "wlan0" )
+			if wlan_signal_strength and new_wlan_signal_strength then
+				if new_wlan_signal_strength>=-255 then
+					new_led_status = "on"
+					if wlan_signal_strength<-255 then
+						logf(LG_INF, lgid, "wifi signal recovered")
+					end
+				elseif wlan_signal_strength>=-255 then
+					logf(LG_WRN, lgid, "wifi signal lost. (%d dB)",
+							new_wlan_signal_strength)
+				end
+			end
+			if new_wlan_signal_strength then
+				wlan_signal_strength = new_wlan_signal_strength
+			end
+		end
 	end
+
+	if current_carrier_status ~= nil then
+		carrier_status = current_carrier_status
+	end
+
 	if new_led_status ~= led_status then
 		led_status = new_led_status;
 		led:set("blue", led_status)
@@ -478,22 +539,30 @@ local function on_check_network_status_timer( event, nw )
 			logf(LG_INF,lgid,"Network is up")
 		elseif not upping_network then
 			logf(LG_INF,lgid,"Network is down")
+			if interface == "wifi" and not Network:wlan_is_available() then
+				logf(LG_WRN,lgid,"wifi is down unexpected.")
+			end
 		end
 	end
 
-	if current_carrier_status ~= nil then
-		if interface == "ethernet" and carrier_status ~= current_carrier_status and carrier_status ~= nil then
-			if current_carrier_status then
-				logf(LG_INF, lgid, "Carrier restored")
-			else
-				logf(LG_WRN, lgid, "Network error: Carrier lost (network re-init or cable failure)")
-			end
-		end
-		carrier_status = current_carrier_status
+	if interface == "wifi" and not upping_network and not current_ip_addr 
+			and Network:wlan_is_available() then
+		logf(LG_WRN,lgid,"Trying to re-init the network.")
+ 		up(nw)
 	end
 
 	return true;
 end
+
+
+local function on_interface_changed(node, nw)
+	if config:get("/network/interface")=="wifi" then
+		os.execute("/cit200/reload_wlan_driver.sh &")
+	else
+		os.execute("while killall reload_wlan_driver.sh; do sleep .1; done")
+	end
+end
+
 
 local has_gprs_hw
 function gprs_is_available()
@@ -511,7 +580,11 @@ function gprs_is_available()
 				local data = sys.readport( fd, 20, 1000 )
 				logf(LG_DBG,lgid,"gprs_is_available() data='%s'", (data or "<nil>"))
 				has_gprs_hw = data and data:find("OK") and true or false;
-				logf(LG_INF,lgid,"%sGPRS hardware detected.", (has_gprs_hw and "" or "No "))
+				if has_gprs_hw then
+					logf(LG_INF,lgid,"GPRS hardware detected.") 
+				else
+					logf(LG_DBG,lgid,"No GPRS hardware detected.") 
+				end
 				sys.close(fd)
 			else
 				logf(LG_WRN,lgid,"GPRS modem device '%s' not found (should probably be ttyS1).", dev )
@@ -521,22 +594,19 @@ function gprs_is_available()
 	return has_gprs_hw
 end
 
-local has_wlan_hw = nil
+
 function wlan_is_available()
-	if has_wlan_hw == nil then
-		has_wlan_hw = false
-		local fd = io.popen("iwconfig", "r")
-		if fd then
-			for l in fd:lines() do
-				if l:match("wlan0") then
-					has_wlan_hw = true
-				end
-			end
-			fd:close()
-		end
+
+	local fd = io.open("/sys/class/net/wlan0","r")
+	if fd then
+		fd:close()
+		return true
+	else
+		return false
 	end
-	return has_wlan_hw
+
 end
+
 
 --
 -- Constructor
@@ -562,22 +632,30 @@ function new()
 	
 	evq:signal_add("SIGCHLD")
 
+	config:add_watch("/network/macaddress", "get", get_macaddress, netwrk)
+	config:add_watch("/network/current_ip", "get", get_current_ip, netwrk)
+
+	carrier_status = get_carrier_status()
+	
 	local function	reconfigure(node, nw) 
-		print("Reconfiguring network")
-		nw:configure()
+		-- print("Reconfiguring network")
+		-- reconfigure signal with delay -1 (don't queue: handle direct) so 
+		-- connections can be closed before the network goes down
+		config_is_changed = true;
+		evq:push("network_reconfigure",nil,-1)
 		nw:up()
 	end
 
-	carrier_status = get_carrier_status()
-
-	config:add_watch("/network/macaddress", "get", get_macaddress, netwrk)
-	config:add_watch("/network/current_ip", "get", get_current_ip, netwrk)
 	config:add_watch("/network", "set", reconfigure, netwrk)
 	config:add_watch("/dev/modem", "set", reconfigure, netwrk)
+	config:add_watch("/network/interface", "set", on_interface_changed, netwrk)
+	on_interface_changed(nil,netwrk)
 
 	evq:register("check_network_status_timer", on_check_network_status_timer, netwrk)
-	evq:push("check_network_status_timer", nil, 5.0)
+	evq:push("check_network_status_timer", nil, 2.0)
 
+	netwrk:configure()
+	
 	return netwrk
 end
 	

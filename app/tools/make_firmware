@@ -1,0 +1,111 @@
+#!/bin/bash
+
+# this scripts assumes app.tar is build.
+# usually one should call this script via the Makefile. E.g.:
+# make RELEASE_TAG=beta1 dist
+
+#set -x
+
+if test -z "$1"; then
+	echo "ERROR: specify the release tag on the commandline" >&2
+	exit -1
+fi
+FIRMWARE_RELEASE_TAG=$1
+
+TRUNK_DIR=`pwd`/..
+APP_DIR=`pwd`
+
+if ! cd ${APP_DIR}; then
+	echo "ERROR: Could not cd ${APP_DIR}" 1>&2
+	exit -1
+fi
+APP_IMG=${APP_DIR}/app.tar
+
+if ! test -r ${APP_IMG}; then
+	echo "ERROR: Could not find ${APP_IMG}" 1>&2
+	echo "Use 'make ${APP_IMG}' to create  ${APP_IMG}" 1>&2
+	echo "Or call this script via make. E.g.: 'make RELEASE_TAG=.beta1 dist'" 1>&2
+	exit -1
+fi	
+
+# Export from svn is slow, so we copy it from the newland dev tree instead 
+#svn export https://server.mbarc.nl/newland/nquire/svn/trunk/cit200-upgrade-tools
+CIT_UPGRADE_TOOLS=${TRUNK_DIR}/cit200-upgrade-tools
+if ! cd $CIT_UPGRADE_TOOLS; then
+	echo "ERROR: Could not cd $CIT_UPGRADE_TOOLS;" 1>&2
+	exit -1
+else
+	cd -
+	UPGRADE_TOOLS_DIR=${APP_DIR}/cit200-upgrade-tools
+	cp -a /home/maarten/workspace/NQuire/trunk/cit200-upgrade-tools .
+	rm -rf `find cit200-upgrade-tools/ -name '.svn'`
+	make -C cit200-upgrade-tools clean
+	SRC_IMG=${UPGRADE_TOOLS_DIR}/src/appfs.jffs2
+fi
+
+if ! test `pwd` == ${APP_DIR}; then
+	echo "ERROR: Not in ${APP_DIR}" 1>&2
+	exit -1
+fi
+
+# create mount-point
+MNT_DIR=${APP_DIR}/tmp/mnt_appfs
+
+# just in case this is still mounted:
+sudo umount ${MNT_DIR}
+
+if ! mkdir -p ${MNT_DIR}; then
+	echo "ERROR: Could not create mount-point ${MNT_DIR}" 1>&2
+	exit -1
+fi
+
+
+# load modules (just in case they are not loaded)
+sudo modprobe mtdcore
+sudo modprobe jffs2
+sudo modprobe mtdram
+sudo modprobe mtdchar
+sudo modprobe mtdblock
+
+# clean-up ramdisk (can't this be done easier?)
+sudo mount -t jffs2 /dev/mtdblock0 ${MNT_DIR}
+sudo rm -rf ${MNT_DIR}/*
+sudo umount ${MNT_DIR}
+
+# dump disk-image to the created ram-disk:
+sudo dd if=${SRC_IMG} of=/dev/mtd0
+# and mount the ram-dik to our mount point:
+sudo mount -t jffs2 /dev/mtdblock0 ${MNT_DIR}
+
+# insert the new source:
+sudo rm -rf ${MNT_DIR}/cit200/*
+sudo tar xvf ${APP_IMG} -C ${MNT_DIR}/cit200
+
+ls -al ${MNT_DIR}/cit200
+
+# overwrite the firmware source image used for building the image file
+sudo mkfs.jffs2 -r ${MNT_DIR} -o ${SRC_IMG} -e 0x10000 --pad=0x50000 -n
+
+# make a new dist
+ln -sf ${TRUNK_DIR}/app-binary ${APP_DIR}/app-binary
+cd ${APP_DIR}/cit200-upgrade-tools
+make
+cd ${APP_DIR}
+
+# rename the result files:
+mkdir -p ${APP_DIR}/release
+
+F=${UPGRADE_TOOLS_DIR}/release/cit-firmware*.image
+FW=${APP_DIR}/release/`basename $F | sed -e "s/cit-firmware-.*.build.rexported/cit-firmware-$FIRMWARE_RELEASE_TAG/"`
+cp $F ${FW}
+
+#F=${UPGRADE_TOOLS_DIR}/release/cit-app*.image
+#FW=${APP_DIR}/release/`basename $F | sed -e "s/.\..\.build.rexported/$FIRMWARE_RELEASE_TAG/"`
+#cp $F ${FW}
+
+# clean up
+sudo rm -rf ${MNT_DIR}/*
+sudo umount ${MNT_DIR}
+rm -rf ${MNT_DIR} ${UPGRADE_TOOLS_DIR}
+rm ./app-binary
+

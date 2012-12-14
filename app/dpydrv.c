@@ -25,23 +25,22 @@
 #include <lauxlib.h>
 
 #define UPDATE_FREQ 10.0
-#define MAX_IMAGES 8
+#define MAX_IMAGES 18
 #define MAX_FRAMES 32
 
 #define BARF(L, msg...) do { lua_pushnil(L); lua_pushfstring(L, msg); return 2; } while(0)
 
-//#define TRACE(msg...) { fprintf(stderr,"%s:%d - %s ", __FILE__, __LINE__, __FUNCTION__);fprintf(stderr,msg);fprintf(stderr,"\n"); }
-#define TRACE(msg...) {}
+//#define DEBUG
+#include "misc.h"
 
-struct image {
-	int x, y;
-	int w, h;
+typedef struct {
+	SDL_Rect rect; // x, y, w, h
 	unsigned frame;
 	unsigned nframes;
 	double t_update;
-	SDL_Surface *surf[32];
-	double delay[32];
-};
+	SDL_Surface *surf[MAX_FRAMES];
+	double delay[MAX_FRAMES];
+} Image;
 
 
 struct dpydrv {
@@ -61,6 +60,7 @@ struct dpydrv {
 	Uint32 background_color;
 	SDL_Surface *screen;
 	double t_dirty;
+	double t_refreshed;
 
 	/* Freetype */
 	
@@ -69,7 +69,8 @@ struct dpydrv {
 	int font_loaded;
 	int font_size;
 
-	struct image image[MAX_IMAGES];
+	/* image[0] is reserved for use as text-layer */
+	Image image[MAX_IMAGES];
 };
 
 
@@ -128,7 +129,6 @@ static int get_fb_info(struct dpydrv *dd)
 
 static int l_open(lua_State *L)
 {
-	int r;
 	struct dpydrv *dd;
 	dd = lua_touserdata(L, 1);
 
@@ -156,17 +156,47 @@ static int l_open(lua_State *L)
 		dd->w = dd->vinfo.xres;
 		dd->h = dd->vinfo.yres;
 	}
-		
+	
 	//dd->screen = SDL_SetVideoMode(dd->w, dd->h, 32, 0);
 	dd->screen = SDL_SetVideoMode(dd->w, dd->h, 0, SDL_SWSURFACE);
 	if(dd->screen ==  NULL)
 		BARF(L, "Can't SDL_SetVideoMode :%s\n", SDL_GetError());
 
+	// and create the text-layer:
+	SDL_Surface *text_layer = SDL_CreateRGBSurface(
+		SDL_SWSURFACE,
+		dd->w, 
+		dd->h,
+		8, 0, 0, 0, 0);
+	if(!text_layer) BARF(L,"Could not allocate the text-layer");
+	dd->image[0].rect.x = 0;
+	dd->image[0].rect.y = 0;
+	dd->image[0].rect.w = dd->w;
+	dd->image[0].rect.h = dd->h;
+	dd->image[0].frame = 0;
+	dd->image[0].nframes = 1;
+	dd->image[0].t_update = 0;
+	dd->image[0].delay[0] = 0;
+	// set colormap for text-layer
+	SDL_Color surf_colormap[256];
+	int j;
+	for(j=0; j<256; j++) {
+		surf_colormap[j].r = j<128 ? 0 : 255;
+		surf_colormap[j].g = j<128 ? 0 : 255;
+		surf_colormap[j].b = j<128 ? 0 : 255;
+	}
+	SDL_SetColors(text_layer, surf_colormap, 0, 256);
+//	SDL_SetAlpha(text_layer, SDL_SRCALPHA, 0);
+	SDL_SetColorKey(text_layer, SDL_SRCCOLORKEY, SDL_MapRGB(text_layer->format, 0, 0, 0));
+	
+	dd->image[0].surf[0] = SDL_DisplayFormatAlpha(text_layer);
+	SDL_FreeSurface(text_layer);
+
 	//if(!dd->screen) BARF(L, "Could not open dpydrv_tiny: %s", SDL_GetError());
 
 	SDL_ShowCursor(SDL_DISABLE);
 	
-	r = FT_Init_FreeType(&dd->ft_library);
+	int r = FT_Init_FreeType(&dd->ft_library);
 	if(r) BARF(L, "Init_freetype failed");
 
 	lua_pushnumber(L, UPDATE_FREQ);
@@ -177,7 +207,6 @@ static int l_open(lua_State *L)
 static int l_close(lua_State *L)
 {
 	struct dpydrv *dd;
-	struct image *image;
 
 	dd = lua_touserdata(L, 1);
 	TRACE(" ");
@@ -185,10 +214,11 @@ static int l_close(lua_State *L)
 	// free current images
 	int i;
 	for(i=0; i<MAX_IMAGES; i++) {
-		image = &dd->image[i];
+		Image *image = &dd->image[i];
 		int j;
 		for(j=0; j<image->nframes; j++) {
 			SDL_FreeSurface(image->surf[j]);
+			image->surf[j] = 0;
 		}
 		image->nframes = 0;
 	}
@@ -203,10 +233,37 @@ static int l_close(lua_State *L)
 	if(r) BARF(L, "Done_FreeType failed");
 
 	SDL_FreeSurface(dd->screen);
-//	SDL_QuitSubSystem(SDL_INIT_VIDEO);
+	dd->screen=0;
 	SDL_Quit();
 
 	return 0;
+}
+
+
+/* Dump the contents of the visible screen as a string value
+ * this is for automated testing purposes only!
+ */
+static int l_dump(lua_State *L)
+{
+	struct dpydrv *dd;
+	dd = lua_touserdata(L, 1);
+	int l = dd->h * dd->screen->pitch;
+	
+	char *buff = (char*)malloc( 2*l+1 + dd->h );
+	int i;
+	int j=0;
+	for(i=0; i<l; i++)
+	{
+		sprintf(buff+j, "%02x", (unsigned)((unsigned char*)(dd->screen->pixels))[i]);
+		j=j+2;
+		if( (i+1) % dd->screen->pitch == 0 && i+1<l)
+			buff[j++] = '\n';
+	}
+	
+	buff[j] = 0;
+	lua_pushstring( L, buff );
+	free( buff );
+	return 1;
 }
 
 
@@ -223,7 +280,8 @@ static int l_gotoxy(lua_State *L)
 	return 1;
 }
 
-
+// draw a charracter
+// the background of a charrecters is always transparent (see impl. below)
 static int draw_char(struct dpydrv *dd, int ch, int silent)
 {
 	FT_GlyphSlot slot;
@@ -236,12 +294,15 @@ static int draw_char(struct dpydrv *dd, int ch, int silent)
 	slot = dd->face->glyph;
 	bitmap = &slot->bitmap;
 
-	py = dd->screen->pixels + 
-	     (dd->y - slot->bitmap_top + dd->font_size - 4) * dd->screen->pitch +
+	SDL_Surface *surf = dd->image[0].surf[0];
+	
+	TRACE("char='%c', slot->bitmap_top=%d, dd->font_size=%d\n", ch, slot->bitmap_top, dd->font_size );
+	py = surf->pixels + 
+	     (dd->y - slot->bitmap_top + dd->font_size - 2) * surf->pitch +
 	     (dd->x + slot->bitmap_left)* 4;
 
-	pmin = dd->screen->pixels;
-	pmax = dd->screen->pixels + dd->h * dd->screen->pitch;
+	pmin = surf->pixels;
+	pmax = surf->pixels + dd->h * surf->pitch;
 
 	for(y=0; y<bitmap->rows; y++) {
 		if( y>=0 && y+dd->y<dd->h-1 ) {
@@ -253,7 +314,8 @@ static int draw_char(struct dpydrv *dd, int ch, int silent)
 					v = bitmap->buffer[x/8 + y*bitmap->pitch] & (128>>(x%8));
 					if(v && !silent && p >= pmin && p < pmax) {
 						//TRACE("x=%d,y=%d, color=%d", x,y,dd->color);
-						*p = dd->color;  //SDL_MapRGB(dd->screen->format, 255, 255, 255);
+						*p = dd->color;  //SDL_MapRGB(surf->format, 255, 255, 255);
+						//printf("x=%d,y=%d\n", x+dd->x,y+dd->y);
 					}
 				}
 				p++;
@@ -261,11 +323,12 @@ static int draw_char(struct dpydrv *dd, int ch, int silent)
 			}
 		}
 
-		py += dd->screen->pitch/4;
+		py += surf->pitch/4;
 	}
 
 	dd->x += slot->advance.x / 64;
-	dd->y += slot->advance.y / 64;
+	dd->y += slot->advance.y / 64 ;
+
 	return slot->advance.x / 64;
 }
 
@@ -342,14 +405,12 @@ static int l_draw_text(lua_State *L)
 	wmax = 0;
 	h = dd->font_size;
 
-	int text_x_start = dd->x;
-	
 	p = text;
 	while(*p) {
 		pi = 0;
 		ch = utf8_decode((char *)p, &pi);
 		if(ch == '\n') {
-			dd->x = text_x_start;
+			dd->x = 0;
 			dd->y += dd->font_size;
 			w=0;
 			h += dd->font_size;
@@ -374,155 +435,10 @@ static int l_draw_text(lua_State *L)
 }
 
 
-static void image_blit(struct dpydrv *dd, struct image *image)
-{
-	SDL_Rect rect;
-	double now;
-	
-	now = hirestime();
-	if(now < image->t_update) return;
-	if(image->nframes == 0) return;
-
-	rect.x = image->x;
-	rect.y = image->y;
-	rect.w = image->w;
-	rect.h = image->h;
-	TRACE("nframes=%d, x=%d, y=%d, w=%d, h=%d", image->nframes, rect.x, rect.y, rect.w, rect.h );
-
-	SDL_BlitSurface(image->surf[image->frame], NULL, dd->screen, &rect);
-	SDL_UpdateRects(dd->screen, 1, &rect);
-
-	if((image->nframes > 1) && (image->delay[image->frame] > 0)) {
-		image->t_update = now + image->delay[image->frame];
-	} else {
-		image->t_update = now + 1E6;
-	}
-
-	image->frame = (image->frame + 1) % image->nframes;
-	
-	dd->t_dirty = hirestime();
-}
-
-
-static int l_draw_image(lua_State *L)
-{
-	struct image *image = NULL;
-	struct dpydrv *dd;
-	const char *fname;
-	SDL_Surface *surf;
-	SDL_Color surf_colormap[256];
-	struct GifColorType *gif_colormap;
-	GifFileType *gif;
-	struct SavedImage *savedimage;
-	struct GifImageDesc *desc;
-	ExtensionBlock *eb;
-	lua_Number img_x, img_y;
-	int r;
-	int i, j;
-	int y;
-	Uint8 *pfrom, *pto;
-	double delay;
-
-	dd = lua_touserdata(L, 1);
-	fname = luaL_optstring(L, 2, "");
-	img_x = luaL_optnumber(L, 3, 0);
-	img_y = luaL_optnumber(L, 4, 0);
-	TRACE("fname=%s, x=%d, y=%d", fname, (int)img_x, (int)img_y);
-
-	dd->x = (int)img_x;
-	dd->y = (int)img_y;
-	
-	/* Find empty image slot */
-	
-	for(i=0; i<MAX_IMAGES; i++) {
-		if(dd->image[i].nframes == 0) {
-			image = &dd->image[i];
-			break;
-		}
-	}
-
-	if(image == NULL) BARF(L, "Too many images");
-
-	memset(image, 0, sizeof *image);
-
-	/* Open and read GIF image */
-	
-	gif = DGifOpenFileName(fname);
-	if(gif == NULL) 
-		BARF(L, "Could not open image '%s', error '%d'", fname, GifLastError() );
-
-	r = DGifSlurp(gif);
-	if(r != GIF_OK) {
-		DGifCloseFile(gif);
-		BARF(L, "Error decoding image '%s'", fname);
-	}
-
-	image->x = dd->x;
-	image->y = dd->y;
-	image->w = gif->SWidth;
-	image->h = gif->SHeight;
-	image->frame = 0;
-	image->nframes = gif->ImageCount;
-
-	/* Temp surf for reading gif data */
-
-	surf = SDL_CreateRGBSurface(
-		SDL_SWSURFACE,
-		image->w, 
-		image->h,
-		8, 0, 0, 0, 0);
-
-	for(i=0; i<image->nframes; i++) {
-
-		savedimage = gif->SavedImages + i;
-		desc = &savedimage->ImageDesc;
-	
-		/* Copy colormap from gif into surface */
-
-		gif_colormap = gif->SColorMap->Colors;
-		for(j=0; j<256; j++) {
-			surf_colormap[j].r = gif_colormap[j].Red;
-			surf_colormap[j].g = gif_colormap[j].Green;
-			surf_colormap[j].b = gif_colormap[j].Blue;
-		}
-
-		SDL_SetColors(surf, surf_colormap, 0, 256);
-
-		/* Copy pixel data */
-
-		for(y=0; y<desc->Height; y++) {
-			pfrom = savedimage->RasterBits + (desc->Width * y);
-			pto = surf->pixels + (surf->pitch * (y + desc->Top)) + desc->Left;
-			memcpy(pto, pfrom, desc->Width);
-		}
-
-		/* If animated gif, get delay time */
-
-		delay = 0;
-		for(j=0; j<savedimage->ExtensionBlockCount; j++) {
-			eb = &savedimage->ExtensionBlocks[j];
-			if(eb->Function == 0xf9) {
-				delay = ((unsigned char)eb->Bytes[2]*256 + (unsigned char)eb->Bytes[1]) / 100.0;
-			}
-		}
-
-		image->delay[i] = delay;
-
-		/* Copy indexed GIF surface to image frame surface */
-		 
-		image->surf[i] = SDL_DisplayFormatAlpha(surf);
-	}
-	
-	SDL_FreeSurface(surf);
-	DGifCloseFile(gif);
-
-	image_blit(dd, image);
-
-	lua_pushboolean(L, 1);
-	return 1;
-}
-
-
+/* l_set_font( L )
+ * @param L[2]	font_name, this is the filename of the fontfile. eg "arial.ttf"
+ * @param l[3]	font_size in points
+ */
 static int l_set_font(lua_State *L)
 {
 	struct dpydrv *dd;
@@ -597,7 +513,7 @@ static int l_set_color(lua_State *L)
 	b = (int)(luaL_checknumber(L, 4) * 255 +.5);
 	TRACE("r=%d, g=%d, b=%d", r,g,b);
 
-	dd->color = SDL_MapRGB(dd->screen->format, r, g, b);
+	dd->color = SDL_MapRGB(dd->image[0].surf[0]->format, r, g, b);
 
 	return 0;
 }
@@ -611,76 +527,254 @@ static int l_set_background_color(lua_State *L)
 	r = (int)(luaL_checknumber(L, 2) * 255 +.5);
 	g = (int)(luaL_checknumber(L, 3) * 255 +.5);
 	b = (int)(luaL_checknumber(L, 4) * 255 +.5);
-	TRACE("r=%d, g=%d, b=%d", r,g,b);
 
-	dd->background_color = SDL_MapRGB(dd->screen->format, r, g, b);
+	dd->background_color = SDL_MapRGB(dd->image[0].surf[0]->format, r, g, b);
+	TRACE("background = %x = {r=%d, g=%d, b=%d}",dd->background_color, r,g,b);
 
 	return 0;
+}
+
+
+static void image_blit(struct dpydrv *dd, Image *image, SDL_Rect* rect)
+{
+	double now = hirestime();
+	if(image->nframes == 0) return;
+
+	*rect = image->rect;
+	
+	//TRACE("nframes=%d, frame=%d, x=%d, y=%d, w=%d, h=%d", image->nframes, image->frame, rect->x, rect->y, rect->w, rect->h );
+
+	// transparent blit: see SDL_SetColorKey in surface innitialisation
+	SDL_BlitSurface(image->surf[image->frame], NULL, dd->screen, rect);
+	
+	if(image->nframes > 1)
+	{
+		if( now >= image->t_update )
+		{
+			// next frame
+			image->t_update = now + image->delay[image->frame];
+			image->frame = (image->frame + 1) % image->nframes;
+		}
+	
+		if( dd->t_dirty > image->t_update )
+			dd->t_dirty = image->t_update ;
+	}
 }
 
 
 static int l_update(lua_State *L)
 {
 	struct dpydrv *dd;
-	unsigned i;
-	struct image *image;
-	double now;
+	int i;
+	Image *image;
 	int force;
 	
 	dd = lua_touserdata(L, 1);
 	force = lua_toboolean(L, 2);
 
-	/* Blit images, checking for animation updates as well */
+	double now = hirestime();
 
-	for(i=0; i<MAX_IMAGES; i++) {
-		image = &dd->image[i];
-		if(image->nframes > 0) {
-			image_blit(dd, image);
+	// only update if forced or max 2 times per second:
+	// This is because of performance reasons: the wifi module/driver has 
+	// problems when the app requires 20% cpu time.
+	if( force || 
+		(now > dd->t_dirty + 0.05 && now-dd->t_refreshed > 0.4) )
+	{
+		// update at least 1 time per 15 seconds
+		dd->t_dirty = now+15;
+		
+		// clear buffer:
+		SDL_FillRect(dd->screen, NULL, dd->background_color);
+
+		/* Blit images, checking for animation updates as well */
+		SDL_Rect rects[MAX_IMAGES];
+		unsigned rect_count = 0;
+		for(i=0; i<MAX_IMAGES; i++) {
+			image = &dd->image[i];
+			if(image->nframes > 0) {
+				//TRACE("Blitting image %d", i);
+				image_blit(dd, image, &(rects[rect_count]));
+				rect_count++;
+				sleep(0);
+			}
 		}
-	}
 
-	/* Update the display as soon as the last dirty time is > 0.05 second away */
-
-	now = hirestime();
-
-	if(force || (now >= dd->t_dirty + 0.05)) {
+		SDL_UpdateRects(dd->screen, rect_count, rects);
+		sleep(0);
 		SDL_Flip(dd->screen);
-		dd->t_dirty = now + 1E6;
+		dd->t_refreshed = now;
 	}
+	
 	
 	lua_pushboolean(L, 1);
 	return 0;
 }
 
+// Draw an image.
+// Each image is loaded in memory and put into an SDL_Surface
+// There can be as much as MAX_IMAGES images, each image having
+// as much as MAX_FRAMES frames.
+// L[1] device context
+// L[2] filename
+// L[3] x-coord
+// L[4] y-coord
+// return image_index, error
+static int l_draw_image(lua_State *L)
+{
+	struct dpydrv *dd = lua_touserdata(L, 1);
+	const char *fname = luaL_optstring(L, 2, "");
+	lua_Number img_x = luaL_optnumber(L, 3, 0);
+	lua_Number img_y = luaL_optnumber(L, 4, 0);
+	TRACE("fname=%s, x=%d, y=%d", fname, (int)img_x, (int)img_y);
+
+	dd->x = (int)img_x;
+	dd->y = (int)img_y;
+	
+	/* Find empty image slot */
+	Image *image = NULL;
+	int animations = 0;
+	int ii;
+	for(ii=1; ii<MAX_IMAGES; ii++) {
+		if(dd->image[ii].nframes == 0 && image==0)
+		{
+			image = &dd->image[ii];
+		}
+		else if( dd->image[ii].nframes > 1 )
+		{
+			animations++;
+		}
+	}
+
+	if(image == NULL) BARF(L, "Too many images");
+
+	memset(image, 0, sizeof *image);
+
+	/* Open and read GIF image */
+	
+	GifFileType *gif = DGifOpenFileName(fname);
+	if(gif == NULL) 
+		BARF(L, "Could not open image '%s', error '%d'", fname, GifLastError() );
+
+	int r = DGifSlurp(gif);
+	if(r != GIF_OK) {
+		DGifCloseFile(gif);
+		BARF(L, "Error decoding image '%s'", fname);
+	}
+
+	int nframes = gif->ImageCount < MAX_FRAMES ? gif->ImageCount : MAX_FRAMES;
+	if( nframes > 1 && animations >= 2 )
+	{
+		DGifCloseFile(gif);
+		BARF(L, "Maximum of 2 animations exceeded for image '%s'", fname);
+	}
+
+	image->nframes = nframes;
+	image->rect.x = dd->x;
+	image->rect.y = dd->y;
+	image->rect.w = gif->SWidth;
+	image->rect.h = gif->SHeight;
+	image->frame = 0;
+
+	/* Temp surf for reading gif data */
+
+	SDL_Surface *surf = SDL_CreateRGBSurface(
+		SDL_SWSURFACE,
+		image->rect.w, 
+		image->rect.h,
+		8, 0, 0, 0, 0);
+
+	int i;
+	for(i=0; i<image->nframes; i++) 
+	{
+		struct SavedImage *savedimage = gif->SavedImages + i;
+		struct GifImageDesc *desc = &savedimage->ImageDesc;
+
+		/* Copy colormap from gif into surface */
+
+		struct GifColorType *gif_colormap = gif->SColorMap->Colors;
+		SDL_Color surf_colormap[256];
+		{   int j;
+			for(j=0; j<256; j++) {
+				surf_colormap[j].r = gif_colormap[j].Red;
+				surf_colormap[j].g = gif_colormap[j].Green;
+				surf_colormap[j].b = gif_colormap[j].Blue;
+			}
+		}
+
+		SDL_SetColors(surf, surf_colormap, 0, 256);
+
+		/* Copy pixel data */
+		{   int j;
+			for(j=0; j<desc->Height; j++) {
+				Uint8 *pfrom = savedimage->RasterBits + (desc->Width * j);
+				Uint8 *pto = surf->pixels + (surf->pitch * (j + desc->Top)) + desc->Left;
+				memcpy(pto, pfrom, desc->Width);
+			}
+		}
+
+		/* If animated gif, get delay time */
+		double delay = 0;
+		{   int j;
+			for(j=0; j<savedimage->ExtensionBlockCount; j++) {
+				ExtensionBlock *eb = &savedimage->ExtensionBlocks[j];
+				if(eb->Function == 0xf9) {
+					delay = ((unsigned char)eb->Bytes[2]*256 + (unsigned char)eb->Bytes[1]) / 100.0;
+				}
+			}
+		}
+		image->delay[i] = delay;
+
+		// Copy indexed GIF surface to image frame surface
+		// pure blue functions as transparent
+		SDL_SetColorKey(surf, SDL_SRCCOLORKEY, SDL_MapRGB(surf->format, 0, 0, 255));
+		image->surf[i] = SDL_DisplayFormatAlpha(surf);
+	}
+
+	SDL_FreeSurface(surf);
+	DGifCloseFile(gif);
+
+	// and return the image index:
+	lua_pushinteger(L, ii);
+	return 1;
+}
+
+
 /* clear screen
+ * use L[1]=layer to clear only a certain layer. (layer[0] is for text)
  */
 static int l_clear(lua_State *L)
 {
-	struct image *image;
+	Image *image;
 	struct dpydrv *dd;
 	int i, j;
 
 	dd = lua_touserdata(L, 1);
+	int layer = luaL_optint(L, 2, -1);
 
 	TRACE(" ");
 	SDL_FillRect(dd->screen, NULL, dd->background_color);
+	if(layer==-1 || layer==0)
+		SDL_FillRect(dd->image[0].surf[0], NULL, dd->background_color);
 
 	dd->x = 0;
 	dd->y = 0;
 
-	for(i=0; i<MAX_IMAGES; i++) {
-		image = &dd->image[i];
-		for(j=0; j<image->nframes; j++) {
-			SDL_FreeSurface(image->surf[j]);
+	// start counting from 1: surface 0 is the text layer
+	for(i=1; i<MAX_IMAGES; i++) {
+		if(layer == -1 || layer == i)
+		{
+			image = &dd->image[i];
+			for(j=0; j<image->nframes; j++) {
+				SDL_FreeSurface(image->surf[j]);
+			}
+			image->nframes = 0;
 		}
-		image->nframes = 0;
 	}
 	
 	dd->t_dirty = hirestime();
 
 	return 0;
 }
-
 
 
 static int l_free(lua_State *L) 
@@ -717,6 +811,7 @@ static struct luaL_Reg dpydrv_metatable[] = {
 	{ "clear",			l_clear },
 	{ "update",			l_update },
 	{ "list_fonts",		l_list_fonts },
+	{ "dump",           l_dump }, // for testing pruposes only!
 	{ NULL },
 };
 
@@ -743,6 +838,5 @@ int luaopen_dpydrv(lua_State *L)
 
 
 /*
- * End
+ * vi: ft=c ts=4 sw=4 
  */
-

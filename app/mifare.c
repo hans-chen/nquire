@@ -14,10 +14,8 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
-#define BARF(L, msg...) do { lua_pushnil(L); lua_pushfstring(L, msg); return 2; } while(0)
-
-//#define TRACE(msg...) { fprintf(stdout,"%s:%d - %s ", __FILE__, __LINE__, __FUNCTION__);fprintf(stdout,msg);fprintf(stdout,"\n"); }
-#define TRACE(msg...) {}
+//#define DEBUG
+#include "misc.h"
 
 typedef struct {
 
@@ -27,6 +25,26 @@ typedef struct {
 	int fd;
 } Mifare;
 
+
+/* convert the errornumber into a string in an consistent value (independent of what nlrf.h defines) */
+static int mifare_error( int nlrf_error )
+{
+	switch( nlrf_error )
+	{
+		case NLRF_OK: return 0;
+		case -NLRF_ERR_NODEV: return -1;
+    	case -NLRF_ERR_NOCARD: return -2;
+    	case -NLRF_ERR_WRONGKEY: return -3;
+    	case -NLRF_ERR_CARDORKEY: return -4;
+    	case -NLRF_ERR_IGNORE_ME: return -5;
+    	case -NLRF_ERR_INVALID: return -6;
+    	case -NLRF_ERR_SETTTY: return -7;
+    	case -NLRF_ERR_BACKUPTTY: return -8;
+    	case -NLRF_ERR_RESTORETTY: return -9;
+    	case -NLRF_ERR_UNKNOWN: return -10;
+    	default: return -100;
+    }
+}
 
 static int l_new(lua_State *L)
 {
@@ -56,15 +74,14 @@ static int l_open(lua_State *L)
 	// Parse arguments
 	const char *device_name = lua_tostring(L, 2);
 
-	TRACE(" device_name = %s", device_name);
-
 	// innitialize
 	dd->device_name = (char*)malloc( strlen( device_name )+1 );
 	strcpy( dd->device_name, device_name );
 
 	// functional implementation
+	TRACE("before: nlrf_open( devicename = %s )", dd->device_name);
 	dd->fd = nlrf_open(dd->device_name);
-	TRACE(" fd = %d", dd->fd);
+	TRACE("after: nlrf_open, fd = %d", dd->fd);
 	
 	// return parameters
 	lua_pushnumber(L, dd->fd);
@@ -72,20 +89,23 @@ static int l_open(lua_State *L)
 }
 
 
-//  
+//
 static int l_close(lua_State *L)
 {
 	Mifare *dd = lua_touserdata(L, 1);
-	TRACE(" fd = %d", dd->fd);
 
-	nlrf_close(dd->fd);
-	dd->fd = 0;
-	free(dd->device_name);
-	dd->device_name = 0;
-
+	if( dd->fd )
+	{
+		TRACE("before: nlrf_close( fd = %d )", dd->fd);
+		nlrf_close(dd->fd);
+		TRACE("after: nlrf_close");
+		dd->fd = 0;
+		free(dd->device_name);
+		dd->device_name = 0;
+	}
+	
 	return 0;
 }
-
 
 // 
 static int l_free(lua_State *L) 
@@ -105,16 +125,13 @@ static int l_querycardinfo(lua_State *L)
 	Mifare *dd = lua_touserdata(L, 1);
 	TRACE(" fd = %d", dd->fd);
 
-	if( dd->fd == 0 )
-	{
-		BARF(L,"Interface not opened");
-		lua_pushnumber(L, -1);	
-		return 1;
-	}
+	if( dd->fd == 0 ) BARF(L,"Interface not opened");
 
 	struct nlrf_cardinfo info;
+	TRACE("before: nlrf_querycardinfo");
 	int result = nlrf_querycardinfo(dd->fd, &info);
-	lua_pushnumber(L, result);
+	TRACE("after: nlrf_querycardinfo, result=%d", result);
+	lua_pushinteger(L, mifare_error(result));
 	switch( result )
 	{
 	case 0:
@@ -138,16 +155,13 @@ int l_send_querycardinfo(lua_State *L)
 	Mifare *dd = lua_touserdata(L, 1);
 	TRACE(" fd = %d", dd->fd);
 
-	if( dd->fd == 0 )
-	{
-		BARF(L,"Interface not opened");
-		lua_pushnumber(L, -1);	
-		return 1;
-	}
+	if( dd->fd == 0 ) BARF(L,"Interface not opened");
 
+	TRACE("before: nlrf_send_querycardinfo");
 	int result = nlrf_send_querycardinfo(dd->fd);
+	TRACE("after: nlrf_sendquerycardinfo, result=%d", result);
 
-	lua_pushinteger(L, result);
+	lua_pushinteger(L, mifare_error(result));
 	return 1;
 }
 
@@ -159,22 +173,17 @@ int l_fetch_querycardinfo(lua_State *L)
 	Mifare *dd = lua_touserdata(L, 1);
 	TRACE(" fd = %d", dd->fd);
 
-	if( dd->fd == 0 )
-	{
-		BARF(L,"Interface not opened");
-		lua_pushnumber(L, -1);	
-		return 1;
-	}
+	if( dd->fd == 0 ) BARF(L,"Interface not opened");
 
 	struct nlrf_cardinfo info;
 	memset(&info,0,sizeof(info));
+	TRACE("before: nlrf_fetch_querycardinfo");
 	int result = nlrf_fetch_querycardinfo(dd->fd, &info);
-	lua_pushinteger(L, result);
+	TRACE("after: nlrf_fetch_querycardinfo, result=%d", result);
+	lua_pushinteger(L, mifare_error(result));
 	switch( result )
 	{
 	case 0:
-		TRACE(" ");
-
 		TRACE("nsector=%d, nblock=%d, blocksize=%d, cardnum=%02x%02x%02x%02x",
 				info.nsector, info.nblock, info.blocksize, 
 				info.cardnum[0], info.cardnum[1], info.cardnum[2], info.cardnum[3]);
@@ -197,13 +206,14 @@ static int l_chkkey(lua_State *L)
 	Mifare *dd = lua_touserdata(L, 1);
 	unsigned int length=0U;
 	const char *key = lua_tolstring(L, 2, &length);
-	TRACE(" length=%d", length);
-	TRACE(" key='%02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x'", 
-		key[0],key[1],key[2],key[3], key[4],key[5],key[6],key[7], key[8],key[9],key[10],key[11]);
-
+	TRACE("before: nlrf_chkkey( key='%02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x', length=%d )", 
+			key[0],key[1],key[2],key[3], key[4],key[5],
+			key[6],key[7], key[8],key[9],key[10],key[11], 
+			length);
 	int result = nlrf_chkkey(dd->fd, (const unsigned char*)key, length);
+	TRACE("after: nlrf_chkkey, result = %d", result);
 
-	lua_pushnumber(L, result);
+	lua_pushinteger(L, mifare_error(result));
 
 	return 1;
 }
@@ -216,31 +226,25 @@ static int l_readblock(lua_State *L)
 {
 	Mifare *dd = lua_touserdata(L, 1);
 
-	if( dd->fd == 0 )
-	{
-		BARF(L,"Interface not opened");
-		lua_pushnumber(L, -1);	
-		return 1;
-	}
+	if( dd->fd == 0 ) BARF(L,"Interface not opened");
+
 	int sector = lua_tointeger(L, 2);
 	int block = lua_tointeger(L, 3);
 	int size = lua_tointeger(L, 4);
 
 	unsigned char *data = (unsigned char*)malloc( size );
-	if( !data )
+	if( !data ) 
 	{
 		BARF(L,"Could not allocate %d bytes: not performing nlrf_readblock()", size);
-		lua_pushnumber(L, -1);
-		return 1;
 	}
 	else
 	{
 		memset(data,0,size);
-		TRACE(" fd=%d, sector=%d, block=%d, size=%d", dd->fd, sector, block, size);
-
+		TRACE("before: nlrf_readblock( fd=%d, sector=%d, block=%d, size=%d )", dd->fd, sector, block, size);
 		int result = nlrf_readblock(dd->fd, sector, block, data, size);
+		TRACE("after: nlrf_readblock, result=%d", result);
 
-		lua_pushnumber(L, result);
+		lua_pushinteger(L, mifare_error(result));
 		int numpar = 1;
 		if (result == 0)
 		{
@@ -253,6 +257,20 @@ static int l_readblock(lua_State *L)
 	}
 }
 
+static int l_get_modeltype(lua_State *L)
+{
+	Mifare *dd = lua_touserdata(L, 1);
+
+	if( dd->fd == 0 ) BARF(L,"Interface not opened");
+
+	switch(nlrf_get_modeltype(dd->fd))
+	{
+	case NLRF_MODEL_V1: lua_pushinteger( L, 1 ); break;
+	case NLRF_MODEL_V2: lua_pushinteger( L, 2 ); break;
+	default: lua_pushinteger( L, -1 ); break;
+	}
+	return 1;
+}
 
 /***************************************************************************
 * Lua bindings
@@ -266,7 +284,8 @@ static struct luaL_Reg mifare_metatable[] = {
 	{ "fetch_querycardinfo", l_fetch_querycardinfo },
 	{ "chkkey",			l_chkkey },
 	{ "readblock",		l_readblock },
-
+	{ "get_modeltype",	l_get_modeltype },
+	
 	{ NULL },
 };
 
@@ -293,6 +312,5 @@ int luaopen_mifare(lua_State *L)
 
 
 /*
- * End
+ * vi: ft=c ts=4 sw=4 
  */
-

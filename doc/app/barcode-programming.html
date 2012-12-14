@@ -452,7 +452,7 @@ cellspacing="0" cellpadding="4">
 </div>
 </div>
 </div>
-<h2 id="_barcode_programming">1. Barcode programming==</h2>
+<h2 id="_barcode_programming">1. Barcode programming</h2>
 <div class="sectionbody">
 <h3 id="_introduction">1.1. Introduction</h3><div style="clear:left"></div>
 <div class="para"><p>Barcode programming can be used for changing settings in the Nquire.</p></div>
@@ -471,50 +471,117 @@ normal programming mode.</p></div>
 <strong>This however does not mean that execution of the settings were successfull!</strong>
 For instance: setting the Nquire to dhcp or grps takes some time and can fail,
 just like it can fail during power-on of the nquire.</p></div>
-<h3 id="_codes">1.2. Codes</h3><div style="clear:left"></div>
+</div>
+<h2 id="_codes">2. Codes</h2>
+<div class="sectionbody">
 <div class="para"><p>The following barcodes are used to control the programming state of the enquire:</p></div>
-<h4 id="_enter_programming_mode">1.2.1. Enter programming mode</h4>
+<h3 id="_enter_programming_mode">2.1. Enter programming mode</h3><div style="clear:left"></div>
 <div class="para"><p><span class="image">
-<img src="img/enter_programming_mode.png" alt="Enter programming mode" title="Enter programming mode" />
+<img src="img/enter_programming_mode.png" alt="Enter programming mode" title="Enter programming mode" height="70" />
 </span></p></div>
 <div class="para"><p>The display will show:</p></div>
 <div class="listingblock">
 <div class="content">
 <pre><tt>Programming</tt></pre>
 </div></div>
-<h4 id="_exit_programming_mode">1.2.2. Exit programming mode</h4>
+<h3 id="_exit_programming_mode">2.2. Exit programming mode</h3><div style="clear:left"></div>
 <div class="para"><p><span class="image">
-<img src="img/exit_programming_mode.png" alt="exit programming mode" title="exit programming mode" />
+<img src="img/exit_programming_mode.png" alt="exit programming mode" title="exit programming mode" height="70" />
 </span></p></div>
 <div class="para"><p>The display will show the configured welcome text.</p></div>
-<h4 id="_anounce_settings">1.2.3. Anounce settings</h4>
-<div class="para"><p>image:img/anounce_settings.png</p></div>
+<h3 id="_command_codes">2.3. Command codes</h3><div style="clear:left"></div>
+<h4 id="_reboot">2.3.1. Reboot</h4>
+<div class="para"><p><span class="image">
+<img src="img/reboot.png" alt="reboot: 020700" title="reboot: 020700" height="70" />
+</span></p></div>
+<h4 id="_restore_defaults">2.3.2. Restore defaults</h4>
+<div class="para"><p><span class="image">
+<img src="img/restore-defaults.png" alt="restore defaults: 020701" title="restore defaults: 020701" height="70" />
+</span></p></div>
+<h4 id="_show_configuration">2.3.3. Show configuration</h4>
+<div class="para"><p><span class="image">
+<img src="img/show-config.png" alt="Show configuration: 020702" title="Show configuration: 020702" height="70" />
+</span></p></div>
+<h4 id="_set_serial_number">2.3.4. Set serial number</h4>
+<div class="para"><p>It is possible to scan a serial number.
+However the scanned serial number is volatile: after reboot the device will
+have it's original serial number.</p></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">this is meant for testing purposes only.</td>
+</tr></table>
+</div>
+<div class="para"><p><span class="image">
+<img src="img/set-serial.png" alt="Set serial: 020704" title="Set serial: 020704" height="70" />
+</span></p></div>
+<div class="para"><p>And 2 different serial numbers:</p></div>
+<div class="para"><p><span class="image">
+<img src="img/serial-EI00000.png" alt="Serial: EI00000" title="Serial: EI00000" height="70" />
+</span></p></div>
+<div class="para"><p><span class="image">
+<img src="img/serial-EI4316002P.png" alt="Serial: EI4316002P" title="Serial: EI4316002P" height="70" />
+</span></p></div>
+<h4 id="_anounce_settings">2.3.5. Anounce settings</h4>
+<div class="para"><p><span class="image">
+<img src="img/anounce_settings.png" alt="anounce settings barcode" title="anounce settings barcode" height="70" />
+</span></p></div>
 <div class="para"><p>The display will show:</p></div>
 <div class="listingblock">
 <div class="content">
 <pre><tt>programming
 scan settings</tt></pre>
 </div></div>
-<h3 id="_some_usefull_examples">1.3. Some usefull examples</h3><div style="clear:left"></div>
+<h5 id="_some_usefull_examples">Some usefull examples</h5>
 <div class="para"><p><span class="image">
-<img src="img/set_dhcp_false.png" alt="dhcp=false" title="dhcp=false" />
-</span>
-<span class="image">
-<img src="img/set_dhcp_true.png" alt="dhcp=true" title="dhcp=true" />
-</span>
-<span class="image">
-<img src="img/set_interface_ethernet.png" alt="ethernet" title="ethernet" />
-</span>
-<span class="image">
-<img src="img/set_interface_wifi.png" alt="wifi" title="wifi" />
-</span>
-<span class="image">
-<img src="img/set_interface_gprs.png" alt="gprs" title="gprs" />
+<img src="img/set_dhcp_false.png" alt="img/set_dhcp_false.png" height="70" />
 </span></p></div>
+<div class="para"><p><span class="image">
+<img src="img/set_dhcp_true.png" alt="img/set_dhcp_true.png" height="70" />
+</span></p></div>
+<div class="para"><p><span class="image">
+<img src="img/set_interface_ethernet.png" alt="img/set_interface_ethernet.png" height="70" />
+</span></p></div>
+<div class="para"><p><span class="image">
+<img src="img/set_interface_wifi.png" alt="img/set_interface_wifi.png" height="70" />
+</span></p></div>
+<div class="para"><p><span class="image">
+<img src="img/set_interface_gprs.png" alt="img/set_interface_gprs.png" height="70" />
+</span></p></div>
+<div class="para"><p><span class="image">
+<img src="img/network_interface_ethernet_2d.png" alt="interface = ethernet" title="interface = ethernet" />
+</span>
+/network/interface = ethernet</p></div>
+<div class="para"><p><span class="image">
+<img src="img/set_interface_wifi_2d.png" alt="interface = wifi" title="interface = wifi" />
+</span>
+/network/interface = wifi</p></div>
+<div class="para"><p><span class="image">
+<img src="img/network_dhcp_false_2d.png" alt="dhcp=false" title="dhcp=false" />
+</span>
+/network/dhcp = false</p></div>
+<div class="para"><p><span class="image">
+<img src="img/network_dhcp_true_2d.png" alt="dhcp_true_2d" title="dhcp_true_2d" />
+</span>
+/network/dhcp = true</p></div>
+<div class="para"><p><span class="image">
+<img src="img/network_static_server_129.png" alt="static_server_129" title="static_server_129" />
+</span>
+static server 129</p></div>
+<div class="para"><p><span class="image">
+<img src="img/network_static_client_129.png" alt="static_client_129" title="static_client_129" />
+</span>
+static client 129</p></div>
+<div class="para"><p><span class="image">
+<img src="img/1d_and_2d.png" alt="1d and 2d" title="1d and 2d" />
+</span>
+1d and 2d</p></div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2009-12-21 21:26:43 CEST
+Last updated 2010-04-15 16:22:23 CEST
 </div>
 </div>
 </body>
