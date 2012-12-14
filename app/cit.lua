@@ -380,7 +380,7 @@ local command_list = {
 
 	[0x2e] = {
 		name = "align string of text",
-		nparam = 26,
+		nparam = 1000,
 		fn = function(cit, pos, ...)
 		
 			local align = {
@@ -409,8 +409,8 @@ local command_list = {
 			end
 
 			local text = string.char(...)
-			logf(LG_DBG,lgid,"text=%s", text)
 			text = to_utf8(text, cit.codepage)
+			logf(LG_DBG,lgid,"text=%s", text)
 			w, h , pixel_x, pixel_y = display:format_text(text, pixel_x, pixel_y, align_h, align_v, fontsize)
 		end
 	},
@@ -439,7 +439,6 @@ local command_list = {
 				fontsize = fontsize_big
 			elseif f > 0x31 and f<=0x40 then
 				fontsize = (f-0x30)*6
-				print("DEBUG: fontsize=" .. fontsize)
 			end
 			display:set_font(font, fontsize)
 		end
@@ -584,7 +583,7 @@ end
 -- Handle incoming byte to decode escape sequence and parameters
 --
 
-local function handle_byte(cit, c, is_last)
+local function handle_byte(cit, c)
 
 	-- Small state machine for keeping track of what we are doing.
 
@@ -607,9 +606,6 @@ local function handle_byte(cit, c, is_last)
 				force_flush( cit )
 			else
 				table.insert(cit.param, c)
-				if is_last then 
-					force_flush( cit )
-				end
 			end
 		end
 
@@ -641,12 +637,11 @@ local function handle_byte(cit, c, is_last)
 		end
 
 		if c == 0x03 or #cit.param == cit.cmd.nparam then
+			logf(LG_DBG, lgid, "#cit.param=%d, cit.cmd.nparam=%s", #cit.param , cit.cmd.nparam)
 			logf(LG_DBG, lgid, "Handling command %q", cit.cmd.name)
 			answer = cit.cmd.fn(cit, unpack( cit.param ) )
 			cit.param = {}
 			cit.n = 0
-		elseif is_last then
-			force_flush( cit )
 		end
 	end
 
@@ -661,7 +656,7 @@ local function handle_bytes(cit, command)
 	message_received = true
 	local answer=""
 	for i, c in ipairs( { command:byte(1, #command) } ) do
-		local current_answer = handle_byte(cit, c, i==#command)
+		local current_answer = handle_byte(cit, c)
 		if current_answer then
 			logf( LG_DMP, lgid, "Current answer \"" .. current_answer .. "\"" )
 			answer = answer .. current_answer

@@ -67,7 +67,6 @@ struct dpydrv {
 	FT_Face face;
 	int font_loaded;
 	int font_size;
-	int text_x_start, text_y_start;
 
 	struct image image[MAX_IMAGES];
 };
@@ -230,7 +229,6 @@ static int draw_char(struct dpydrv *dd, int ch, int silent)
 
 	dd->x += slot->advance.x / 64;
 	dd->y += slot->advance.y / 64;
-
 	return slot->advance.x / 64;
 }
 
@@ -307,13 +305,15 @@ TRACE(" ");
 	wmax = 0;
 	h = dd->font_size;
 
+	int text_x_start = dd->x;
+	
 	p = text;
 	while(*p) {
 		pi = 0;
 		ch = utf8_decode((char *)p, &pi);
 
 		if(ch == '\n') {
-			dd->x = dd->text_x_start;
+			dd->x = text_x_start;
 			dd->y += dd->font_size;
 			w=0;
 			h += dd->font_size;

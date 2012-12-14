@@ -1,0 +1,44 @@
+= Server communication =
+Maarten van Dootingh <maarten@vdtai.nl>
+
+Revision history
+
+`-------`-----------------------`-------------------------------------------------------------
+v1.0 	December 21 2009	Conversion from hand-written html
+----------------------------------------------------------------------------------------------
+
+== Message types ==
+
+The nquire server communication is 3-fold (as seen from the server):
+
+ -	link:nquire-discovery-protocol.html[Discovery] of available Nquires on a network
+ -	Barcode data messages from Nquire to server
+ -	Messages from server to NQuire (display, beep, etc).
+ 
+Note that discovery can also be done using the SG15 compatebility.
+
+== Protocol == 
+
+The server communication is done by UDP and/or TCP.
+The TCP connection can be in server mode or in client mode.
+In server mode the Nquire will listen to connections on the configured TCP port,
+whereas in client mode the quire will try to make the connection using the 
+configured "remote ip address" and "tcp port".
+When there are multiple connections (server mode only), scanned barcode data will
+be sent to all connected servers.
+
+Depending on the configuration (webui), the barcode prefix will or will not be 
+sent along with the barcode.
+
+Note that scanned mifare data is prefixed with `MF` followed by 4 bytes 
+(binary data) containing the barcode id.
+
+Putting text on the nquire is done by a (downwards) SG15 compatible protocol: 
+the Nquire is able to do more, so the protocol is extended:
+
+ -	The screen is bigger so "set pixel position" allows bigger values.
+ -	"select font set" is extended: values 0x32 to 0x40 represent fonts from
+	6px to 96px with steps of 6px.
+ -	For testing purposes there is a 'fake scan' escape code.
+
+

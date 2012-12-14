@@ -109,18 +109,18 @@ table.top {
 	height: 70px;
 	margin: 0px;
 	padding: 0px;
-	background-image: url(top-gradient.png); 
+	background-image: url(img/top-gradient.png); 
 	border-collapse: collapse;
 }
 
 td.top-left {
-	background-image: url(top-left.png); 
+	background-image: url(img/top-left.png); 
 	background-repeat: no-repeat;
 	width: 608px;
 }
 
 td.top-right {
-	background-image: url(top-right.png); 
+	background-image: url(img/top-right.png); 
 	background-repeat: no-repeat;
 	background-position: top right;
 }
@@ -130,12 +130,12 @@ table.bottom {
 	height: 70px;
 	margin: 0px;
 	padding: 0px;
-	background-image: url(bottom-gradient.png); 
+	background-image: url(img/bottom-gradient.png); 
 	border-collapse: collapse;
 }
 
 td.bottom-left {
-	background-image: url(bottom-left.png); 
+	background-image: url(img/bottom-left.png); 
 	background-repeat: no-repeat;
 	background-position: top left;
 }

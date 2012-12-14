@@ -343,7 +343,7 @@ function to_utf8(text, page)
 		local out = {}
 		for _, c in ipairs( { string.byte(text, 1, #text) } ) do
 			if c ~= 0 then
-				out[#out+1] = xlat[c] or c
+				out[#out+1] = xlat[c] or string.char(c)
 			end
 		end
 		local out = table.concat(out, "")

@@ -319,22 +319,36 @@ local function format_text(display, text, xpos, ypos, align_h, align_v, size)
 	align_h = align_h:sub(1, 1)
 	align_v = align_v:sub(1, 1)
 
-	if align_h == "c" then xpos = dpy_w/2 end
-	if align_h == "r" then xpos = dpy_w end
-	if align_v == "m" then ypos = dpy_h / 2 end
-	if align_v == "b" then ypos = dpy_h end
+	-- and now for each line in text
+	local w=0
+	local h=0
+	local x=0
+	local y=0
+	local ll = string.split( text, "\n" )
+	local n = #ll
+	for i, l in pairs(ll) do
 
-	local text_w, text_h = display:get_text_size(text)
+		local text_w, text_h = display:get_text_size(l)
+		-- weird correction neccessary for right aligning text 
+		-- (something to do with truncation errors????)
+		text_w = text_w + 1
 
-	if align_h == "c" then xpos = xpos - text_w / 2 end
-	if align_h == "r" then xpos = xpos - text_w end
-	if align_v == "m" then ypos = ypos - (text_h+2) / 2 end
-	if align_v == "b" then ypos = ypos - (text_h+2) end
+		if align_h == "c" then xpos = dpy_w/2 - text_w / 2 end
+		if align_h == "r" then xpos = dpy_w - text_w end
+		if align_v == "m" then ypos = dpy_h/2 - n*text_h/2 + (i-1)*text_h end
+		if align_v == "b" then ypos = dpy_h   - n*text_h   + (i-1)*text_h end
 
-	logf(LG_DBG,"cit", "gotoxy(%d,%d)", xpos,ypos )
-	display:gotoxy(xpos, ypos)
-	return display:draw_text(text)
+		logf(LG_DBG,lgid, "gotoxy(%d,%d)", xpos,ypos )
+		display:gotoxy(xpos, ypos)
+		local lw, lh
+		lw, lh , x, y = display:draw_text(l)
+		if lw>w then w = lw end
+		h = h + lh
 
+		if i ~= n and align_v ~= "m" and align_v ~= "b" then ypos = ypos + lh end
+		
+	end
+	return w, h, x, y
 end
 
 

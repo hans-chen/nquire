@@ -2,6 +2,9 @@
 Introduction
 ============
 
+documentation for the Nquire can be found in ../doc/app
+
+
 The application is mainly writting in Lua, with some C modules for implementing
 special functionality not available in Lua by default. 
 
@@ -179,14 +182,13 @@ Connecting
 There is a simple test script available (cit-test) to send test codes to the
 application. Usage:
 
-$ ./cit-test <udp|tcp> <test_nr>
+$ ./cit-test -h|{[-u] <ip adres> <test id>+}
+
+Use -h a complete help on this tool
 
 For example, to run test 2 over UDP, run
 
-$ ./cit-test udp 2
-
-Note that the test script always connects to localhost 127.0.0.1. Adjust the
-address in the script to test on other addresses.
+$ ./cit-test -u 192.168.1.200 2
 
 
 Web interface
@@ -221,6 +223,10 @@ main.lua*		Main application
 net.c			Low-level network code for socket handling
 network.lua		Network configuration for ethernet, GPRS and wifi
 scanner.lua		Scanner handling
+scanner_1d.lua
+scanner_2d.lua
+scanner_rf.lua
+scanner_hid
 cit.lua			CIT protocol implementation
 sys.c			Some low-level helper functions and version info written in C
 typecheck.lua	Typechecking for configuration database 

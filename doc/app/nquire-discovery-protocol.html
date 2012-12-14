@@ -1,89 +1,554 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
-<HTML>
-<HEAD>
-	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=utf-8">
-	<TITLE></TITLE>
-	<META NAME="AUTHOR" CONTENT="van Dootingh">
-	<link rel="stylesheet" type="text/css" href="nquire_doc.css" /> 
-</HEAD>
-<BODY class="document">
-<H1>Nquire discovery protocol</H1>
-<p>Last update: dec 10 2009</p>
-<p>	The Nquire discovery protocol can be used to discover all Nquire
-	devices in a network.
-</p>
-<p>	Another function is the get information about the available Nquires.
-</p>
-<H2>Protocol description</H2>
-<p>	The protocol is fairly simplistic:
-</p>
-<p> The server has to send an UDP packet to the discovery port
-	(19200) of the Nquire (using broadcasting on 239.255.255.250 or the actual address of the nquire), containing the following text:
-</p>
-<p>	<code>
-		CIT-DISCOVER-REQUEST<br>
-		Version: 1
-	</code>
-</p>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="generator" content="AsciiDoc 8.2.7" />
+<style type="text/css">
+/* Debug borders */
+p, li, dt, dd, div, pre, h1, h2, h3, h4, h5, h6 {
+/*
+  border: 1px solid red;
+*/
+}
+
+body {
+  margin: 1em 5% 1em 5%;
+}
+
+a {
+  color: blue;
+  text-decoration: underline;
+}
+a:visited {
+  color: fuchsia;
+}
+
+em {
+  font-style: italic;
+  color: navy;
+}
+
+strong {
+  font-weight: bold;
+  color: #083194;
+}
+
+tt {
+  color: navy;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #527bbd;
+  font-family: sans-serif;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+h1, h2, h3 {
+  border-bottom: 2px solid silver;
+}
+h2 {
+  padding-top: 0.5em;
+}
+h3 {
+  float: left;
+}
+h3 + * {
+  clear: left;
+}
+
+div.sectionbody {
+  font-family: serif;
+  margin-left: 0;
+}
+
+hr {
+  border: 1px solid silver;
+}
+
+p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+ul, ol, li > p {
+  margin-top: 0;
+}
+
+pre {
+  padding: 0;
+  margin: 0;
+}
+
+span#author {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+span#email {
+}
+span#revision {
+  font-family: sans-serif;
+}
+
+div#footer {
+  font-family: sans-serif;
+  font-size: small;
+  border-top: 2px solid silver;
+  padding-top: 0.5em;
+  margin-top: 4.0em;
+}
+div#footer-text {
+  float: left;
+  padding-bottom: 0.5em;
+}
+div#footer-badges {
+  float: right;
+  padding-bottom: 0.5em;
+}
+
+div#preamble,
+div.tableblock, div.imageblock, div.exampleblock, div.verseblock,
+div.quoteblock, div.literalblock, div.listingblock, div.sidebarblock,
+div.admonitionblock {
+  margin-right: 10%;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+div.admonitionblock {
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
+}
+
+div.content { /* Block element content. */
+  padding: 0;
+}
+
+/* Block element titles. */
+div.title, caption.title {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-weight: bold;
+  text-align: left;
+  margin-top: 1.0em;
+  margin-bottom: 0.5em;
+}
+div.title + * {
+  margin-top: 0;
+}
+
+td div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content + div.title {
+  margin-top: 0.0em;
+}
+
+div.sidebarblock > div.content {
+  background: #ffffee;
+  border: 1px solid silver;
+  padding: 0.5em;
+}
+
+div.listingblock {
+  margin-right: 0%;
+}
+div.listingblock > div.content {
+  border: 1px solid silver;
+  background: #f4f4f4;
+  padding: 0.5em;
+}
+
+div.quoteblock {
+  padding-left: 2.0em;
+}
+div.quoteblock > div.attribution {
+  padding-top: 0.5em;
+  text-align: right;
+}
+
+div.verseblock {
+  padding-left: 2.0em;
+}
+div.verseblock > div.content {
+  white-space: pre;
+}
+div.verseblock > div.attribution {
+  padding-top: 0.75em;
+  text-align: left;
+}
+/* DEPRECATED: Pre version 8.2.7 verse style literal block. */
+div.verseblock + div.attribution {
+  text-align: left;
+}
+
+div.admonitionblock .icon {
+  vertical-align: top;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-decoration: underline;
+  color: #527bbd;
+  padding-right: 0.5em;
+}
+div.admonitionblock td.content {
+  padding-left: 0.5em;
+  border-left: 2px solid silver;
+}
+
+div.exampleblock > div.content {
+  border-left: 2px solid silver;
+  padding: 0.5em;
+}
+
+div.imageblock div.content { padding-left: 0; }
+div.imageblock img { border: 1px solid silver; }
+span.image img { border-style: none; }
+
+dl {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+dt {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  font-style: normal;
+}
+dd > *:first-child {
+  margin-top: 0.1em;
+}
+
+ul, ol {
+    list-style-position: outside;
+}
+div.olist > ol {
+  list-style-type: decimal;
+}
+div.olist2 > ol {
+  list-style-type: lower-alpha;
+}
+
+div.tableblock > table {
+  border: 3px solid #527bbd;
+}
+thead {
+  font-family: sans-serif;
+  font-weight: bold;
+}
+tfoot {
+  font-weight: bold;
+}
+
+div.hlist {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+div.hlist td {
+  padding-bottom: 15px;
+}
+td.hlist1 {
+  vertical-align: top;
+  font-style: normal;
+  padding-right: 0.8em;
+}
+td.hlist2 {
+  vertical-align: top;
+}
+
+@media print {
+  div#footer-badges { display: none; }
+}
+
+div#toctitle {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-top: 1.0em;
+  margin-bottom: 0.1em;
+}
+
+div.toclevel1, div.toclevel2, div.toclevel3, div.toclevel4 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+div.toclevel2 {
+  margin-left: 2em;
+  font-size: 0.9em;
+}
+div.toclevel3 {
+  margin-left: 4em;
+  font-size: 0.9em;
+}
+div.toclevel4 {
+  margin-left: 6em;
+  font-size: 0.9em;
+}
+/* Workarounds for IE6's broken and incomplete CSS2. */
+
+div.sidebar-content {
+  background: #ffffee;
+  border: 1px solid silver;
+  padding: 0.5em;
+}
+div.sidebar-title, div.image-title {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-weight: bold;
+  margin-top: 0.0em;
+  margin-bottom: 0.5em;
+}
+
+div.listingblock div.content {
+  border: 1px solid silver;
+  background: #f4f4f4;
+  padding: 0.5em;
+}
+
+div.quoteblock-attribution {
+  padding-top: 0.5em;
+  text-align: right;
+}
+
+div.verseblock-content {
+  white-space: pre;
+}
+div.verseblock-attribution {
+  padding-top: 0.75em;
+  text-align: left;
+}
+
+div.exampleblock-content {
+  border-left: 2px solid silver;
+  padding-left: 0.5em;
+}
+
+/* IE6 sets dynamically generated links as visited. */
+div#toc a:visited { color: blue; }
+
+/* Because IE6 child selector is broken. */
+div.olist2 ol {
+  list-style-type: lower-alpha;
+}
+div.olist2 div.olist ol {
+  list-style-type: decimal;
+}
+</style>
+<script type="text/javascript">
+/*<![CDATA[*/
+window.onload = function(){generateToc(2)}
+/* Author: Mihai Bazon, September 2002
+ * http://students.infoiasi.ro/~mishoo
+ *
+ * Table Of Content generator
+ * Version: 0.4
+ *
+ * Feel free to use this script under the terms of the GNU General Public
+ * License, as long as you do not remove or alter this notice.
+ */
+
+ /* modified by Troy D. Hanson, September 2006. License: GPL */
+ /* modified by Stuart Rackham, October 2006. License: GPL */
+
+function getText(el) {
+  var text = "";
+  for (var i = el.firstChild; i != null; i = i.nextSibling) {
+    if (i.nodeType == 3 /* Node.TEXT_NODE */) // IE doesn't speak constants.
+      text += i.data;
+    else if (i.firstChild != null)
+      text += getText(i);
+  }
+  return text;
+}
+
+function TocEntry(el, text, toclevel) {
+  this.element = el;
+  this.text = text;
+  this.toclevel = toclevel;
+}
+
+function tocEntries(el, toclevels) {
+  var result = new Array;
+  var re = new RegExp('[hH]([2-'+(toclevels+1)+'])');
+  // Function that scans the DOM tree for header elements (the DOM2
+  // nodeIterator API would be a better technique but not supported by all
+  // browsers).
+  var iterate = function (el) {
+    for (var i = el.firstChild; i != null; i = i.nextSibling) {
+      if (i.nodeType == 1 /* Node.ELEMENT_NODE */) {
+        var mo = re.exec(i.tagName)
+        if (mo)
+          result[result.length] = new TocEntry(i, getText(i), mo[1]-1);
+        iterate(i);
+      }
+    }
+  }
+  iterate(el);
+  return result;
+}
+
+// This function does the work. toclevels = 1..4.
+function generateToc(toclevels) {
+  var toc = document.getElementById("toc");
+  var entries = tocEntries(document.getElementsByTagName("body")[0], toclevels);
+  for (var i = 0; i < entries.length; ++i) {
+    var entry = entries[i];
+    if (entry.element.id == "")
+      entry.element.id = "toc" + i;
+    var a = document.createElement("a");
+    a.href = "#" + entry.element.id;
+    a.appendChild(document.createTextNode(entry.text));
+    var div = document.createElement("div");
+    div.appendChild(a);
+    div.className = "toclevel" + entry.toclevel;
+    toc.appendChild(div);
+  }
+  if (entries.length == 0)
+    document.getElementById("header").removeChild(toc);
+}
+/*]]>*/
+</script>
+<title>Nquire discovery protocol</title>
+</head>
+<body>
+<div id="header">
+<h1>Nquire discovery protocol</h1>
+<span id="author">Maarten van Dootingh</span><br />
+<span id="email"><tt>&lt;<a href="mailto:maarten@vdtai.nl">maarten@vdtai.nl</a>&gt;</tt></span><br />
+<div id="toc">
+  <div id="toctitle">Table of Contents</div>
+  <noscript><p><b>JavaScript must be enabled in your browser to display the table of contents.</b></p></noscript>
+</div>
+</div>
+<div id="preamble">
+<div class="sectionbody">
+<div class="para"><p>Revision history</p></div>
+<div class="tableblock">
+<table rules="none"
+frame="hsides"
+cellspacing="0" cellpadding="4">
+<col width="91" />
+<col width="274" />
+<col width="708" />
+<tbody valign="top">
+  <tr>
+    <td align="left">
+    v1.0
+    </td>
+    <td align="left">
+    December 21 2009
+    </td>
+    <td align="left">
+    Conversion from hand-written html
+    </td>
+  </tr>
+</tbody>
+</table>
+</div>
+<div class="para"><p>This document describes &#8230;</p></div>
+</div>
+</div>
+<h2 id="_introduction">1. Introduction</h2>
+<div class="sectionbody">
+<div class="para"><p>The Nquire discovery protocol can be used to discover all Nquire devices in a network.</p></div>
+<div class="para"><p>Another function is the get information about the available Nquires.</p></div>
+</div>
+<h2 id="_protocol_description">2. Protocol description</h2>
+<div class="sectionbody">
+<div class="para"><p>The protocol is fairly simplistic:</p></div>
+<div class="para"><p>The server has to send an UDP packet to the discovery port (19200) of the Nquire
+(using broadcasting on 239.255.255.250 or the actual address of the nquire),
+containing the following text:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>CIT-DISCOVER-REQUEST
+Version: 1</tt></pre>
+</div></div>
+<div class="para"><p>In which:</p></div>
+<div class="ilist"><ul>
+<li>
 <p>
-	In which:
-	<ul>
-		<li>
-			Line breaks can be '\n' (0x0d) or '\n\r' (0x0d0a) or '\r\n'
-		</li>
-		<li>
-			The first line is a discovery packet identifier. It should
-			contain: <code>CIT-DISCOVER-REQUEST</code>
-			(cit stands for 'customer information terminal').<br>
-		</li>
-		<li>
-			The second line is the version of the discovery protocol 
-			(so this is not the version of the application!)
-			It begins with the "<code>Version:</code>" string (case sensitive, no space 
-			between "<code>Version</code>" and "<code>:</code>"), followed by exactly 1
-			space charracter and the version number "<cod>1</code>".
-			From application version 1.3 on, the protocol is somewhat relaxed: there can 
-			be a number of spaces and/or tabs between the ":" and the version number. 
-		</li>
-	</ul>
+Line breaks can be <em>\n</em> (0x0d) or <em>\n\r</em> (0x0d0a) or <em>\r\n</em>
 </p>
-<p>	From application version 1.3, the discovery protocol is extended with
-	an optional line containing: <code>RESPONSE-TO-SENDER-PORT</code><br>
-	When this option is used, the response is not broadcasted using the 
-	discovery port but broadcasted using the port on which the 
-	<code>CIT-DISCOVER-REQUEST</code> packet was send.<br>
-	The protocol version is not increased because this addition is of no
-	consequence when not used.
-</p>
-<p>	All	Nquires receiving the packet and implementing the sent version will
-	respond by broadcasting an UDP packet to <code>239.255.255.250</code>
-	port <code>19200</code> or, when <code>RESPONSE-TO-SENDER-PORT</code> is 
-	used, to the sender port of the <code>CIT-DISCOVER-REQUEST</code> packet.
-	The packet will have the following format (BNF):<br>
-</p>
-<p>	<code>
-		file ::= "CIT-DISCOVER-RESPONSE" EOL &lt;idvalues&gt;<br>
-		idvalues ::= &lt;idvalue&gt; EOL &lt;idvalues&gt; | &lt;idvalue&gt; EOF<br>
-		idvalue ::= &lt;identifier&gt; ":" SPACE &lt;value&gt;<br>
-		SPACE ::= "" | " " SPACE | TAB SPACE
-		identifier ::= [printable asci not ':']
-	</code>
-</p>
+</li>
+<li>
 <p>
-Version 1 of the Nquire discovery protocol will send the following 
-packet header and identifier-value pairs (values are an example):
+The first line is a discovery packet identifier. It should
+        contain: <tt>CIT-DISCOVER-REQUEST</tt>
+        (cit stands for <em>customer information terminal</em>).
 </p>
-<p>	<code>
-		CIT-DISCOVER-RESPONSE<br>		Device name: Newland NQuire 200<br>		Application version: 1.2<br>		Application build nr: 456<br>		Serial number: EI0123456RW<br>		IP-Address: 192.168.1.226<br>		MAC-Address: 08:00:46:31:60:95<br>
-	</code>
-</p><p>	Note 1: The protocol for a certain version will not change. Any
-	change with a consequence for usage of the existing protocol version will
-	result in an increased version number in the
-	<code>CIT-DISCOVER-REQUEST</code> packet.
+</li>
+<li>
+<p>
+The second line is the version of the discovery protocol
+        (so this is not the version of the application!)
+        It begins with the "<tt>Version:</tt>" string (case sensitive, no space
+        between "<tt>Version</tt>" and "<tt>:</tt>"), followed by exactly 1
+        space charracter and the version number "<tt>1</tt>".
+        From application version 1.3 on, the protocol is somewhat relaxed: there can
+        be a number of spaces and/or tabs between the ":" and the version number.
 </p>
-<p>	Note 2: The rational behind using broadcasting is to be able to discover 
-	Nquires configured for a different subnet as the server sending the 
-	discovery packet.
+</li>
+</ul></div>
+<div class="para"><p>From application version 1.3, the discovery protocol is extended with
+an optional line containing: <tt>RESPONSE-TO-SENDER-PORT</tt>.</p></div>
+<div class="para"><p>When this option is used, the response is not broadcasted using the
+discovery port but broadcasted using the port on which the
+`CIT-DISCOVER-REQUEST `packet was send.</p></div>
+<div class="para"><p>The protocol version is not increased because this addition is of no
+consequence when not used.</p></div>
+<div class="para"><p>All     Nquires receiving the packet and implementing the sent version will
+respond by broadcasting an UDP packet to <tt>239.255.255.250</tt>
+port `19200 `or, when `RESPONSE-TO-SENDER-PORT `is
+used, to the sender port of the `CIT-DISCOVER-REQUEST `packet.
+The packet will have the following format (BNF):</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>file ::= "CIT-DISCOVER-RESPONSE" EOL &lt;idvalues&gt;
+idvalues ::= &lt;idvalue&gt; EOL &lt;idvalues&gt; | &lt;idvalue&gt; EOF
+idvalue ::= &lt;identifier&gt; ":" SPACE &lt;value&gt;
+SPACE ::= "" | " " SPACE | TAB SPACE
+identifier ::= [printable asci not ':']</tt></pre>
+</div></div>
+<div class="para"><p>Version 1 of the Nquire discovery protocol will send the following
+packet header and identifier-value pairs (values are an example):</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>CIT-DISCOVER-RESPONSE
+Device name: Newland NQuire 200
+Application version: 1.2
+Application build nr: 456
+Serial number: EI0123456RW
+IP-Address: 192.168.1.226
+MAC-Address: 08:00:46:31:60:95</tt></pre>
+</div></div>
+<div class="ilist"><ul>
+<li>
+<p>
+Note 1: The protocol for a certain version will not change. Any
+        change with a consequence for usage of the existing protocol version will
+        result in an increased version number in the
+        `CIT-DISCOVER-REQUEST `packet.
 </p>
-</BODY>
-</HTML>
+</li>
+<li>
+<p>
+Note 2: The rational behind using broadcasting is to be able to discover
+        Nquires configured for a different subnet as the server sending the
+        discovery packet.
+</p>
+</li>
+</ul></div>
+</div>
+<div id="footer">
+<div id="footer-text">
+Last updated 2009-12-21 21:26:44 CEST
+</div>
+</div>
+</body>
+</html>

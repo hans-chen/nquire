@@ -142,6 +142,9 @@ if mac == "00:05:f4:11:22:33" then
 	logf(LG_WRN,lgid, "Problematical mac-address detected (00:05:f4:11:22:33). Contact the heldpdesk.")
 end
 
+-- beeper should be opened BEFORE display and other device allocations!
+beeper = Beeper.new()
+
 -- Open all peripherals
 
 logf(LG_INF,lgid,"Open all periferals")
@@ -182,8 +185,6 @@ webserver:start()
 -- Create web interface CGI
 
 webui = Webui:new( )
-
-beeper = Beeper.new()
 
 -- Setup network
 network = Network:new()

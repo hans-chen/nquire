@@ -44,7 +44,7 @@ prefixes = {
    { name = "ISBN",               prefix_2d = "?", prefix_1d = "B", prefix_out = "B"  },
    { name = "Code-11",            prefix_2d = "?", prefix_1d = "z", prefix_out = "Z"  },
    { name = "2_5-Matrix",         prefix_2d = "?", prefix_1d = "v", prefix_out = "v"  },
-   { name = "ITF14",              prefix_2d = "?", prefix_1d = "q", prefix_out = "q"  },
+   { name = "ITF14",              prefix_2d = "q", prefix_1d = "q", prefix_out = "q"  },
    { name = "MSI-Plessey",        prefix_2d = "?", prefix_1d = "m", prefix_out = "m"  },
 
 	{ name = "Plessey",            prefix_2d = "?", prefix_1d = "p", prefix_out = "n"  },

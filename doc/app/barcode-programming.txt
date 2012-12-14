@@ -1,0 +1,71 @@
+= Barcode programming =
+Maarten van Dootingh <maarten@vdtai.nl>
+
+Revision history
+
+`-------`-----------------------`-------------------------------------------------------------
+v1.0 	December 21 2009	Conversion from hand-written html
+----------------------------------------------------------------------------------------------
+
+== Barcode programming== 
+
+=== Introduction ===
+
+Barcode programming can be used for changing settings in the Nquire.
+
+Simply put a line or multiple lines of cit.conf in a barcode and use
+the programming mode of the nquire to make those settings.
+The barcode has to be a DataMatrix, QR Code or Code128 (of course it is not 
+possible to put much settings in a Code 128 barcode).
+For security reasons it is possible to enable a 'security' barcode that has to 
+be scanned when a barcode is used to change settings of the Nquire. This has to 
+be enabled in the webui, or by a programming barcode.
+There is a configurable timeout on the programming mode. After this timeout the 
+scanner will resume normal scanning mode.
+
+Upon reading incorrect codes the nquire will sound the error beep and resume 
+normal programming mode.
+
+After successful programming the nquire will resume normal programming mode.
+*This however does not mean that execution of the settings were successfull!*
+For instance: setting the Nquire to dhcp or grps takes some time and can fail,
+just like it can fail during power-on of the nquire.
+
+=== Codes ===
+
+The following barcodes are used to control the programming state of the enquire:
+
+==== Enter programming mode ====
+
+image:img/enter_programming_mode.png[Enter programming mode]
+
+The display will show:
+
+----
+Programming
+----
+
+==== Exit programming mode ====
+
+image:img/exit_programming_mode.png[exit programming mode]
+
+The display will show the configured welcome text.
+
+==== Anounce settings ====
+
+image:img/anounce_settings.png
+
+The display will show:
+----
+programming
+scan settings
+----
+
+=== Some usefull examples === 
+image:img/set_dhcp_false.png[dhcp=false]
+image:img/set_dhcp_true.png[dhcp=true]
+image:img/set_interface_ethernet.png[ethernet]
+image:img/set_interface_wifi.png[wifi]
+image:img/set_interface_gprs.png[gprs]
+
+

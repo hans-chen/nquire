@@ -1,0 +1,26 @@
+= Introduction =
+Maarten van Dootingh <maarten@vdtai.nl>
+
+Revision history
+
+`-------`-----------------------`-------------------------------------------------------------
+v1.0 	Dec 21 2009	            Conversion from hand-written html
+----------------------------------------------------------------------------------------------
+
+These pages are the application documention of the nquire.
+
+These pages are written in asciidoc format (see http://www.methods.co.nz/asciidoc/userguide.html)
+Html or pdf code is generated from that.
+
+== Targets ==
+
+This documentation *should* be minimal but complete (but it is not complete): 
+
+ - self explanatore code is prefered
+ - function headers and file headers are prfered when that documentation does 
+   not surpass the scope of that file.
+ - everything else worth noting is or should be described here.
+
+NOTE: only version specific information concerting the application should be
+ documented here. Things that are not version specific should be documented in
+ trac (https://server.mbarc.nl/newland/nquire/trac).

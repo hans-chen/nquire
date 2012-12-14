@@ -2,6 +2,30 @@
 
 require "net"
 require "sys"
+require "misc"
+require "cit-codepages"
+
+local FONT_SMALL = string.char(27, 0x42, 0x30)
+local FONT_LARGE = string.char(27, 0x42, 0x31)
+local CLS = string.char(27, 0x24)
+local EOS = string.char(0x03)
+
+local ALIGN = { 
+	lt = string.char(27, 0x2e, 0x30), 
+	ct = string.char(27, 0x2e, 0x31), 
+	rt = string.char(27, 0x2e, 0x32), 
+	lm = string.char(27, 0x2e, 0x33), 
+	cm = string.char(27, 0x2e, 0x34), 
+	rm = string.char(27, 0x2e, 0x35), 
+	lb = string.char(27, 0x2e, 0x36), 
+	cb = string.char(27, 0x2e, 0x37), 
+	rb = string.char(27, 0x2e, 0x38), 
+	l  = string.char(27, 0x2e, 0x39), 
+	c  = string.char(27, 0x2e, 0x3a), 
+	r  = string.char(27, 0x2e, 0x3b), 
+	t  = string.char(27, 0x2e, 0x3c), 
+	m  = string.char(27, 0x2e, 0x3d), 
+	b  = string.char(27, 0x2e, 0x3e) } 
 
 local db = {
 	["F4002432308552"] = { name = "Leitz multomap", 		price = 2.99 },
@@ -10,6 +34,17 @@ local db = {
 	["F8710537703375"] = { name = "Davitamon\nVitamine D",		price = 7.95 },
 	["FF50110100"]     = { name = "Rexona\nMen Quantum",		price = 3.49 },
 	["?8590379825"]    = { name = "Programming \nin LUA",       price = 42 },
+
+-- codes from the barcode testing booklet:
+	["#45612348973"]   = { name = "CODE 128", price = 128 },
+	["P0591-83979222"] = { name = "UUC/EAN-128", price = 1.28 },
+	
+-- special formatted return strings (with 
+	["**83979208*"]    = { name = "code 39", out = CLS .. FONT_SMALL .. ALIGN.ct .. "CODE 39\nblabla\nblabla\nblablabla\nblablablabla" .. EOS },
+	
+	["cNewland"]       = { name = "code 93", out = CLS .. 
+							FONT_LARGE .. ALIGN.ct .. "CODE 93 (middle)" .. EOS ..
+							FONT_SMALL .. ALIGN.cb .. "bottom\nbuiten beeld" .. EOS }
 }
 
 local s = net.socket("tcp")
@@ -23,11 +58,11 @@ while true do
 		if barcode then
 			barcode = barcode:gsub("[\r\n]", "")
 		end
-		print("Barcode: %s\n", barcode )
+		print("Barcode: " .. barcode .. "\n" )
 	
 		out = ""
 		local info = db[barcode]
-		if info then
+		if info and info.name and info.price then
 			out = out .. string.char(27, 0x42, 0x31)	-- select font
 			out = out .. string.char(27, 0x24)		-- Clear screen
 			out = out .. info.name
@@ -36,6 +71,8 @@ while true do
 			out = out .. string.char(0xe2, 0x82, 0xac)	-- euro sign
 			out = out .. string.format("%.2f", info.price)	-- show price
 			out = out .. string.char(0x03)
+		elseif info and info.name and info.out then
+			out = info.out
 		else
 			out = out .. string.char(27, 0x24)		-- Clear screen
 			out = out .. "Unknown product" .. string.char(0x03)
@@ -43,7 +80,7 @@ while true do
 
 		net.send(s, out)
 		local f = io.popen("hd", "w")
-		f:write(out)
+		f:write(to_utf8(out))
 		f:close()
 	end
 end

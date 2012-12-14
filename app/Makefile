@@ -4,7 +4,7 @@
 
 NAME    := cit-app
 BUILD   := $(shell svnversion . | cut -d : -f 2)
-VERSION	:= 1.3
+VERSION	:= 1.3.1
 
 ###########################################################################
 # Modules 

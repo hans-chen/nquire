@@ -39,10 +39,10 @@ TOOLS_PACK			:=	$(PATH_TOOLS)/host_pack_tar.sh
 ##################################################################
 #	image version					    <------	config them
 ##################################################################
-VERSION_APP		:= 1.3
-VERSION_ROOTFS		:= 1.0
+VERSION_APP		:= 1.3.1
+VERSION_ROOTFS		:= 1.1
 VERSION_KERNEL		:= 2.6.27.2
-VERSION_FIRMWARE	:= 1.2
+VERSION_FIRMWARE	:= 1.3.1
 VERSION_LOGO		:= 1.0
 VERSION_EM2027_KRL	:= 3.05.024
 VERSION_EM2027_APP	:= 3.01.013

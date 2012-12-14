@@ -1,0 +1,84 @@
+= Nquire discovery protocol =
+Maarten van Dootingh <maarten@vdtai.nl>
+
+Revision history
+
+`-------`-----------------------`-------------------------------------------------------------
+v1.0 	December 21 2009	Conversion from hand-written html
+----------------------------------------------------------------------------------------------
+
+This document describes ...
+
+== Introduction ==
+
+The Nquire discovery protocol can be used to discover all Nquire devices in a network.
+
+Another function is the get information about the available Nquires.
+
+== Protocol description ==
+
+The protocol is fairly simplistic:
+
+The server has to send an UDP packet to the discovery port (19200) of the Nquire
+(using broadcasting on 239.255.255.250 or the actual address of the nquire), 
+containing the following text:
+
+----
+CIT-DISCOVER-REQUEST
+Version: 1
+----
+
+In which:
+
+ -	Line breaks can be '\n' (0x0d) or '\n\r' (0x0d0a) or '\r\n'
+ -	The first line is a discovery packet identifier. It should
+	contain: `CIT-DISCOVER-REQUEST`
+	(cit stands for 'customer information terminal').
+ -	The second line is the version of the discovery protocol 
+	(so this is not the version of the application!)
+	It begins with the "`Version:`" string (case sensitive, no space 
+	between "`Version`" and "`:`"), followed by exactly 1
+	space charracter and the version number "`1`".
+	From application version 1.3 on, the protocol is somewhat relaxed: there can 
+	be a number of spaces and/or tabs between the ":" and the version number. 
+
+From application version 1.3, the discovery protocol is extended with
+an optional line containing: `RESPONSE-TO-SENDER-PORT`.
+
+When this option is used, the response is not broadcasted using the 
+discovery port but broadcasted using the port on which the 
+`CIT-DISCOVER-REQUEST `packet was send.
+
+The protocol version is not increased because this addition is of no
+consequence when not used.
+
+All	Nquires receiving the packet and implementing the sent version will
+respond by broadcasting an UDP packet to `239.255.255.250`
+port `19200 `or, when `RESPONSE-TO-SENDER-PORT `is 
+used, to the sender port of the `CIT-DISCOVER-REQUEST `packet.
+The packet will have the following format (BNF):
+
+----
+file ::= "CIT-DISCOVER-RESPONSE" EOL <idvalues>
+idvalues ::= <idvalue> EOL <idvalues> | <idvalue> EOF
+idvalue ::= <identifier> ":" SPACE <value>
+SPACE ::= "" | " " SPACE | TAB SPACE
+identifier ::= [printable asci not ':']
+----
+
+Version 1 of the Nquire discovery protocol will send the following 
+packet header and identifier-value pairs (values are an example):
+
+----
+CIT-DISCOVER-RESPONSEDevice name: Newland NQuire 200Application version: 1.2Application build nr: 456Serial number: EI0123456RWIP-Address: 192.168.1.226MAC-Address: 08:00:46:31:60:95
+----
+
+ -	Note 1: The protocol for a certain version will not change. Any
+	change with a consequence for usage of the existing protocol version will
+	result in an increased version number in the
+	`CIT-DISCOVER-REQUEST `packet.
+
+ -	Note 2: The rational behind using broadcasting is to be able to discover 
+	Nquires configured for a different subnet as the server sending the 
+	discovery packet.
+

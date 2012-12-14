@@ -9,6 +9,19 @@ TCP_PORT=9101
 
 test_1()
 {
+    cat 1>&2 << !EOF!
+Testing normal operation, left aligned
+Required: utf8
+The display should show:
+------------------------
+Mineral water
+1 lt
+
+
+
+                  € 0.98
+------------------------
+!EOF!
 	echo -en "\e\x42\x30"				# Font size 0
 	echo -en "\e\x24"					# Clear screen
 	echo -en "Mineral water"			# Text
@@ -20,17 +33,43 @@ test_1()
 
 test_2()
 {
+    cat 1>&2 << !EOF!
+Testing normal operation, centered aligned
+Required: imb852
+The display should show ("Special offer" in font big):
+------------------------
+   Coca Cola 0.33Ltr
+     € 2.69 (Crate)
+     
+     
+     
+     Special Offer!
+------------------------
+!EOF!
 	echo -en "\e\x42\x30"						# Font size 0
 	echo -en "\e\x24"							# Clear the screen
 	echo -en "\e\x2e\x31Coca Cola 0.33Ltr\x03" 	# Text center - top
 	echo -en "\e\x2c\x30\x45"					# Set pixel position (0,21)
-	echo -en "\e\x2e\x3a\x802.69 (Crate)\x03"	# Align text to horizontal center
+	echo -en "\e\x2e\x3a\x80 2.69 (Crate)\x03"	# Align text to horizontal center
 	echo -en "\e\x42\x31"						# Font size 1
 	echo -en "\e\x2e\x37Special Offer !\x03"	# Text bottom center
 }
 
 test_3()
 {
+    cat 1>&2 << !EOF!
+Testing alignment
+------------------------
+lt         ct    xt   rt
+
+ly Y       cy         ry
+
+lm         cm    xm   rm
+
+                 X
+lb         cb    xb   rb
+------------------------
+!EOF!
 	echo -en "\e\x42\x30"				# Set font
 	echo -en "\e\x25"					# Clear display
 	echo -en "\e\x2e\x30lt\x03" 		# Left top
@@ -60,6 +99,13 @@ test_3()
 
 test_4()
 {
+    cat 1>&2 << !EOF!
+Testing utf8 euro sign
+Required: utf8
+------------------------
+€
+------------------------
+!EOF!
 	echo -en "\e\x42\x30"					# Set font
 	echo -en "\e\x25"						# Clear display
 	echo -en "\e\x2e\x30\xe2\x82\xac\x03"	# Left top € sign = \xe2\x82\xac
@@ -67,7 +113,12 @@ test_4()
 
 test_5()
 {
-	echo -en "\e\xffA1234\x03"					# Fake barcode scan
+    cat 1>&2 << !EOF!
+Testing fake barcode scan
+The display should should the error message (please ask for assistance)
+And the received parcode should be "A1234" == 
+!EOF!
+	echo -en "\e\xffA1234\x03"				# Fake barcode scan
 }
 
 test_6()
@@ -107,32 +158,55 @@ test_7()
 
 test_8()
 {
+    cat 1>&2 << !EOF!
+Disabling scanner. Verify whether the scanner is disabled
+!EOF!
 	echo -en "\e\x5b\x30"				# Scanner disable
 }
 
 test_9()
 {
+    cat 1>&2 << !EOF!
+Enable scanner. Verify whether the scanner is enabled
+!EOF!
 	echo -en "\e\x5b\x31"				# Scanner enable
 }
 
 test_10()
 {
+    cat 1>&2 << !EOF!
+Show config.
+Verify: 
+	serial number
+	application version
+	ip-address
+	used interface
+	mac address
+!EOF!
 	echo -en "\e\xfe"					# Show config
 }
 
 test_11()
 {
+    cat 1>&2 << !EOF!
+Check operation with sloppy formatting 
+(not closing a string with \x03)
+!EOF!
 	# test sloppy formatting without end of string (=\x03) chars
 	echo -en "\e\x42\x30"				# Font size 0
 	echo -en "\e\x24"					# Clear screen
 	echo -en "\e\x27\x35\x32"			# set cursor (not pixel!) position
 	echo -en "One of 2"
 	echo -en "\e\x27\x35\x33"			# set cursor position
-	echo -en "Two of 2"					# Text
+	echo -en "Two of 2\x03"				# Text
 }
 
 test_12()
 {
+    cat 1>&2 << !EOF!
+Play a beep
+!EOF!
+
 	echo -en "\e\x5e"					# Beep
 }
 
@@ -148,42 +222,71 @@ test_13 ()
 	# Peripheral power(usb,wifi,2027,GPRS,lcd-backlight)	PID1  --> PC7 (offset:18)
 	#											High level enable ;	Low level disable
 
+    cat 1>&2 << !EOF!
+Set gpio 0 low
+!EOF!
+	
 	echo -en "\e\x7e00"			# GPIO 0 low
 }
 
 
 test_14 ()
 {
+    cat 1>&2 << !EOF!
+Set gpio 0 high
+!EOF!
 	echo -en "\e\x7e01"			# GPIO 0 high
 }
 
 test_15 ()
 {
+    cat 1>&2 << !EOF!
+Set gpio 1 low
+!EOF!
 	echo -en "\e\x7e10"			# GPIO 1 low
 }
 
 test_16 ()
 {
+    cat 1>&2 << !EOF!
+Set gpio 1 high
+!EOF!
 	echo -en "\e\x7e11"			# GPIO 1 high
 }
 
 test_17 ()
 {
+    cat 1>&2 << !EOF!
+Set scanner in sleep mode (should only works with scanners
+from production batch 1 and than only when using the ethernet interface)
+!EOF!
+
 	echo -en "\e\x5d\x30"               # scanner sleep
 }
 
 test_18 ()
 {
+    cat 1>&2 << !EOF!
+Wake up scanner from sleep mode
+!EOF!
 	echo -en "\e\x5d\x31"               # scanner wake up
 }
 
 test_19 ()
 {
+    cat 1>&2 << !EOF!
+return the firmware version, SG15 format.
+Expect: "SG15V01.03" ==
+!EOF!
+
 	echo -en "\e\x60"                   # SG15 firmware version
 }
 
 test_20 ()
 {
+    cat 1>&2 << !EOF!
+!EOF!
+
 	echo -en "\e\x42\x30"
 	echo -en "\e\x25"
 	echo -en "Cheese\n"
@@ -195,6 +298,10 @@ test_20 ()
 
 test_21 ()
 {
+    cat 1>&2 << !EOF!
+Test right bottom alignement for chinese charracters
+Required: utf8
+!EOF!
 	echo -en "\e\x25"
 	echo -en "\e\x2e\x38" # right bottom
 	echo -en "欢迎光临\x03"
@@ -202,6 +309,10 @@ test_21 ()
 
 test_22 ()
 {
+    cat 1>&2 << !EOF!
+Test small and big chinese font
+Required: utf8
+!EOF!
 	echo -en "\e\x42\x30" # font size small
 	echo -en "\e\x25"     # clear screen
 	echo -en "汽水\n500ml"
@@ -212,21 +323,128 @@ test_22 ()
 
 test_23 ()
 {
+    cat 1>&2 << !EOF!
+Test use of line break in line with centered alignment and long text
+Expect on display:
+------------------------------
+        Line 1 part 1
+  blabla line1 part 2 blabla
+  
+  
+  
+------------------------------
+!EOF!
+
 	echo -en "\e\x25"     # clear screen
 	echo -en "\e\x42\x30" # font size small
-	echo -en "\e\x2e\x30Line1 part 1,cr\nline1 part 2\x03" 		# Left top
+	echo -en "\e\x2e\x31Line1 part 1\nblabla line1 part 2 blabla\x03" 		# Center top
 }
 
 test_24 ()
 {
-	echo -en "\e\x25" 				# clear screen
-	echo -en "\e\x27\x30\x31"		# set cursor position 0 , line 1
-	echo -en "Pos=3,1\x03"			# some text 
-	echo -en "\e\x2e\x3bRight\x03"	# Align text to horizontal right, keep line
+    cat 1>&2 << !EOF!
+Test use of line break in text
+Just positioning on 10,21 px
+Expect on display:
+------------------------------
+
+   Line 1 part 1
+   line 1 part 2
+  
+  
+  
+------------------------------
+!EOF!
+
+	echo -en "\e\x25"     # clear screen
+	echo -en "\e\x42\x30" # font size small
+	echo -en "\e\x2c\x3a\x45"					# Set pixel position (10,21)
+	echo -en "Line1 part 1\nline1 part 2\x03"
 }
 
 test_25 ()
 {
+    cat 1>&2 << !EOF!
+Test use of line break in text
+Just positioning 4,2 (char pos)
+------------------------------
+
+
+    Line 1 part 1
+    line 1 part 2
+
+  
+------------------------------
+!EOF!
+
+	echo -en "\e\x25"     # clear screen
+	echo -en "\e\x42\x30" # font size small
+	echo -en "\e\x27\x34\x32"					# Set cursor position 4,2
+	echo -en "Line1 part 1\nline1 part 2\x03"
+}
+
+test_26 ()
+{
+    cat 1>&2 << !EOF!
+Test use of line break in text with alignments
+Expect on display:
+------------------------
+lt         ct         rt
+lt2       ct02       rt2
+
+lm         cm         rm
+lm2       cm02       rm2
+                 
+lb         cb         rb
+lb2       cb02       rb2
+------------------------
+!EOF!
+	echo -en "\e\x42\x30"				# Set font
+	echo -en "\e\x25"					# Clear display
+	echo -en "\e\x2e\x30lt1\nlt2\x03" 		# Left top
+	echo -en "\e\x2e\x31ct\nct02\x03" 		# Centre top
+	echo -en "\e\x2e\x32rt\nrt2\x03" 		# Right top
+	echo -en "\e\x2e\x33lm\nlm2\x03" 		# left middle
+	echo -en "\e\x2e\x34cm\ncm02\x03" 		# Centre middle
+	echo -en "\e\x2e\x35rm\nrm2\x03" 		# Right middle
+	echo -en "\e\x2e\x36lb\nlb2\x03" 		# Left bottom
+	echo -en "\e\x2e\x37cb\ncb02\x03" 		# Centre bottom
+	echo -en "\e\x2e\x38rb\nrb2\x03" 		# Right bottom
+}
+
+test_27 ()
+{
+    cat 1>&2 << !EOF!
+Test use of line break in text with alignments
+Expect on display:
+------------------------
+tbd
+------------------------
+!EOF!
+	echo -en "\e\x42\x30"				# Set font
+	echo -en "\e\x25"					# Clear display
+	echo -en "\e\x2c\xd0\x82X\x03"		# Write x at (
+	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2e\x3cxt\nxt2\x03" 	# Left keep x
+	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2e\x3dxm\nxm2\x03" 	# Centre keep x
+	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2e\x3exb\nxb2\x03" 	# right keep x
+
+	echo -en "\e\x2c\x44\x44Y\x03"		# Write Y at (20,20)
+	echo -en "\e\x2c\x44\x44"			# Set pixel position (20,20)
+	echo -en "\e\x2e\x39ly\nly2\x03" 	# Left keep y
+	echo -en "\e\x2e\x3Acy\ncy2\x03" 	# Centre keep y
+	echo -en "\e\x2e\x3Bry\nry2\x03" 	# right keep y
+}
+
+
+
+test_28 ()
+{
+    cat 1>&2 << !EOF!
+Test custom font size (very small and VERY BIG)
+!EOF!
 	echo -en "\e\x25" 				# clear screen
 	echo -en "\e\x42\x32custom 32H\n\x03" # 6pt
 	echo -en "\e\x42\x4040H\x03" # 96pt
@@ -261,7 +479,10 @@ then
 	echo "22           small and big chinese"
 	echo "23           newline in line"
 	echo "24           right align with same y"
-	echo "25           alternative font sizes"
+	echo "25           alignment tests"
+	echo "26           alignment tests"
+	echo "27           alignment tests"
+	echo "28           alternative font sizes"
 
 	exit
 
