@@ -46,12 +46,14 @@ end
 
 --
 -- Set value on node and trigger set-watches if value changed
--- when now==true, the watch functions will be called immediately, otherwise
--- that will be queued and handled during the next node_set_watch event
+-- when now==true, the watch functions will be called immediately (or with node:set_immediate()==true,
+-- otherwise that will be queued and handled during the next node_set_watch event
+-- no observers will be notified when nowatch==true
+-- the observers will not be notified when nowatch~=nil (only meant for innitial database loading)
+-- return: true = node is set to new value
+--         false = node value did not change (either error or value did not change)
 --
-local function set(node, value, now)
-
-	logf(LG_DBG,lgid,"Setting node %s", node:full_id())
+local function set(node, value, now, nowatch)
 
 	if node:is_readonly() then
 		logf(LG_DBG,lgid,"Setting config item rejected because it is a read-only node")
@@ -65,13 +67,14 @@ local function set(node, value, now)
 			or node.type ~= "custom" and type_check(node.type, node.range, value) 
 				and ( node.match == nil or value:match(node.match) ) then
 		if node.value ~= value then
+			logf(LG_DBG,lgid,"Setting node %s", node:full_id())
 			node.value = value
 			if node.cache then
 				node.cache_until = sys.hirestime() + node.cache
 			end
-			if node.set_watch_list then
+			if nowatch~=true and node.set_watch_list then
 				for _, watch in ipairs(node.set_watch_list) do
-					if now then
+					if now or node:watch_immediate() then
 						watch.fn(watch.node, watch.fndata)
 					else
 						watch.callcount = watch.callcount + 1
@@ -79,15 +82,20 @@ local function set(node, value, now)
 					end
 				end
 			end
+			return true
+		else
+			logf(LG_DMP,lgid,"Not setting node %s because value did not change", node:full_id())
+			return false
 		end
-		return true
 	else
+		logf(LG_WRN,lgid,"Range check failed for node %s", node:full_id())
 		return false
 	end
 end
 
--- Set raw, do not call watches
-
+--
+-- Set raw, don't check the value and do not call watches
+--
 local function setraw(node, value)
 	node.value = value
 end
@@ -261,7 +269,7 @@ end
 --
 -- Shortcuts to query node mode
 --
-
+local function watch_immediate(node) if node.mode then return node.mode:find("i") else return false end end
 local function is_readable(node)   if node.mode then return node.mode:find("r") else return true end end
 local function is_readonly(node)   if node.mode then return node.mode:find("r") and not node.mode:find("w") else return false end end
 local function is_writable(node)   if node.mode then return node.mode:find("w") else return true end end
@@ -286,6 +294,7 @@ local node_meta = {
 		add_child = add_child,
 		add_watch = add_watch,
 		lookup = lookup,
+		watch_immediate = watch_immediate,
 		is_visible = is_visible,
 		is_readable = is_readable,
 		is_readonly = is_readonly,

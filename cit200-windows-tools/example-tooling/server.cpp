@@ -84,7 +84,7 @@ void show_help()
 		<< "                  looking for files formats.ini and barcodes.ini" << endl
 		<< "   -log=file      write logging to 'file' instead of 'nquire-server.log'" << endl
 		<< "                  use '-log=-' for logging to the screen" << endl
-		<< "   -l=n           [3] log-level (1=fatal, 2=warning, 3=info, 4=debug, 5=dump" << endl
+		<< "   -v=n           log verbosity: 3=info (default), 4=debug, 5=dump" << endl
 		<< endl;
 }
 
@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 	int port=DEFAULT_PORT;
 	string db_dir(".");
 
-	set_log_file( "nquire-server.log" );
+	std::string logfile = "nquire-server.log";
 
 	// interprete commandline
 	for(int i=1; i<argc; i++)
@@ -138,10 +138,9 @@ int main(int argc, char *argv[])
 		}
 		else if( opt.compare(0,5,"-log=")==0 )
 		{
-			string logfile = opt.substr(5);
-			set_log_file( logfile );
+			logfile = opt.substr(5);
 		}
-		else if ( opt.compare(0,3,"-l=")==0 )
+		else if ( opt.compare(0,3,"-v=")==0 )
 		{
 			set_log_level( atoi(opt.substr(3).c_str()) );
 		}
@@ -153,8 +152,12 @@ int main(int argc, char *argv[])
 		}
 	}
 
+
 	std::vector<string> my_addresses = get_local_ip_addresses();
 
+	set_log_file( logfile );
+	if (logfile != "-")
+		cout << "Logging to " << logfile << endl;
 	LOG_INF( "Using database directory " << db_dir );
 	LOG_INF( "Using UDP port " << port );
 

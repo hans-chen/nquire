@@ -53,7 +53,7 @@ for CIT in $nquire_ips; do
 				echo "$f to img/$f"
 				curl ftp://$CIT/img/ --upload-file "$f"
 			elif [[ "$f" =~ .*ttf$ ]]; then
-				echo "$f to img/$f"
+				echo "$f to fonts/$f"
 				curl ftp://$CIT/fonts/ --upload-file "$f"
 			else		
 				echo "$f"

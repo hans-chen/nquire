@@ -137,22 +137,22 @@ function test_image_clipping_for_image_too_big()
 end
 
 
-function test_text()
+function test_text_normal()
 
-	open(12,12)
+	open(28,24)
 	
-	drv:set_font_size(12)
+	drv:set_font_size(24)
 	drv:gotoxy(0,0)
-	w,h,x,y = drv:draw_text("Hi")
-	print("w=" .. w, "h=" .. h, "x=" .. x, "y=" ..y)
+	w,h,x,y,n = drv:draw_text("Hi")
+	print("w=" .. w, "h=" .. h, "x=" .. x, "y=" ..y, ",n=" .. n)
 	drv:update(true)
 	print(dump())
 
 	drv:clear()
-	drv:set_font_size(6)
+	drv:set_font_size(12)
 	drv:gotoxy(0,0)
-	w,h,x,y = drv:draw_text("Hi\nthere")
-	print("w=" .. w, "h=" .. h, "x=" .. x, "y=" ..y)
+	w,h,x,y,n = drv:draw_text("Hi\nthere")
+	print("w=" .. w, "h=" .. h, "x=" .. x, "y=" ..y, ",n=" .. n)
 	drv:update(true)
 	print(dump())
 
@@ -160,6 +160,65 @@ function test_text()
 
 end
 
+function test_text_mode1()
+
+	open(25,7)
+	
+	drv:set_font_size(12)
+	drv:gotoxy(0,0)
+	w,h,x,y,n = drv:draw_text("Hello",false,false,1)
+	print("w=" .. w, "h=" .. h, "x=" .. x, "y=" ..y, ",n=" .. n)
+	drv:update(true)
+	print(dump())
+
+	close()
+
+end
+
+function test_text_opaque()
+
+	open(40,12)
+	
+	drv:set_font_size(12)
+	drv:gotoxy(0,0)
+	w,h,x,y,n = drv:draw_text("123ABC")
+	print("w=" .. w, "h=" .. h, "x=" .. x, "y=" ..y, ",n=" .. n)
+	drv:update(true)
+	print(dump())
+
+	drv:gotoxy(0,0)
+	w,h,x,y,n = drv:draw_text("456abc",false,true)
+	print("w=" .. w, "h=" .. h, "x=" .. x, "y=" ..y, ",n=" .. n)
+	drv:update(true)
+	print(dump())
+
+	close()
+end
+
+function test_text_invisible()
+
+	print("Text dimensions should be the same on clipping boundaries")
+	for w_display=15,16 do
+		open(w_display,12)
+	
+		drv:set_font_size(12)
+		drv:gotoxy(0,0)
+		w,h,x,y,n = drv:draw_text("1w",false,false,1)
+		print("w=" .. w, "h=" .. h, "x=" .. x, "y=" ..y, ",n=" .. n)
+		drv:update(true)
+		print(dump())
+
+		drv:clear()
+		drv:set_font_size(12)
+		drv:gotoxy(0,0)
+		w,h,x,y,n = drv:draw_text("1w",true,false,1)
+		print("w=" .. w, "h=" .. h, "x=" .. x, "y=" ..y, ",n=" .. n)
+		drv:update(true)
+		print(dump())
+
+		close()
+	end
+end
 
 function test_fonts()
 	
@@ -253,10 +312,13 @@ if arg[1] ~= "--min" then
 
 	th:run( test_clear_screen, "test_clear_screen" )
 	th:run( test_image_clipping_and_transparency, "test_image_clipping_and_transparency" )
-	th:run( test_text, "test_text" )
 	th:run( test_fonts, "test_fonts" )
 	th:run( test_image_clipping_for_image_too_big, "image_too_big" )
 	th:run( test_invert, "invert" )
+	th:run( test_text_normal, "test_text_normal" )
+	th:run( test_text_mode1, "test_text_mode1" )
+	th:run( test_text_opaque, "test_text_opaque" )
+	th:run( test_text_invisible, "test_text_invisible" )
 end
 --th:run( test_welcome_gif, "test_welcome_gif" )
 

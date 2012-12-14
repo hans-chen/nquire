@@ -13,7 +13,13 @@
 #include <fstream>
 #include <time.h>
 #include <ios>
+#ifdef WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+#else
 #include <ifaddrs.h>
+#endif
 #include <assert.h>
 
 using namespace std;
@@ -147,6 +153,47 @@ void strip_trailing_return( string& line )
 	
 }
 
+#ifdef WIN32
+std::vector<string> get_local_ip_addresses()
+{
+	// Get the local hostname
+	std::vector<string> result;
+	unsigned long size=15*1024;
+	MIB_IPADDRTABLE *ip_addr_table = (MIB_IPADDRTABLE*)malloc(size);
+
+	DWORD get_result = GetIpAddrTable(ip_addr_table, &size, true);
+
+	if( get_result != NO_ERROR )
+	{
+		const char *errorstr=0;
+		switch( get_result )
+		{
+		case ERROR_INSUFFICIENT_BUFFER: errorstr = "insufficient buffer "; break;
+		case ERROR_INVALID_PARAMETER: errorstr = "invalid parameter "; break;
+		case ERROR_NOT_SUPPORTED: errorstr = "not supported "; break;
+		default: errorstr = ""; break;
+		}
+		LOG_WRN("Looking up the own ip-address(es) failed: " << errorstr << "(" << get_result << ")")
+	}
+	else
+	{
+		IN_ADDR IPAddr;
+		for (int i=0; i < (int) ip_addr_table->dwNumEntries; i++)
+		{
+	        //printf("\n\tInterface Index[%d]:\t%ld\n", i, ip_addr_table->table[i].dwIndex);
+	        IPAddr.S_un.S_addr = (u_long) ip_addr_table->table[i].dwAddr;
+			const char *buff = inet_ntoa(IPAddr);
+	        //printf("\tIP Address[%d]:     \t%s\n", i, buff );
+			result.push_back( buff );
+		}
+	}
+
+	free(ip_addr_table);
+
+	result.push_back("192.168.1.15");
+	return result;
+}
+#else
 std::vector<string> get_local_ip_addresses()
 {	
 	// Get the local hostname
@@ -175,4 +222,4 @@ std::vector<string> get_local_ip_addresses()
 
 	return result;
 }
-
+#endif

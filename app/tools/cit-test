@@ -16,6 +16,9 @@ if test -f .cit.ip; then
 	ADDRESS="`cat .cit.ip`"
 fi
 
+CIT_IP_FILE=.cit.ip
+
+
 all=""
 # ===========================================================================
 
@@ -91,7 +94,6 @@ Mineral water
 	echo -en "\e\x2e\x38${EURO} 0.98\x03"	# Align text right bottom
 }
 
-
 # alignment
 all="$all text_2"
 test_text_2()
@@ -133,6 +135,50 @@ lb      xb cb         rb
 	echo -en "\e\x2e\x39ly\x03" 		# Left keep y
 	echo -en "\e\x2e\x3Acy\x03" 		# Centre keep y
 	echo -en "\e\x2e\x3Bry\x03" 		# right keep y
+}
+
+
+all="$all text_wrap1"
+test_text_wrap1()
+{
+    cat 1>&2 << !EOF!
+Testing word-wrap with pixel position 16,16
+!EOF!
+	echo -en "\e\x42\x30"					# Set font
+	echo -en "\e\x25"						# Clear display
+	echo -en "\e\x2d\x31"					# word wrap on
+	echo -en "\e\x2c\x40\x40"				# Set pixel position (10H,10H)
+	echo -en "word1 word2 word3 word4 word5\x03"
+	echo -en "\e\x2d\x30"					# word wrap off
+}
+
+all="$all text_wrap2"
+test_text_wrap2()
+{
+    cat 1>&2 << !EOF!
+Testing word-wrap
+This should result in 3 lines of which the last is only shown half
+!EOF!
+	echo -en "\e\x42\x30"					# Set font
+	echo -en "\e\x25"						# Clear display
+	echo -en "\e\x2d\x31"					# word wrap on
+	echo -en "\e\x2c\x7f\x80"				# Set pixel position (4FH,50H)
+	echo -en "Word1 word2 word3 word4 word5 word6 word7 word8 word9\x03"
+	echo -en "\e\x2d\x30"					# word wrap off
+}
+
+all="$all text_wrap3"
+test_text_wrap3()
+{
+    cat 1>&2 << !EOF!
+Testing word-wrap with the first word to long to fit on 2 lines
+!EOF!
+	echo -en "\e\x42\x30"					# Set font
+	echo -en "\e\x25"						# Clear display
+	echo -en "\e\x2d\x31"					# word wrap on
+	echo -en "\e\x2c\x42\x40"				# Set pixel position (20,20)
+	echo -en "wwwwwwwwwwwwwwwwwThisIsAVeryExtraLongLineDueToWichWordwrapDoesNotWorkSoTheWordIsCutInPieces etc etc etc etc etc etcetera\x03"
+	echo -en "\e\x2d\x30"					# word wrap off
 }
 
 
@@ -863,7 +909,7 @@ Image test. 1 image in each corner and 'winking kitty' in the middle
 }
 
 all="$all image_bad"
-image_anim_sleep=3
+image_bad_sleep=3
 test_image_bad ()
 {
 	curl -v ftp://${ADDRESS}/img/ -T img/kitty.gif
@@ -985,6 +1031,28 @@ Than after the error-message-timeout, the error message should be shown
 
 # ===========================================================================
 
+all="$all get_status"
+delay_get_status_sleep=1
+test_get_status ()
+{
+    cat 1>&2 << !EOF!
+Request the status of the nquire.
+!EOF!
+	echo -en "\e\xfd"
+}
+
+all="$all get_info"
+delay_get_info_sleep=1
+test_get_info ()
+{
+    cat 1>&2 << !EOF!
+Request the status of the nquire.
+!EOF!
+	echo -en "\e\xfc"
+}
+
+# ===========================================================================
+
 all="$all crash"
 test_crash()
 {
@@ -997,16 +1065,25 @@ This should be catched and logged
 
 # ===========================================================================
 
+
+function test_ip
+{
+	if ! ping -c 1 $1; then
+		help
+		exit -1
+	fi
+}
+
 if test -z "$1" -o "$1" = "-h" -o "$1" = "--help";
 then
 cat << EOF
-cit-test -h|{[-udp][-tcp][-imb852][-utf8] [-a <ip address>] <test id>}+
+cit-test -h|{[-udp][-tcp][-imb852][-utf8] [-ip <ip address>] <test id>}+
 Send a certain string to the cit
  -udp        use udp messages using port 9000
  -tcp        use tcp messages using port 9101 (default)
  -ibm852     use ibm852 euro sign charracter (default)
  -utf8       use utf8 euro sign charracter
- -a address  the address or name of the nquire (when ommitted, the
+ -ip address  the address or name of the nquire (when ommitted, the
              contents of .cit.ip is used)
  -base64     messages are to be 'encrypted' using base64
 
@@ -1028,14 +1105,25 @@ else
 			EURO=${EURO_UTF8}
 		elif test "$1" = "-ibm852"; then
 			EURO=${EURO_IBM852}
-		elif test "$1" = "-a"; then
+		elif test "$1" = "-ip"; then
 			shift
 			ADDRESS=$1
+			test_ip ${ADDRESS}
 			echo "$ADDRESS" > .cit.ip
 		elif test "$1" = "-base64"; then
 			ENCODE="base64"
 			DECODE="base64 -d"
 		else 
+			if test "$ADDRESS" == ""; then
+				echo "No address, discovering nquire..."
+				ADDRESS="`nquire-discover.exe -1`"
+				if test -z "$ADDRESS"; then
+					help
+				    exit -1
+				else
+					echo "Found nquire on $ADDRESS"
+				fi
+			fi
 			echo ------------------------------------------------------------------
 			echo "test $1 on ${ADDRESS}:${PORT}"
 			#set -x
@@ -1050,7 +1138,7 @@ else
 				answer="`test_$1 | $ENCODE | nc -q $wait_for_answer $UDP ${ADDRESS} ${PORT}`"
 				echo -n "$answer" | $DECODE
 			fi
-			set +x
+			#set +x
 		fi
 		shift
 	done

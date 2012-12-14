@@ -305,7 +305,7 @@ local function open(scanner)
 			led:set("yellow","blink")
 			scanner.retry_counter = scanner.retry_counter + 1
 			logf(LG_WRN, lgid, "Retry configure in 3 seconds")
-			evq:push("reinit_scanner", scanner, 3)
+			evq:push("reinit_scanner", nil, 3)
 		elseif fatal then
 			logf(LG_WRN, lgid, "Fatal error during scanner configuration.")
 		else
@@ -342,7 +342,11 @@ end
 local function close(scanner, quick)
 	if scanner.fd then
 		gpio:scan_1d_led( false )
-		if not quick then scanner:disable() end
+		if not quick then 
+			scanner:disable()
+		else
+			led:set("yellow","off")
+		end
 		evq:fd_del(scanner.fd)
 		evq:unregister("fd", on_fd_scanner, scanner)
 		sys.set_noncanonical(scanner.fd, false)

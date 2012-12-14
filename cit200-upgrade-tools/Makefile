@@ -54,14 +54,14 @@ FILE_DEV			:=	$(PATH_SRC)/dev.tar
 ##################################################################
 #	image version					    <------	config them
 ##################################################################
-VERSION_APP			:= 1.7
+VERSION_APP			:= 2.0
 VERSION_ROOTFS		:= 1.5.3
 VERSION_KERNEL		:= 2.6.35.7
-VERSION_FIRMWARE	:= 1.6.1
+VERSION_FIRMWARE	:= 2.0
 VERSION_LOGO		:= 1.0
 VERSION_EM2027_KRL	:= 3.06.024
 VERSION_EM2027_APP	:= 1.01.002
-VERSION_EM1300_KRL	:= 1.25.20
+VERSION_EM1300_KRL	:= 1.30.25
 
 LOGFILE				:= upgrade_log.txt
 ##################################################################

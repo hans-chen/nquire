@@ -280,15 +280,41 @@ static int l_gotoxy(lua_State *L)
 	return 1;
 }
 
-// draw a charracter
-// the background of a charrecters is always transparent (see impl. below)
-static int draw_char(struct dpydrv *dd, int ch, int silent)
+static int l_getpos(lua_State *L)
+{
+	struct dpydrv *dd;
+
+	dd = lua_touserdata(L, 1);
+	lua_pushinteger(L, dd->x);
+	lua_pushinteger(L, dd->y);
+	return 2;
+}
+
+static int l_getscreensize(lua_State *L)
+{
+	struct dpydrv *dd;
+
+	dd = lua_touserdata(L, 1);
+	lua_pushinteger(L, dd->w);
+	lua_pushinteger(L, dd->h);
+	return 2;
+}
+
+/* draw a charracter
+ the background of a charrecters is always transparent (see impl. below)
+ @param ch			the charracter to be drawn
+ @param silent		false=draw, true=don't draw, only reposition
+ @param opaque		false=only draw the foreground collor, false=also draw the background color
+ @param mode		0=draw all, 
+					1=only draw when the charracter does not surpass the right margin
+ @return the width of the actually drawn charracter
+*/
+static int draw_char(struct dpydrv *dd, int ch, int silent, int opaque, int mode)
 {
 	FT_GlyphSlot slot;
 	FT_Bitmap *bitmap;
-	Uint32 *p, *py, *pmax, *pmin;
+	Uint32 *p;
 	int x, y;
-	int v;
 
 	FT_Load_Char(dd->face, ch, FT_LOAD_RENDER | FT_LOAD_TARGET_MONO);
 	slot = dd->face->glyph;
@@ -297,12 +323,51 @@ static int draw_char(struct dpydrv *dd, int ch, int silent)
 	SDL_Surface *surf = dd->image[0].surf[0];
 	
 	TRACE("char='%c', slot->bitmap_top=%d, dd->font_size=%d", ch, slot->bitmap_top, dd->font_size );
-	py = surf->pixels + 
+
+	int width = slot->advance.x / 64;
+	int height = dd->font_size; // slot->bitmap_top + bitmap->rows;
+
+	if( mode == 1 && dd->x + slot->bitmap_left + bitmap->width >= dd->w+1 )
+		return 0;
+
+	if( silent )
+	{
+		dd->x += width;
+		return width;
+	}
+
+	Uint32 *pmin = surf->pixels;
+	Uint32 *pmax = surf->pixels + dd->h * surf->pitch;
+
+	if( opaque )
+	{
+		// clear charracter area (this is seually more than the bitmap!
+		Uint32 *py = surf->pixels + dd->y * surf->pitch + dd->x* 4;
+		for(y=0; y<height; y++) 
+		{
+			if( y+dd->y >=0 && y+dd->y < dd->h-1 ) 
+			{
+				p = py;
+				for(x=0; x<width; x++) 
+				{
+					if( x+dd->x>=0 && x+dd->x < dd->w )
+					{
+						if(p >= pmin && p < pmax)
+						{
+							*p = dd->background_color;
+						}
+					}
+					p++;
+				}
+			}
+
+			py += surf->pitch/4;
+		}
+	}
+
+	Uint32 *py = surf->pixels + 
 	     (dd->y - slot->bitmap_top + dd->font_size - 2) * surf->pitch +
 	     (dd->x + slot->bitmap_left)* 4;
-
-	pmin = surf->pixels;
-	pmax = surf->pixels + dd->h * surf->pitch;
 
 	for(y=0; y<bitmap->rows; y++) {
 		if( y>=0 && y+dd->y<dd->h-1 ) {
@@ -310,26 +375,29 @@ static int draw_char(struct dpydrv *dd, int ch, int silent)
 
 			for(x=0; x<bitmap->width; x++) {
 
-				if( x+dd->x>=0 && x+dd->x < dd->w-1 ) {
-					v = bitmap->buffer[x/8 + y*bitmap->pitch] & (128>>(x%8));
-					if(v && !silent && p >= pmin && p < pmax) {
-						//TRACE("x=%d,y=%d, color=%d", x,y,dd->color);
-						*p = dd->color;  //SDL_MapRGB(surf->format, 255, 255, 255);
-						//printf("x=%d,y=%d\n", x+dd->x,y+dd->y);
+				if( x+dd->x>=0 && x+dd->x < dd->w )
+				{
+					if(p >= pmin && p < pmax)
+					{
+						if(bitmap->buffer[x/8 + y*bitmap->pitch] & (128>>(x%8)))
+						{
+							//TRACE("x=%d,y=%d, color=%d", x,y,dd->color);
+							*p = dd->color;  //SDL_MapRGB(surf->format, 255, 255, 255);
+							//printf("x=%d,y=%d\n", x+dd->x,y+dd->y);
+						}
 					}
 				}
 				p++;
-			
 			}
 		}
 
 		py += surf->pitch/4;
 	}
 
-	dd->x += slot->advance.x / 64;
+	dd->x += width;
 	dd->y += slot->advance.y / 64 ;
 
-	return slot->advance.x / 64;
+	return width;
 }
 
 
@@ -380,29 +448,43 @@ static int utf8_decode(char *s, unsigned int *pi)
 	return c;
 }
 
-
+/* draw text at the current position
+ @param [1] lua-context
+ @param [2] text to be drawn
+ @param [3] silent (optional): when true don't actually draw, just return the text-size
+ @param [4] opaque (optional): when true, also draw background pixels, otherwise only draw foreground pixels.
+ @param [5] mode (optional: 
+					nil=draw all, 
+					1=draw up the the last whole charracter that does not pass the right marging
+ @return w,h,x,y,n
+*/
 static int l_draw_text(lua_State *L)
 {
 	struct dpydrv *dd;
-	const char *text;
-	int ch;
-	const char *p;
-	unsigned int pi;
-	int w, h, wmax;
+	const char *text = 0;
+	int ch = 0;
+	const char *p = 0;
+	unsigned int pi = 0;
+	int w = 0;
+	int h = 0;
+	int wmax = 0;
 	int silent = 0;
+	int opaque = 0;
+	int mode = 0;
+	int n=0;
 
 	dd = lua_touserdata(L, 1);
 	text = luaL_checkstring(L, 2);
 	silent = lua_toboolean(L, 3);
+	opaque = lua_toboolean(L, 4);
+	mode = luaL_optint(L, 5, 0);
+
 	TRACE("text='%s', silent=%s", text, (silent ? "true" : "false"));
 
 	if(! dd->font_loaded) BARF(L, "Cant draw_text, no font loaded");
 
 	/* UTF-8 decode string and draw characters */
 
-	ch = 0;
-	w = 0;
-	wmax = 0;
 	h = dd->font_size;
 
 	p = text;
@@ -415,7 +497,11 @@ static int l_draw_text(lua_State *L)
 			w=0;
 			h += dd->font_size;
 		} else {
-			w += draw_char(dd, ch, silent);
+			int draw_width = draw_char(dd, ch, silent, opaque, mode);
+			if( draw_width == 0 ) 
+				break;
+			n++;
+			w += draw_width;
 			if (w>wmax)
 				wmax = w;
 		}
@@ -431,7 +517,9 @@ static int l_draw_text(lua_State *L)
 	lua_pushinteger(L, dd->x);
 	lua_pushinteger(L, dd->y);
 
-	return 4;
+	lua_pushinteger(L, n);
+
+	return 5;
 }
 
 
@@ -946,6 +1034,8 @@ static struct luaL_Reg dpydrv_metatable[] = {
 	{ "draw_image",		l_draw_image },
 	{ "draw_video",		l_draw_video },
 	{ "gotoxy",			l_gotoxy },
+	{ "getpos",			l_getpos },
+	{ "getscreensize",	l_getscreensize },
 	{ "set_font",		l_set_font },
 	{ "set_font_size",	l_set_font_size },
 	{ "set_color",		l_set_color },

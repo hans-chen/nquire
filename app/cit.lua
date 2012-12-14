@@ -2,6 +2,10 @@
 -- Copyright © 2007. All Rights Reserved.
 --
 
+-- This module needs major refactoring:
+--   * introduce an explicit statemachine
+--   * split into more than 1 module
+
 module("CIT", package.seeall)
 
 require "cit-codepages"
@@ -33,7 +37,7 @@ local pixel_y = 0
 local align_h = "l"
 local align_v = "t"
 
-local message_received = false
+local error_msg_enabled = true
 
 -- variables for handling the delayed message
 
@@ -57,12 +61,13 @@ local translate_NL = { ["LF"] = "\n", ["CR"] = "\r", ["CRLF"] = "\r\n" }
 
 local function expand_message_tag()
 	if config:get("/cit/enable_message_tag")=="true" then
-		local tag = config:get("/cit/message_tag")
-
-		-- replace variables:
-		tag = tag:gsub("%${serial}", config:get("/dev/serial") )
-		tag = tag:gsub("%${mac}", config:get("/network/macaddress_eth0") )
-
+		local tag = config:get("/cit/message_tag"):gsub("${(..-)}", 
+			function (tag)
+				if tag == "serial" then return config:get("/dev/serial") end 
+				if tag == "mac" then return config:get("/network/macaddress_eth0") end 
+				if tag == "now" then return get_date_time() end
+				return "<nil>"
+			end)
 		return tag
 	else
 		return ""
@@ -154,39 +159,99 @@ end
 
 
 
+-- function for handling device events (eg barcode)
+-- depending on the /cit/mode and /cit/offlinedb/enabled, the event is handled 
+--  locally or by sending it to a server
+-- @return true    the event is handled
+--         false   the server should send escape codes as response to this
+--         nil     the event could not be handled (failed offline lookup without fallback) 
+local function handle_device_event(self, data)
+
+	local mode = config:get("/cit/mode")
+
+	if offline_server ~= nil and config:get( "/cit/offlinedb/enabled" )=="true" then
+		local offline_mode = config:get("/cit/offlinedb/mode")
+
+		logf(LG_DBG,lgid,"Handling data offline")
+		local escapecode_response = offline_server:get_barcode_response( data )
+		
+		if escapecode_response then
+			logf(LG_EVT,lgid,"Offline database response: '%s'", escapecode_response )
+			self:handle_bytes(escapecode_response)
+		end
+		
+		if offline_mode == "server fallback" then
+			if escapecode_response == nil then
+				logf(LG_DBG,lgid,"Fallback to response from server")
+				if self:send_to_clients(data) == true then
+					return false
+				else
+					return nil
+				end
+			else
+				return true
+			end
+		elseif offline_mode == "server notify" then
+			logf(LG_DBG,lgid,"And also (try to) send to server")
+			self:send_to_clients(data)
+			if escapecode_response == nil then 
+				return nil 
+			else 
+				return true
+			end
+		else
+			-- offline_mode == "database only"
+			if escapecode_response == nil then 
+				return nil 
+			else 
+				return true
+			end
+		end
+	else
+		if self:send_to_clients(data) == true then
+			return false
+		else
+			return nil
+		end
+	end 
+end
+
 -- public function for sending data to all clients
+-- return true     data is sent (or at least queued)
+--        nil      no server connection or socket error
 local function send_to_clients(self, data)
+
+	local mode = config:get("/cit/mode")
 	local nl = translate_NL[config:get("/cit/message_separator")]
 	local s = expand_message_tag() .. data .. nl
 	if config:get("/cit/message_encryption") == "base64" then
 		s = base64.encode( s ) .. nl
 	end
 
-	local mode = config:get("/cit/mode")
-	logf(LG_DBG,lgid,"Sending packet with mode='%s'",mode)
+	local packet_is_sent = false
+	
+	logf(LG_DBG,lgid,"Mode='%s'",mode)
 	if mode=="UDP" or mode=="client" or mode=="server" then
-		local host = config:get("/cit/resolved_remote_ip")
-		local ips, errstr = net.gethostbyname( host )
+		local ips = get_host_by_name( config:get("/cit/remote_ip") )
 		if ips == nil then
-			logf(LG_WRN, lgid, "Could not resolve host %s: %s", host, (errstr or "nil"))
-			logf(LG_WRN, lgid, "Data will not be send using udp")
+			logf(LG_WRN, lgid, "Host %s not resolved (yet?)\nData will not be send using udp", config:get("/cit/remote_ip"))
 		else
-			-- send to all addresses associated with host
-			for i,addr in pairs(ips) do
-				local port = config:get("/cit/udp_port")
-				-- Send to UDP remote server
-				local sock = net.socket("udp")
-				logf(LG_DBG,lgid,"sendto(addr=%s,port=%d)", addr, port)
-				if net.sendto(sock, s, addr, port)~=#s then
-					logf(LG_WRN,lgid,"Error sending data to %s (addr=%s), port=%d using UDP", host, addr, port )
-				end
-				net.close(sock)
+			local ip = ips[1]
+			local port = config:get("/cit/udp_port")
+			-- Send to UDP remote server
+			local sock = net.socket("udp")
+			logf(LG_DBG,lgid,"sendto(addr=%s,port=%d)", ip, port)
+			if net.sendto(sock, s, ip, port)~=#s then
+				logf(LG_WRN,lgid,"Error sending data to %s (addr=%s), port=%d using UDP", host, ip, port )
+			else
+				packet_is_sent = true
 			end
+			net.close(sock)
 		end
 	end
 	
 	-- connect to server when "TCP client on scan"
-	if config:get("/cit/mode") == "TCP client on scan" then
+	if mode == "TCP client on scan" then
 		cit:connect_to_server( )
 	end
 	
@@ -195,8 +260,16 @@ local function send_to_clients(self, data)
 		logf( LG_DBG,lgid,"Sending to client-socket")
 		if net.send(client.sock, s)~=#s then
 			logf(LG_WRN,lgid,"Error sending data to addr=%s,port=%d using TCP", addr, port )
+		else
+			packet_is_sent = true
 		end
 	end
+
+	if packet_is_sent then
+		logf(LG_EVT,lgid,"Sent: '%s'", s)
+		return true
+	end
+	return nil
 end
 
 
@@ -208,17 +281,22 @@ end
 local function handle_barcode_normal(self, barcode, prefix)
 	logf(LG_DBG,lgid,"handle_barcode_normal")
 	local success = true
-
+	local handled
 	if config:get("/dev/scanner/enable_barcode_id")=="true" then
-		self:send_to_clients(prefix .. barcode)
+		handled = self:handle_device_event(prefix .. barcode)
 	else
-		self:send_to_clients(barcode)
+		handled = self:handle_device_event(barcode)
 	end	
 		
-	-- Register timer to show error message if no data received in time
-	message_received = false
-	local timeout = tonumber(config:get("/cit/messages/error/timeout"))
-	evq:push("cit_error_msg", nil, timeout)
+	if handled == false then
+		-- Register timer to show error message if no data received in time
+		error_msg_enabled = true
+		local timeout = tonumber(config:get("/cit/messages/error/timeout"))
+		evq:push("cit_error_msg", nil, timeout)
+	elseif handled == nil then
+		error_msg_enabled = true
+		evq:push("cit_error_msg", nil, 0)
+	end
 
 	return success
 end
@@ -273,7 +351,7 @@ local function restore_defaults()
 	logf(LG_INF, lgid, "Scanned 'factory defaults' barcode, restoring and rebooting system")
 
 	os.execute("rm -f /mnt/img/* /mnt/log/* /mnt/fonts/*")
-	os.execute("rm -f /mnt/mmc/img/* /mnt/mmc/log/* /mnt/mmc/fonts/*")
+	os.execute("rm -f /mnt/mmc/img/* /mnt/mmc/log/* /mnt/mmc/fonts/* /mnt/mmc/offline/*")
 	os.execute("rm -f /cit200/*.conf /etc/nowatchdog /mnt/*.conf")
 	-- remove possible files from versions prior to 1.6
 	os.execute("rm -f /mnt/*conf.bkup /mnt/mmc/*conf.bkup")
@@ -290,6 +368,7 @@ local function prepare_for_settings_barcode()
 	if scanner.enable_citical_2d then
 		scanner:enable_citical_2d()
 	end
+	push_cit_idle_msg( 20 )
 end
 
 local function show_wlan_diag( )
@@ -443,6 +522,7 @@ local function handle_barcode_programming(cit, barcode, prefix)
 				prepare_for_settings_barcode()
 			else
 				-- bug, should not happen
+				logf(LG_DBG,lgid,"Unknown expected barcode type '%d'", next_barcode_type)
 				push_cit_idle_msg( 0 )
 				success = false
 				next_barcode_type = ""
@@ -473,6 +553,7 @@ local function handle_barcode_programming(cit, barcode, prefix)
 			scanner:reinit_2d()
 		end
 
+		t_idle_msg = 0
 		push_cit_idle_msg( 0 )
 
 	else
@@ -859,6 +940,16 @@ local function write_mifare_card( cit, msg )
 	end
 end
 
+local function format_gpi_event( pin, evt )
+	local pin_to_index = { [5] = 0, [7] = 1 }
+	local evt_txt = config:get("/dev/gpio/prefix") .. pin_to_index[pin] .. evt.value
+	if config:get("/dev/gpio/event_counter") == "true" then
+		return evt_txt .. " " ..  evt.count
+	else
+		return evt_txt
+	end
+end
+
 
 -- Note. The booklet with CIT protocol description is ambigious on the 'clear
 -- display' command. The examples use command 0x24, but the command list uses
@@ -908,6 +999,15 @@ local command_list = {
 			pixel_x = x - 0x30
 			pixel_y = y - 0x30
 			logf(LG_DBG,lgid,"pixel_x=%d, pixel_y=%d", pixel_x, pixel_y)
+		end
+	},
+
+	[0x2d] = {
+		name = "word wrap mode",
+		nparam = 1,
+		fn = function( cit, enable )
+			display:enable_word_wrap( enable == 0x31 )
+			logf(LG_DBG,lgid,"word wrap %s", enable == 0x31 and "enabled" or "disabled" )
 		end
 	},
 
@@ -1011,10 +1111,9 @@ local command_list = {
 	},
 
 	[0x5d] = {
-		name = "sleep/wakeup barcode scanner",
+		name = "sleep/wakeup nquire",
 		nparam = 1,
 		fn = function(cit, onoff)
-			logf(LG_INF, lgid, "Putting scanner to %s", (onoff==0x30 and "sleep" or "wakeup") )
 			if onoff == 0x30 and not cit.power_saving_on then
 				local itf = config:get("/network/interface")
 				local hw = config:get("/dev/hardware")
@@ -1025,14 +1124,16 @@ local command_list = {
 						"it would disable the used network interface (%s) " .. 
 						"with this HW version (%s)", itf, hw)
 				else
-					led:set("yellow","off")
+					logf(LG_INF, lgid, "Putting nquire to sleep" )
+					scanner:close(true)
 					local ok, err = gpio:set_pin(18, 0)
 					cit.power_saving_on = true
 				end
 			end
 			if onoff == 0x31 and cit.power_saving_on then
+				logf(LG_INF, lgid, "Wakeup nquire" )
 				local ok, err = gpio:set_pin(18, 1)
-				evq:push("reinit_scanner", scanner, 1 )
+				evq:push("reinit_scanner", {retry=10}, 6 )
 				cit.power_saving_on = false
 			end
 		end
@@ -1066,7 +1167,7 @@ local command_list = {
 
 
 	[0x7E] = {
-		name = "Set GPIO output",
+		name = "GPO set",
 		nparam = 2,
 		fn = function(cit, nr, state)
 			local port = nr - 0x30 + 1 
@@ -1083,23 +1184,42 @@ local command_list = {
 		end
 	},
 
+	[0xe0] = {
+		name = "set or get date and time",
+		nparam = 20,
+		fn = function( cit, ... )
+			local time = string.char(...)
+			-- time format should be: "YYYY.MM.DD-hh:mm:ss"
+			if #time>0 then
+				local time_before = get_date_time()
+				if set_date_time( time ) then
+					logf(LG_DBG,lgid,"Setting date-time from %s to %s", time_before, time)
+				else
+					logf(LG_WRN,lgid,"Incorrect date-time string '%s'", time)
+				end
+			end
+			return get_date_time()
+		end
+	},
+
 	[0x7F] = {
-		name = "Get GPIO input",
+		name = "GPI get",
 		nparam = 1,
 		fn = function(cit, nr)
-			local port = nr - 0x30 + 1
-			if (port == 1 or port == 2) then
-			
-				logf(LG_INF, lgid, "Getting GPIO port IN%s", port)
-				local value, err = gpio:get_pin(port == 1 and 5 or 7)
-				if not value then
-					logf(LG_WRN, lgid, "Error performing GPIO 'get' command: %s", err)
+			local port = nr - 0x30
+			local port_to_pin = {[0]=5,[1]=7}
+			local pin = port_to_pin[port]
+			if pin ~= nil then
+				logf(LG_INF, lgid, "Getting GPI port %s", port)
+				local gpi, err = gpio:get_pin(pin)
+				if not gpi then
+					logf(LG_WRN, lgid, "Error performing GPI 'get' command: %s", err or "")
 				else
-					return config:get("/dev/gpio/prefix") .. string.char(nr) .. value;
+					return format_gpi_event( pin, gpio:get_pin(pin) )
 				end
 				
 			else
-				logf(LG_WRN, lgid, "Incorrect gpio port number (%x) for gpio in", nr)
+				logf(LG_WRN, lgid, "Incorrect GPI port number (%x)", nr)
 			end
 		end
 	},
@@ -1205,9 +1325,6 @@ local command_list = {
 		end
 	},
 
-
-
-
 	[0xf8] = {
 		name = "mifare read",
 		nparam = 60, 
@@ -1279,6 +1396,31 @@ local command_list = {
 		end
 	},
 
+	[0xfc] = {
+		name = "get discovery info", -- return a message containing the same information as the discovery response would give
+		nparam = 0,
+		fn = function(cit)
+			return "NI" .. discovery:generate_reply("|")
+		end
+	},
+
+	[0xfd] = {
+		name = "get status", -- return a message containing the status (volatile) of the nquire
+		nparam = 0,
+		fn = function(cit)
+			local offline_status = "now:\"" .. get_date_time() .. "\""
+			offline_status = offline_status .. "|memfree:" .. get_memfree()
+			if offline_server then
+				-- use lua formatting:
+				offline_status = offline_status ..
+					"|offline_db.md5:" .. (offline_server:get_md5() or "") .. "" ..
+					"|offline_db.barcodes:" .. (offline_server:get_number_of_barcodes() or "0") ..
+					"|offline_db.formats:" .. (offline_server:get_number_of_formats() or "0") ..
+					"|offline_db.reloading:" .. (offline_server:get_reloading_md5() or "nil")
+			end
+			return "NS" .. offline_status
+		end
+	},
 
 	[0xfe] = {
 		name = "show configuration", -- on display
@@ -1427,7 +1569,7 @@ local function handle_bytes(cit, bytes)
 
 	local answer=""
 
-	message_received = true
+	error_msg_enabled = false
 	local encryption = config:get("/cit/message_encryption")
 	local nl = translate_NL[config:get("/cit/message_separator")]
 			
@@ -1447,18 +1589,18 @@ local function handle_bytes(cit, bytes)
 				logf(LG_DBG,lgid, "bytes_remaining = \"%s\"", bytes_remaining)
 			end
 		end
+		logf(LG_DBG,lgid,"Translated: %s", command)
 	else
 		command = bytes
 		bytes_remaining = ""
 	end
 	
-	logf(LG_DBG,lgid,"Received: %s", command)
 	for i, c in ipairs( { command:byte(1, #command) } ) do
 		local current_answer = handle_byte(cit, c)
 		if current_answer and #current_answer>0 then
 			logf( LG_DBG, lgid, "Current answer '%s'", current_answer )
 			if encryption == "base64" then
-				current_answer = base64.encode(current_answer .. nl)
+				current_answer = base64.encode(expand_message_tag() .. current_answer .. nl)
 			end
 			answer = answer .. current_answer .. nl
 		end
@@ -1483,14 +1625,14 @@ local function on_udp(event, cit)
 	if fd ~= cit.sock_udp then return end
 	logf(LG_DBG,lgid,"on_udp()")
 
-	local command, destaddr, destport = net.recvfrom(cit.sock_udp, 1024)
+	local command, senderaddr, senderport = net.recvfrom(cit.sock_udp, 1024)
 
 	if command and #command > 0 then
+		logf(LG_EVT,lgid,"Recieved (UDP %s:%s): '%s'", senderaddr, senderport, command)
 		local answer = handle_bytes(cit, command)
 		if answer and #answer>0 then
-			local s = expand_message_tag() .. answer
-			logf( LG_DBG, lgid, "Sending back (UDP) '%s'", s )
-			if net.sendto( cit.sock_udp, s, destaddr, destport ) ~= #s then
+			logf( LG_EVT, lgid, "Sending back (UDP %s:%s): '%s'", senderaddr, senderport, answer )
+			if net.sendto( cit.sock_udp, answer, senderaddr, senderport ) ~= #answer then
 				logf( LG_WRN, lgid, "Error sending back data in response to an ESC code" )
 			end
 		end
@@ -1512,11 +1654,11 @@ local function on_tcp_client(event, client)
 	local command = net.recv(fd, 1024)
 	
 	if command and #command > 0 then
+		logf(LG_EVT,lgid,"Recieved (TCP): '%s'", command)
 		local answer = handle_bytes(cit, command)
 		if answer and #answer > 0 then
-			local s = expand_message_tag() .. answer
-			logf( LG_DBG, lgid, "Sending back (TCP) '%s'", s )
-			if net.send(fd, s) ~= #s then
+			logf( LG_EVT, lgid, "Sending back (TCP) '%s'", answer )
+			if net.send(fd, answer) ~= #answer then
 				logf( LG_WRN, lgid, "Error sending back data in response to an ESC code" )
 			end
 		end
@@ -1558,7 +1700,7 @@ local function client_new(cit, sock, addr, port)
 	cit.client_connected = true
 	evq:fd_add(sock)
 	evq:register("fd", on_tcp_client, client)
-	logf(LG_INF, lgid, "Connected to %s:%d", addr, port)
+	logf(LG_EVT, lgid, "Connected to %s:%d", addr, port)
 	
 end
 
@@ -1584,7 +1726,7 @@ local function on_tcp_server(event, cit)
 
 	set_keepalive( sock )
 
-	local client = client_new(cit, sock, addr, port)
+	client_new(cit, sock, addr, port)
 
 end
 
@@ -1633,8 +1775,12 @@ local function draw_error_msg(cit)
 
 	logf(LG_DBG,lgid,"draw_error_msg()")
 
-	if message_received then return end
+	if not error_msg_enabled then 
+		logf(LG_DBG,lgid,"error msg disabled")
+		return 
+	end
 
+	logf(LG_DBG,lgid,"draw_error_msg()")
 	display:clear()
 
 	for row = 1, 2 do
@@ -1691,13 +1837,13 @@ local function connect_to_server( cit )
 
 	-- Try to connect
 	
-	local host = config:get("/cit/resolved_remote_ip")
+	local host = config:get("/cit/remote_ip")
 	local port = config:get("/cit/tcp_port")
 	
 	-- resolve hostname and try all addresses
-	local addrs, errstr = net.gethostbyname(host)
+	local addrs = get_host_by_name(host)
 	if addrs == nil then
-		logf(LG_WRN, lgid, "Could not resolve host %s: %s", host, errstr)
+		logf(LG_WRN, lgid, "Server hostname %s not resolved (yet): not connecting to server", host)
 		return false
 	end
 
@@ -1734,7 +1880,7 @@ local function connect_to_server( cit )
 		net.close(sock)
 	end
 	
-	logf(LG_WRN, lgid, "Could not connect to %s.%s: %s", host, port, err)
+	logf(LG_WRN, lgid, "Could not connect to %s:%s - %s", host, port, err)
 	return false
 end 
 
@@ -1742,31 +1888,55 @@ end
 local function on_connect_timer(event, cit)
 	
 	local mode = config:get("/cit/mode")
-	-- Nothing to do in server mode or UDP only
-	if mode:find("server") or mode=="UDP" or mode == "TCP client on scan" then
-		return true
+	-- Only connect as tcp client
+	if mode=="client" or mode=="TCP client" then
+		cit:connect_to_server()
 	end
 
-	cit:connect_to_server()
-	 
 	return true
 end
 
+-- close udp listening port
+local function close_udp(cit)
+	if cit.sock_udp then
+		net.close(cit.sock_udp)
+		evq:fd_del(cit.sock_udp)
+		cit.sock_udp = nil
+	end
+end
+
+-- close tcp connections and listening port
+local function close_tcp(cit)
+	if cit.sock_tcp then
+		net.close(cit.sock_tcp)
+		evq:fd_del(cit.sock_tcp)
+		cit.sock_tcp = nil
+	end
+
+	for client,_ in pairs(cit.client_list) do
+		net.close(client.sock)
+		evq:fd_del(client.sock)
+		evq:unregister("fd", on_tcp_client, client)
+		cit.client_list[client] = nil
+	end
+	cit.client_connected = false
+end
 
 local function init_cit_mode()
 
 	local mode = config:get("/cit/mode")
 	local udp_port = config:get("/cit/udp_port")
 	local tcp_port = config:get("/cit/tcp_port")
-	local remote_ip = config:get("/cit/resolved_remote_ip")
+	local remote_hostname = config:get("/cit/remote_ip")
+	local remote_ip = get_host_by_name( remote_hostname )
 	
 	-- Close UDP port when needed:
 	if cit.sock_udp ~= nil and 
-			(udp_port ~= cit.udp_port or mode:find("TCP")) then
+			(udp_port ~= cit.udp_port or mode:find("TCP")) or mode=="offline" then
 		close_udp(cit)
 	end
 	-- Open udp port when not "TCP server" and not "TCP client" or "TCP client on scan"
-	if cit.sock_udp == nil and not mode:find("TCP") then
+	if cit.sock_udp == nil and mode=="server" or mode=="UDP" then
 		local sock = net.socket("udp")
 		net.bind(sock, "0.0.0.0", udp_port);
 		evq:fd_add(sock)
@@ -1779,27 +1949,31 @@ local function init_cit_mode()
 			(tcp_port ~= cit.tcp_port or not mode:find("server")) then
 		close_tcp(cit)
 	end
-	if cit.sock_tcp == nil then
-		if mode:find("server") then
-			-- Open tcp listen port mode is "server" or "TCP server"
-			local sock = net.socket("tcp")
-			
-			--enable_keepalive_config( net, sock )
-			
-			--net.setsockopt( sock , "TCP_NODELAY", 1 )
-			
-			net.bind(sock, "0.0.0.0", tcp_port)
-			net.listen(sock, 5)
-			evq:fd_add(sock)
-			cit.sock_tcp = sock
-			logf(LG_INF, lgid, "Listening on TCP port %d", tcp_port)
-		end
+	if cit.sock_tcp == nil and mode:find("server") then
+		-- Open tcp listen port mode is "server" or "TCP server"
+		local sock = net.socket("tcp")
+		net.bind(sock, "0.0.0.0", tcp_port)
+		net.listen(sock, 5)
+		evq:fd_add(sock)
+		cit.sock_tcp = sock
+		logf(LG_INF, lgid, "Listening on TCP port %d", tcp_port)
 	end
 
 	cit.udp_port = udp_port
 	cit.tcp_port = tcp_port
-	cit.remote_ip = remote_ip
-	
+
+	if offline_server ~= nil then
+		if config:get("/cit/offlinedb/enabled") == "true" then
+			logf(LG_DBG,lgid,"OFFLINE database enabled")
+			offline_server:start()
+		else
+			logf(LG_DBG,lgid,"OFFLINE database disabled")
+			offline_server:stop()
+		end
+	elseif config:get("/cit/offlinedb/enabled") == "true" then
+		logf(LG_WRN,lgid,"OFFLINE not possible (insert mmc). Disabling offlinedb.")
+		config:set("/cit/offlinedb/enabled", "false")
+	end
 end
 
 
@@ -1807,7 +1981,7 @@ end
 local function on_send_to_clients( event, cit )
 	-- defensive programming:
 	if event.data then
-		cit:send_to_clients( event.data )
+		cit:handle_device_event( event.data )
 	end
 end
 
@@ -1818,10 +1992,13 @@ local function on_sendevent_for_msg(event, cit)
 	if one_time_timeout_id ~= nil and event.data.one_time_timeout_id == one_time_timeout_id then
 		logf(LG_DBG,lgid,"pushing %s at %d seconds", one_time_timeout_msg, event.data.msg_timeout)
 		evq:push(event.data.msg_type, event.data, event.data.msg_timeout)
-		cit:send_to_clients( "TT" .. one_time_timeout_tag )
-		one_time_timeout_tag = nil
-		if event.data.msg_type == "cit_error_msg" then
-			message_received = false
+		local handled = cit:handle_device_event( "TT" .. one_time_timeout_tag )
+		-- watch out: handled can be nil, false and true
+		if handled ~= true then
+			one_time_timeout_tag = nil
+			if event.data.msg_type == "cit_error_msg" then
+				error_msg_enabled = true
+			end
 		end
 	end
 end
@@ -1883,7 +2060,7 @@ local function on_barcode(event, cit)
 		if barcode == nil then
 			success = false
 		else
-			logf(LG_INF, lgid, "Scanned barcode: '%s%s'", 
+			logf(LG_EVT, lgid, "Scanned barcode: '%s%s'", 
 					prefix or "", ((#barcode <= 255) and barcode or (barcode:sub(1,255) .. "...")) )
 
 			if barcode_mode == "normal" then
@@ -1937,7 +2114,10 @@ local function on_scan_rf(event, cit)
 		push_cit_idle_msg( )
 
 	else
-	
+
+		-- Do not log the data, because that would give a potential security risc
+		logf(LG_EVT,lgid,"Event from rfid: cardnum=%s", event.data.cardnumstr)
+
 		local data = ""
 		if config:get("/dev/mifare/cardnum_format") == "hexadecimal" then
 			data = event.data.cardnumstr
@@ -1965,12 +2145,16 @@ local function on_scan_rf(event, cit)
 			end
 		end
 
-		cit:send_to_clients( "MF" .. data )
-
-		-- and show the error screen when timeout has passed without command:
-		message_received = false
-		local timeout = tonumber(config:get("/cit/messages/error/timeout"))
-		evq:push("cit_error_msg", nil, timeout)
+		local handled = cit:handle_device_event( "MF" .. data )
+		if handled == false then
+			-- and show the error screen when timeout has passed without command:
+			error_msg_enabled = true
+			local timeout = tonumber(config:get("/cit/messages/error/timeout"))
+			evq:push("cit_error_msg", nil, timeout)
+		elseif handled == nil then
+			error_msg_enabled = true
+			evq:push("cit_error_msg", nil, 0)
+		end
 		
 	end
 	
@@ -1979,16 +2163,10 @@ end
 -- handle gpio event
 local function on_gpio(event, cit)
 
-	if event.data.IN1 then
-		local level = string.char(event.data.IN1+0x30)
-		logf(LG_DBG, lgid, "on_gpio(): IN1=%s", level)
-		cit:send_to_clients( config:get("/dev/gpio/prefix") .. "0" .. level )
-	end
+	logf(LG_DBG, lgid, "on_gpio()")
 
-	if event.data.IN2 then
-		local level = string.char(event.data.IN2+0x30)
-		logf(LG_DBG, lgid, "on_gpio(): IN2=%s", level)
-		cit:send_to_clients( config:get("/dev/gpio/prefix") .. "1" .. level )
+	for pin,evt in pairs(event.data) do
+		cit:handle_device_event( format_gpi_event( pin, evt ) )
 	end
 
 end
@@ -1997,16 +2175,20 @@ end
 -- handle touch16 event
 local function on_touch16(event, cit)
 
+	if event.data == nil then return end
+
 	logf(LG_DBG, lgid, "on_touch16(data.type='%s')", (event.data.type or "nil"))
 
 	if event.data.type == "key" then
-		cit:send_to_clients( config:get("/dev/touch16/prefix") .. event.data.key .. (event.data.tag or ""))
+		logf(LG_EVT,lgid,"Event from touch-pad: key '%s' with tag '%s'", event.data.key, (event.data.tag or ""))
+		cit:handle_device_event( config:get("/dev/touch16/prefix") .. event.data.key .. (event.data.tag or "") )
 	elseif event.data.type == "activated" then
 	elseif event.data.type == "deactivated" then
+		logf(LG_EVT,lgid,"Event from touch-pad: %s", event.data.type)
 		if event.data.cause and event.data.cause == "timeout" then
-			cit:send_to_clients( config:get("/dev/touch16/prefix") .. "T" )
+			cit:handle_device_event( config:get("/dev/touch16/prefix") .. "T" )
 		else
-			cit:send_to_clients( config:get("/dev/touch16/prefix") .. "Q" )
+			cit:handle_device_event( config:get("/dev/touch16/prefix") .. "Q" )
 		end
 		
 		push_cit_idle_msg( config:get("/cit/messages/error/timeout") )
@@ -2021,7 +2203,7 @@ local function on_display_clear( event, cit )
 		logf(LG_DBG,lgid,"Killing a one-time-timeout due to display_clear event")
 		if one_time_timeout_tag ~= nil then
 			-- no timeout send yet:
-			cit:send_to_clients( "TQ" .. one_time_timeout_tag )
+			cit:handle_device_event( "TQ" .. one_time_timeout_tag )
 		end
 		one_time_timeout_id = nil
 		one_time_timeout_msg = nil
@@ -2029,73 +2211,6 @@ local function on_display_clear( event, cit )
 	end
 end
 
-local resolved_ip_hostname = nil
-local resolved_ip = nil
-local resolved_ip_time = nil
-local function on_get_resolved_remote_ip(node,cit)
-
-	local hostname = config:get("/cit/remote_ip")
-
-	-- invalidate cache when it more than 1 day old
-	if resolved_ip_time and sys.hirestime() - resolved_ip_time > 60*60*24 then
-		resolved_ip = nil
-		resolved_ip_time = nil
-		logf(LG_DBG,lgid,"Invalidating resolved ip cache because it was more than 1 day ago resolved")
-	end
-	
-	-- check if it is cached:
-	if resolved_ip_hostname == hostname and resolved_ip ~= nil then
-		logf(LG_DBG,lgid,"Using cached resolved ip %s", resolved_ip or "nil" )
-		return resolved_ip
-	end
-
-	-- just use it when it is formatted as a valid ip
-	local n1,n2,n3,n4 = hostname:match("^(%d%d?%d?).(%d%d?%d?).(%d%d?%d?).(%d%d?%d?)%s*$")
-	if n1 and n2 and n3 and n4 and 
-			tonumber(n1)<=255 and tonumber(n2)<=255 and 
-			tonumber(n3)<=255 and tonumber(n4)<=255 then
-		resolved_ip_hostname = hostname
-		resolved_ip = hostname
-		resolved_ip_time = sys.hirestime()
-		logf(LG_DBG,lgid,"Using ip literal %s", resolved_ip )
-		return resolved_ip
-	end
-	
-	-- otherwise start resolving:
-	-- start gethostbyname in the background and fill in "/cit/resolved_remote_ip"
-	-- invalidate the old value:
-	resolved_ip_hostname = hostname
-	resolved_ip = nil
-	
-	logf(LG_DBG,lgid,"Starting 'gethostbyname' for %s", hostname)
-	runbg("killall /cit200/gethostbyname > /dev/null 2>&1; /cit200/gethostbyname " .. hostname,
-		function(rv,cit)
-			if rv == 0 then
-				-- ok
-				logf(LG_INF,lgid,"Using server ip %s (=%s)",
-						resolved_ip or "nil", resolved_ip_hostname or "nil");
-				resolved_ip_time = sys.hirestime()
-			else
-				-- failed
-				logf(LG_WRN,lgid,"Failed resolv ip for hostname '%s'", hostname or "nil");
-			end
-		end,
-		function(data,cit)
-			local ip = data:match("^(%d+%.%d+%.%d+%.%d+)")
-			logf(LG_DBG,lgid,"found ip %s for %s (first of %s)", ip or "nil", hostname, data or "nil")
-			resolved_ip = ip
-		end,
-		cit)
-	
-	-- just wait 1 second in case it is resolved very quick (but most times it should be cached):
-	for i=1,10 do
-		if resolved_ip then
-			return resolved_ip
-		end
-		sys.sleep(0.1)
-	end
-	return "0.0.0.0"
-end
 
 --
 -- Start CIT server process
@@ -2130,7 +2245,7 @@ local function start(cit)
 
 	-- Show version info on display, and schedule idle message in 3 seconds
 
-	message_received = false
+	error_msg_enabled = true
 
 	local keys = {
 		"/dev/name",
@@ -2157,31 +2272,6 @@ local function start(cit)
 
 end
 
--- close udp listening port
-local function close_udp(cit)
-	if cit.sock_udp then
-		net.close(cit.sock_udp)
-		evq:fd_del(cit.sock_udp)
-		cit.sock_udp = nil
-	end
-end
-
--- close tcp connections and listening port
-local function close_tcp(cit)
-	if cit.sock_tcp then
-		net.close(cit.sock_tcp)
-		evq:fd_del(cit.sock_tcp)
-		cit.sock_tcp = nil
-	end
-
-	for client,_ in pairs(cit.client_list) do
-		net.close(client.sock)
-		evq:fd_del(client.sock)
-		evq:unregister("fd", on_tcp_client, client)
-		cit.client_list[client] = nil
-	end
-	cit.client_connected = false
-end
 
 --
 -- Stop CIT and cleanup
@@ -2274,6 +2364,62 @@ local function on_change_ftp_auth()
 	os_execute( "while killall vsftpd; do sleep 0.1; done; vsftpd &" )
 end
 
+local offline_db_import_busy = false
+local offline_db_import_fname = nil
+local function on_offline_db_event( event, cit )
+	local data = event.data
+	if data.ready == true then
+		if data.error then
+			beeper:beep_error()
+			cit:send_to_clients("NDE " .. (data.md5sum or "<nil>") .. " \"" .. data.error .. "\"")
+		else
+			cit:send_to_clients("NDR " .. (data.md5sum or "<nil>"))
+		end
+		offline_db_import_busy = false
+		push_cit_idle_msg(0)
+	else
+		if data.fname and data.fname:match("^/udisk") then
+			offline_db_import_fname = data.fname
+			display:clear()
+			-- TODO: make text configurable
+			display:show_message("Extracting offlinedb...")
+			display:update()
+		end
+		if offline_db_import_fname and data.fname == nil then
+			display:clear()
+			-- TODO: make text configurable
+			display:show_message("Remove USB now")
+			push_cit_idle_msg( )
+			offline_db_import_fname = nil
+		end
+		if not offline_db_import_busy and data.md5sum then
+			cit:send_to_clients("NDS " .. data.md5sum)
+			offline_db_import_busy = true
+		end
+		local position = config:get("/cit/offlinedb/import_busy_msg_pos")
+		if position~="none" then
+			local h = position:match("left") and "l" or "r"
+			local v = position:match("top") and "t" or "b"
+			local msg = config:get("/cit/offlinedb/import_busy_msg"):gsub("${progress}", (data.progress and string.format("%d",data.progress) or "?") )
+			display:format_text(msg, 0, 0, h, v, 10, true)
+			display:update(true)
+		end
+	end
+end
+
+function on_gpio_method_change(evt, cit)
+	local method = config:get("/dev/gpio/method")
+	if method == "On read GPIO" then
+		gpio:disable()
+	else
+		gpio:enable()
+		if method == "Poll" and not cit.gpi_polling_enabled then
+			-- start polling
+			evq:push("cit_gpio_poll",nil,config:get("/dev/gpio/poll_delay"))
+			cit.gpi_polling_enabled = true
+		end
+	end
+end
 
 --
 -- Create cit
@@ -2296,6 +2442,7 @@ function new()
 		tcp_port = "",
 		sock_tcp = nil,
 		remote_ip = "",
+		gpi_polling_enabled = false,
 
 		power_saving_on = false,
 		count_nulls_in_a_row = 0, -- used for ignoring three or more \0 charracters in display text (c1000 bug)
@@ -2307,9 +2454,11 @@ function new()
 		draw_idle_msg = draw_idle_msg,
 		draw_error_msg = draw_error_msg,
 		send_to_clients = send_to_clients,
+		handle_device_event = handle_device_event,
 		display_image = display_image,
 		restore_defaults = restore_defaults,
 		connect_to_server = connect_to_server,
+		handle_bytes = handle_bytes,
 	}
 
 	set_password_salt( password_salt )
@@ -2361,7 +2510,21 @@ function new()
 			end
 		end
 	end
-	
+
+	evq:register( "cit_gpio_poll", function (evt,cit)
+			if config:get("/dev/gpio/method") == "Poll" then
+				cit:handle_device_event( format_gpi_event( 5, gpio:get_pin(5) ) )
+				cit:handle_device_event( format_gpi_event( 7, gpio:get_pin(7) ) )
+				-- reschedule the event:
+				evq:push("cit_gpio_poll",nil,config:get("/dev/gpio/poll_delay"))
+			else
+				cit.gpi_polling_enabled = false
+			end
+		end, cit)
+
+	config:add_watch("/dev/gpio/method", "set", on_gpio_method_change, cit)
+	on_gpio_method_change(nil,cit)
+
 	-- Get codepage
 	
 	cit.codepage = config:get("/cit/codepage") 
@@ -2371,7 +2534,29 @@ function new()
 		end, cit)
 	
 	-- Get resolv remote_ip or convert remote_ip to address
-	config:add_watch("/cit/resolved_remote_ip", "get", on_get_resolved_remote_ip, cit)
+	lookup_busy = false
+	evq:register("lookup_remote_ip", 
+		function (event, cit)
+			local mode = config:get("/cit/mode")
+			if	 mode == "server" or mode=="client" or mode == "UDP" or 
+					mode == "TCP client" or mode=="TCP client on scan" then
+				local ips = get_host_by_name( config:get("/cit/remote_ip") )
+				lookup_busy = ips == nil
+			else
+				lookup_busy = false
+			end
+			return lookup_busy
+		end, cit ); 
+	-- force a lookup when the hostname changed
+	config:add_watch("/cit/remote_ip", "set", 
+		function() 
+			-- start retry when none is busy and an initial lookup did not work
+			if not lookup_busy and get_host_by_name( config:get("/cit/remote_ip") ) == nil then 
+				evq:push("lookup_remote_ip", cit, 15) 
+			end
+		end, cit)
+	-- force a first lookup:
+	evq:push("lookup_remote_ip", cit, 15)
 
 	display:set_font( font, fontsize_small )
 	
@@ -2381,6 +2566,10 @@ function new()
 	evq:push("connect_timer", cit, 3.0)
 
 	evq:register("programming_mode_timeout", on_programming_mode_timeout, cit)
+
+	if offline_server ~= nil then
+		evq:register("offline", on_offline_db_event, cit)
+	end
 	
 	-- configure ftp in case the cit.conf is overwritten during startup (/udisk/cit.conf)
 	on_change_ftp_auth()

@@ -7,7 +7,7 @@
 #include <stdarg.h>
 void trace_header( const char* file, int line, const char* function )
 {
-	printf("%s:%d - %s", file, line, function);
+	fprintf(stderr,"%s:%d - %s", file, line, function);
 }
 // function style trace!
 #define TRACE(msg...) do{trace_header(__FILE__,__LINE__,__FUNCTION__);printf(" "msg); printf("\n");}while(0)

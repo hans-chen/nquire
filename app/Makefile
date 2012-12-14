@@ -14,11 +14,15 @@
 #
 
 NAME    := cit-app
-BUILD   := $(shell svnversion -c . | cut -d : -f 2)
 # only use a major and a minor verion number
 # patch level numbering is not SG15 compatible!
-VERSION	:= 1.7
+VERSION	:= 2.0
 LABEL := $(VERSION).$(BUILD)
+ifdef RELEASE
+BUILD   := $(shell svnversion -c . | cut -d : -f 2)
+else
+BUILD   := $(shell svnversion -c . | cut -d : -f 2).beta
+endif
 
 all:
 
@@ -68,6 +72,14 @@ mifare.so : LDFLAGS += -L../lib/rfid/ -lnlrf
 
 EXE += gethostbyname
 gethostbyname: gethostbyname.c
+
+EXE += scangpi
+scangpi: scangpi.c
+LDFLAGS_scangpi = -lrt
+
+EXE += offline_import_csv
+offline_import_csv: offline_import_csv.c
+offline_import_csv: CFLAGS += -DNDEBUG
 
 LUA_SRC             = $(shell ls -1 *lua)
 
@@ -142,8 +154,12 @@ $(SUBDIRS):
 	$(STRIP) $@
 	chmod -x $@
 
+
+offline_import_csv: offline_import_csv.o
 gethostbyname: gethostbyname.o
-	$(CC) $(CFLAGS) $< -o $@ -L../toolchain/usr/lib  
+scangpi: scangpi.o
+%:%.o
+	$(CC) $(CFLAGS) $< -o $@ -L../toolchain/usr/lib $(LDFLAGS_$@)
 	$(STRIP) $@
 	chmod 751 $@
 	
@@ -163,7 +179,7 @@ links:
 clean:	
 	@echo "[$@]"
 	-rm -rf binary dist doc
-	-rm -f $(OBJS) $(MODULES) core $(EXE) gethostbyname.o
+	-rm -f $(OBJS) $(MODULES) core $(EXE) gethostbyname.o scangpi scangpi.o offline_import_csv offline_import_csv.o
 	for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
 
 clobber: clean
@@ -191,7 +207,7 @@ $(INSTALL)/%.so:%.so
 install: clobber_install \
 		$(EXE) $(LUA_SRC:%=$(INSTALL)/%) $(MODULES:%=$(INSTALL)/%)
 	@echo "[$@]"
-	cp -a cit arial.ttf gethostbyname $(INSTALL)/
+	cp -a cit arial.ttf gethostbyname scangpi offline_import_csv $(INSTALL)/
 	cp -a http/* $(INSTALL)/http/
 	cp -a schema/*.schema $(INSTALL)/schema/
 	cp -a img/ftp/* $(INSTALL)/img/ftp/

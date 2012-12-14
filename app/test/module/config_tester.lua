@@ -85,7 +85,7 @@ end
 local function test2()
 
 	-- now a real-life test:
-	os.execute("ln -s ../schema .")
+	os.execute("ln -sf ../schema .")
 	os.execute("rm -f cit.conf")
 
 	-- first time should create a new file with default settings
@@ -117,7 +117,60 @@ local function test2()
 	
 end
 
+local function test_volatile()
+
+	local config = Config.new("module/config_tester.schema", "config_tester.conf", "config_tester_ext.conf" )
+
+	local function tst( s, ... )
+		th:start("config:set_config_item('" .. s .. "')")
+
+		print("Before:")
+		for i,item in ipairs({...}) do
+			print(item .. " = \"" .. config:get(item) .. "\"")
+		end
+		config:set_config_item(s)
+		print("After:")
+		for i,item in ipairs({...}) do
+			print(item .. " = \"" .. config:get(item) .. "\"")
+		end
+	end
+
+	tst( "/settings/volatile_item")
+
+	th:start("save_db")
+
+	config:save_db()
+
+	-- and print the new configfile contents for verification
+	print("Saved configfile:")
+	local fd = io.open("config_tester_ext.conf", "r")
+	local txt = fd:read("*all")
+	fd:close()
+	print(txt)
+
+	local function on_volatile_item(node, data)
+		print("on_volatile_item, data=" .. data .. ", value=" .. node:get())
+	end
+
+	config:add_watch("/volatile_item", "set", on_volatile_item,"myvolatiledata")
+
+	print("1 before set: " .. config:get("/volatile_item"))
+	local node = config:lookup( "/volatile_item" )
+	node:set( "two" )
+	print("1 after set : " .. config:get("/volatile_item"))
+	for i=1,14 do
+	evq:pop(true)
+	end
+
+	print("2 before set: " .. config:get("/volatile_item"))
+	config:set( "/volatile_item", "one", true )
+	print("2 after set : " .. config:get("/volatile_item"))
+	evq:pop()
+	evq:pop()
+
+end
+
 th:run( test1, "test1" )
 th:run( test2, "test2" )
 
-
+th:run( test_volatile, "test_volatile" )

@@ -23,6 +23,7 @@ all:
 # test and module definitions
 
 MODULE_TESTS   += \
+	module/offline_tester.lua\
 	module/net_tester.lua\
 	module/base64_tester.lua\
 	module/misc_tester.lua\
@@ -90,11 +91,11 @@ MAKE	= $(MAKE)
 .PHONY: all test clean clobber
 #	test_base	execute all base
 
-all: prepare
+all: prepare 
 
-prepare: links $(MODULES)
+prepare: links $(MODULES) offline_import_csv
 	make -C img all
-	make -C testserver all install
+	#make -C testserver all install
 
 discover:
 	nquire-discover.exe -1 > .cit.ip
@@ -104,11 +105,19 @@ test_base: $(TARGET_BASE_TEST_RESULTS)
 test_mifare: $(TARGET_MIFARE_TEST_RESULTS)
 test: test_module test_base
 
+offline_import_csv: ../offline_import_csv.c
+	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
+
 test%:
+	echo "target=$@"
 	if ! diff --exclude=.svn verified results; then echo "There were errors"; meld verified results; fi
 
 show:
 	meld verified results
+
+
+offlinedbs: generate_example_dbs.lua
+	generate_example_dbs.lua
 
 # cleanup testresults etc, but don't remove prepare things
 clean:
@@ -116,7 +125,7 @@ clean:
 
 clobber: clean
 	-rm -rf results *~ img/anim.gif config_tester.conf
-	-rm -f schema config_tester.conf1 cit.conf minimal.supp minimalraw.log
+	-rm -f schema config_tester.conf1 cit.conf minimal.supp minimalraw.log offlinedb*.zip
 	make -C img clobber
 	make -C testserver clobber
 
@@ -164,7 +173,7 @@ results/%.out:
 .SECONDEXPANSION:
 
 $(MODULE_TEST_RESULTS): $$(module_$$(basename $$(notdir $$@))_DEP)
-$(MODULE_TEST_RESULTS): module/$$(basename $$(notdir $$@))
+$(MODULE_TEST_RESULTS): module/$$(basename $$(notdir $$@).lua)
 
 $(TARGET_TEST_RESULTS): $$(target_$$(basename $$(notdir $$@))_DEP)
 $(TARGET_TEST_RESULTS): target/$$(basename $$(notdir $$@))

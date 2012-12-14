@@ -30,6 +30,7 @@ clobber: clean
 	rm -f *~ *.o
 	
 install: all
+	-killall testserver
 	if test -d ${HOME}/bin; then cp testserver ${HOME}/bin; fi
 
 $(ALL): SRC=$($@_SRC)

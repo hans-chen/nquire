@@ -56,6 +56,16 @@ fieldset {
 	padding-right: 10px;
 }
 
+.log-evt {
+	vertical-align: top;
+	font-family: mono;
+	font-size: 0.8em;
+	color: grey;
+	border: solid 1px #dddddd;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
 .log-inf {
 	vertical-align: top;
 	font-family: mono;
@@ -100,18 +110,18 @@ legend {
 	height: 70px;
 	margin: 0px;
 	padding: 0px;
-	background-image: url(top-gradient.jpg); 
+	background-image: url(top-gradient.png); 
 	border-collapse: collapse;
 }
 
 .top-left {
-	background-image: url(top-left.jpg); 
+	background-image: url(top-left.png); 
 	background-repeat: no-repeat;
 	width: 608px;
 }
 
 .top-right {
-	background-image: url(top-right.jpg); 
+	background-image: url(top-right.png); 
 	background-repeat: no-repeat;
 	background-position: top right;
 }
@@ -121,12 +131,12 @@ legend {
 	height: 70px;
 	margin: 0px;
 	padding: 0px;
-	background-image: url(bottom-gradient.jpg); 
+	background-image: url(bottom-gradient.png); 
 	border-collapse: collapse;
 }
 
 .bottom-left {
-	background-image: url(bottom-left.jpg); 
+	background-image: url(bottom-left.png); 
 	background-repeat: no-repeat;
 	background-position: top left;
 }

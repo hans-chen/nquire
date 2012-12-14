@@ -439,11 +439,11 @@ local function page_network(client, request)
 
 	box_start(client, "network", "NQuire protocol settings")
 		local mode = config:get("/cit/mode")
+		draw_node(client, config:lookup("/cit/mode"), false, "onChange=\"enable_disable(this.value!='UDP' && this.value!='offline','tcp_port');enable_disable(this.value!='TCP server' && this.value!='TCP client' && this.value!='TCP client on scan' && this.value!='offline','udp_port');enable_disable(this.value!='TCP server' && this.value!='offline','remote_ip') \"" )
 		draw_node(client, config:lookup("/cit/udp_port"), false, "id='udp_port'" .. 
-				(mode:find("TCP") and " disabled" or "") )
+				((mode:find("TCP") or mode=="offline") and " disabled" or "") )
 		draw_node(client, config:lookup("/cit/tcp_port"), false, "id='tcp_port'" .. 
-				(mode=="UDP" and " disabled" or "") )
-		draw_node(client, config:lookup("/cit/mode"), false, "onChange=\"enable_disable(this.value!='UDP','tcp_port');enable_disable(this.value!='TCP server' && this.value!='TCP client' && this.value!='TCP client on scan','udp_port');enable_disable(this.value!='TCP server','remote_ip') \"" )
+				((mode=="UDP" or mode=="offline") and " disabled" or "") )
 		draw_node(client, config:lookup("/cit/remote_ip"), false, "id='remote_ip'" .. 
 				(mode=="TCP server" and " disabled" or "") )
 	box_end(client)
@@ -651,6 +651,16 @@ local function page_miscellaneous(client, request)
 	draw_node(client, config:lookup("/dev/name"))
 	box_end(client)
 
+	if offline_server then
+		box_start(client, "miscellaneous", "Offline database")
+		draw_node(client, config:lookup("/cit/offlinedb/enabled"), false,"onClick=\"enable_disable(value=='true','offlinedb_mode');enable_disable(value=='true','offlinedb_import_busy_msg');enable_disable(value=='true','offlinedb_import_busy_msg_pos');enable_disable(value=='true','offlinedb_failure')\"")
+		draw_node(client, config:lookup("/cit/offlinedb/mode"), false, " id='offlinedb_mode'")
+		draw_node(client, config:lookup("/cit/offlinedb/import_busy_msg"), false, " id='offlinedb_import_busy_msg'")
+		draw_node(client, config:lookup("/cit/offlinedb/import_busy_msg_pos"), false, " id='offlinedb_import_busy_msg_pos'")
+		draw_node(client, config:lookup("/cit/offlinedb/failure"), false, " id='offlinedb_failure'")
+		box_end(client)
+	end
+
 	box_start(client, "miscellaneous", "Authentication")
 	draw_node(client, config:lookup("/dev/auth/enable"),false,"onClick=\"enable_disable(value=='true', 'auth_username');enable_disable(value=='true', 'auth_password');enable_disable(value=='true', 'auth_password_shadow')\"")
 	local extra = config:lookup("/dev/auth/enable").value=="true" and "" or " disabled";
@@ -686,9 +696,10 @@ local function page_miscellaneous(client, request)
 
 	box_start(client, "miscellaneous", "GPIO")
 	draw_node(client, config:lookup("/dev/gpio/prefix"))
+	draw_node(client, config:lookup("/dev/gpio/event_counter"))
 	draw_node(client, config:lookup("/dev/gpio/method"),false,"onChange=\"enable_disable(this.value=='Poll','poll_delay')\"" )
-	local gpio_poll_delay_disabled = config:get("/dev/gpio/method")=="Poll" and "" or " disabled";
-	draw_node(client, config:lookup("/dev/gpio/poll_delay"),false," id='poll_delay'" .. gpio_poll_delay_disabled)
+	local gpi_poll_delay_disabled = config:get("/dev/gpio/method")=="Poll" and "" or " disabled";
+	draw_node(client, config:lookup("/dev/gpio/poll_delay"),false," id='poll_delay'" .. gpi_poll_delay_disabled)
 	box_end(client)
 	
 	if config:get("/dev/touch16/name") ~= "" then
@@ -701,7 +712,7 @@ local function page_miscellaneous(client, request)
 		draw_node(client, config:lookup("/dev/touch16/send_active_keys_only"))
 		box_end(client)
 	end
-	
+
 	form_end(client)
 	body_end(client);
 
@@ -709,17 +720,25 @@ end
 
 
 local function page_log(client, request)
-	
+
+	if config:get("/cit/loglevel") == "3" then
+		config:lookup("/cit/webui_loglevel"):setraw( "info" )
+	else
+		config:lookup("/cit/webui_loglevel"):setraw( "event" )
+	end
+
+
 	draw_head(client)
 	body_begin(client);
 	
 	local line = 1
-	local f = io.popen("logread", "r")
+	--local f = io.popen("logread", "r")
+	local f = io.popen("cat /home/ftp/messages.2 /home/ftp/messages.1 /home/ftp/messages.0 /home/ftp/messages", "r")
 	if f then
 		box_start(client, "log", "System log")
 		client:add_data("<table class=log>")
 		for l in f:lines() do
-			-- Jan  1 01:56:38 NEWLAND_CIT user.notice lua: inf webserver: 10.0.0.56: GET /bottom-left.jpg
+			-- Jan  1 01:56:38 NEWLAND_CIT user.notice lua: inf webserver: 10.0.0.56: GET /bottom-left.png
 			--local level, component, msg = l:match("lua: (%S+) (%S-): (.+)")
 			-- change above to this when logging should be with time string
 			-- also see log.lua (doing syslog)
@@ -739,6 +758,13 @@ local function page_log(client, request)
 		client:add_data("</table>")
 		f:close()
 		box_end(client)
+
+		form_start(client)
+			box_start(client, "log", "Log settings")
+			draw_node(client, config:lookup("/cit/webui_loglevel"))
+			box_end(client)
+		form_end(client)
+
 	else
 		logf(LG_WRN,lgid,"Could not read the log")
 		client:add_data("<table>ERROR: could not read the system log</table>")
@@ -1015,10 +1041,21 @@ local function on_webserver(client, request)
 
 end
 
+local function set_webui_loglevel( node )
+	logf(LG_INF,lgid,"Setting loglevel to %s", node:get())
+	if node:get() == "info" then
+		config:set("/cit/loglevel", "3" )
+	else 
+		config:set("/cit/loglevel", "4" )
+	end
+end
 
 function new()
 
 	webserver:register("/", on_webserver)
+
+	config:add_watch("/cit/webui_loglevel", "set", set_webui_loglevel, nil)
+
 	
 end
 

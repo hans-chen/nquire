@@ -4,39 +4,57 @@
 
 CIT_IP_FILE=.cit.ip
 
-function help()
+function help
 {
-    echo "usage: put [<ip>]"
+    echo "usage: put [-dq]|[-ip <nquire-ip>]"
 	echo "When ip is omitted, the content of file ./$CIT_IP_FILE is used"
 }
 
-if test -z "$1"; then
+function test_ip
+{
+	if ! ping -c 1 $1; then
+		help
+		exit -1
+	fi
+}
+
+if test "$1" = "-ip"; then
+	IP=$2
+	shift	
+	shift
+	test_ip ${IP}
+	echo $IP > $CIT_IP_FILE
+elif test "$1" = "-dq"; then
+	echo "Discovering nquire..."
+	IP=`nquire-discover.exe -1`
+	if test -z "$IP"; then
+		help
+	    exit -1
+	fi
+else
 	if test -f $CIT_IP_FILE; then
 		IP=`cat $CIT_IP_FILE`
+		test_ip ${IP}
 	else
 		help
 	    exit -1
 	fi		
-else
-	IP=$1
 fi
 
-if ping -c 1 $IP; then
-    CIT=$IP
-	echo $IP > $CIT_IP_FILE
-else
-	help
-    exit -1
-fi
+echo "Uploading to $IP"
 
+
+# first with luac to detect compile errors
+if ! make clean install; then
+	exit
+fi
 make clean
 rm -f app.tar
-#make DEBUG=ON mifare.so
-if make base64.so beepthread.so dpydrv.so net.so sys.so mifare.so && 
-		make install && 
-		make app.tar;
-then
-	curl ftp://$CIT/ --upload-file app.tar
-	curl ftp://$CIT/ --upload-file install
-fi
 
+#if make TRACEON=true sys.so; then
+	# don't compile, just copy!
+	if make DEBUG=on all install app.tar;
+	then
+		pcit -ip $IP app.tar tools/install
+	fi
+#fi

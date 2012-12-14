@@ -22,8 +22,8 @@ int main( int argc, char *argv[] )
 
 	struct addrinfo *res;
 	int addr_counter = 0;
-	char *sep = "";
 	
+	printf("%s", node);
 	for( res = result; res != 0; res = res->ai_next )
 	{
 		// only display the address when it is unique
@@ -37,11 +37,10 @@ int main( int argc, char *argv[] )
 			inet_ntop(sa->sin_family, &sa->sin_addr, s, sizeof(s));
 			addr_counter++;
 		
-			printf("%s%s", sep, s);
-			sep = " ";
-			fflush(stdout);
+			printf(" %s", s);
 		}
 	}
 	freeaddrinfo( result );
+	fflush(stdout);
 	return 0;
 }

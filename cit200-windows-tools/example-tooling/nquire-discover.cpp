@@ -35,7 +35,7 @@ Author: M.R. van Dootingh
 
 using namespace std;
 
-#define VERSION 0.1
+#define VERSION 0.2
 
 // predefined discovery address and port
 static const char discovery_addr[] = "239.255.255.250";
@@ -65,26 +65,28 @@ std::string get_response_ip( std::string buf )
 void show_help()
 {
 	cout << endl
-		<< "nquire-discover [-h]|{[-n=n] [-s] [-r|+r] [-a]" << endl << endl
-		<< "VERSION = " << VERSION << endl << endl
-		<< "discover all nquires on a network" << endl << endl
-		<< "Options:" << endl
-		<< " -h      show this text" << endl
-		<< " -n=n    retry sending discovery packet n-times" << endl
-		<< " -1      exit immediately after 1str found nquire" << endl
-		<< " -s      let system decide which port to send from" << endl
-		<< "         and send RESPONSE-TO-SENDER-PORT discovery option" << endl
-		<< " -r      do not send RESPONSE-TO-SENDER-PORT discovery option" << endl
-		<< " +r      force use of RESPONSE-TO-SENDER-PORT discovery option" << endl
-		<< " -R      do not send RESPONSE-TO-SENDER-ADDRESS discovery option" << endl
-		<< " +R      force use of RESPONSE-TO-SENDER-ADDRESS discovery option" << endl
-		<< " -v=n    logging level 3=inf, 4=debug, 5=trace" << endl << endl
-		<< "E.g.:  nquire-discover -n=2 -s" << endl << endl
-		<< "Note: you won't receive the response packets when using " << endl
-		<< "option -s with -r because the response packet is sent to port 19200." << endl
-		<< "Contrary, using option -r can be used without -s because the sender" << endl
-		<< "port is the default response port. But than you will also receive" << endl
-		<< "the discovery packet itself." << endl << endl;
+		<< "nquire-discover [-h]|{[-n=n] [-s] [-r|+r] [-a]n\n\n"
+		<< "VERSION = " << VERSION << "\n\n"
+		<< "discover all nquires on a network\n\n"
+		<< "Options:\n"
+		<< " -h      show this text\n"
+		<< " -n=n    retry sending discovery packet n-times\n"
+		<< " -1      exit immediately after 1str found nquire\n"
+		<< " -s      let system decide which port to send from\n"
+		<< " -a      show all info of discovered nquires (default is only showing the ip)\n"
+		<< "         and send RESPONSE-TO-SENDER-PORT discovery option\n"
+		<< " -r      do not send RESPONSE-TO-SENDER-PORT discovery option\n"
+		<< " +r      force use of RESPONSE-TO-SENDER-PORT discovery option\n"
+		<< " -R      do not send RESPONSE-TO-SENDER-ADDRESS discovery option\n"
+		<< " +R      force use of RESPONSE-TO-SENDER-ADDRESS discovery option\n"
+		<< " -v=n    logging level 3=inf, 4=debug, 5=trace\n\n"
+		<< "E.g.:  nquire-discover -n=2 -s\n\n"
+		<< "Note: you won't receive the response packets when using\n"
+		<< "option -s with -r because the response packet is sent to port 19200.\n"
+		<< "Contrary, using option -r can be used without -s because the sender\n"
+		<< "port is the default response port. But than you will also receive\n"
+		<< "the discovery packet itself.\n"
+		<< endl;
 }
 
 #define sep "# ----------------------------------------\n"
@@ -106,6 +108,7 @@ int main(int argc, char * argv[]) {
 	int n = 3;
 	unsigned short port = discovery_port;
 	bool exit_1rst = false;
+	bool show_all = false;
 
 	int i;
 	for(i=1; i<argc; i++)
@@ -118,6 +121,10 @@ int main(int argc, char * argv[]) {
 		{
 			show_help();
 			exit(0);
+		}
+		else if( opt=="-a" )
+		{
+			show_all = true;
 		}
 		else if( opt=="-s" )
 		{
@@ -303,7 +310,7 @@ int main(int argc, char * argv[]) {
 
 			fd_set readfd;
 			FD_ZERO(&readfd);
-			FD_SET(fd,&readfd);
+			FD_SET(((unsigned)fd),&readfd);
 
 			rc=select(fd+1,&readfd,NULL,NULL,&tv);
 
@@ -319,7 +326,8 @@ int main(int argc, char * argv[]) {
 #endif
 				rc = recvfrom(fd,buf,sizeof(buf),0, (struct sockaddr*)(&from), &fromlen);
 				HANDLE_ERROR( rc );
-				LOG_DBG("message from " << inet_ntoa(from.sin_addr) 
+				std::string ipaddr =  inet_ntoa(from.sin_addr);
+				LOG_DBG("message from " << ipaddr
 						<< "." << ntohs(from.sin_port)
 						<< " (" <<  rc << "):'" << buf << "'");
 
@@ -329,7 +337,11 @@ int main(int argc, char * argv[]) {
 					if( discovered_nquires.find( ip ) == discovered_nquires.end() )
 					{
 						discovered_nquires.insert( make_pair(ip, buf) );
-						cout << ip << endl;
+						cout << ipaddr << endl; 
+						if( show_all )
+						{
+							cout << buf << endl;
+						}
 						if( exit_1rst )
 						{
 							n=0;

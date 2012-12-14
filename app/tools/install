@@ -14,65 +14,52 @@ if test $0 != /home/ftp/install -a -f /home/ftp/install; then
 	exit
 fi
 
-killall lua
-sleep .5
-if killall lua; then
-	killall -9 lua
-fi
-sleep .1
-
 if ! cd /cit200; then
 	exit
 fi
 
-if mount | grep workspace > /dev/null; then 
+./cit stop
 
-	echo "Mounted to `mount | grep workspace`"
-	echo "Not copying files"
-
-else
-
-	if test "$1" == "-a"; then
-		shift
-		cp /cit200/cit.conf /mnt
-		cd /cit200 && rm -rf *
-		cp /mnt/cit.conf /cit200
-		rm /mnt/cit.conf
-		ifdown eth0
-		ifdown wlan0
-	fi
-
-	#set -x
-	sync_file ( )
-	{
-		if ! test -f $2; then
-			echo "New file: $2"
-			cp -af $1 $2
-		else
-			if ! diff $1 $2 > /dev/null; then 
-				echo "Changed file: $2"
-				cp -af $1 $2
-			fi
-		fi
-	}
-		
-	# copy files that are different:
-	cd /home/ftp
-	mkdir app-tmp
-	cd app-tmp
-	tar xf ../app.tar
-	DIRS=`find . -type d`
-	cd /cit200
-	mkdir -p $DIRS
-	cd /home/ftp/app-tmp
-	for f in `find . -type f`; do 
-		sync_file "/home/ftp/app-tmp/$f" "/cit200/$f"
-	done
-	sync_file "/home/ftp/install" "/cit200/install" 
-	chmod +x /cit200/install
-	cd /cit200
-	rm -rf /home/ftp/app-tmp
+if test "$1" == "-a"; then
+	shift
+	cp /cit200/cit.conf /mnt
+	cd /cit200 && rm -rf *
+	cp /mnt/cit.conf /cit200
+	rm /mnt/cit.conf
+	ifdown eth0
+	ifdown wlan0
 fi
+
+#set -x
+sync_file ( )
+{
+	if ! test -f $2; then
+		echo "New file: $2"
+		cp -af $1 $2
+	else
+		if ! diff $1 $2 > /dev/null; then 
+			echo "Changed file: $2"
+			cp -af $1 $2
+		fi
+	fi
+}
+	
+# only copy files that are different:
+tmpapp=/tmp/app
+mkdir $tmpapp
+cd $tmpapp
+tar xf /home/ftp/app.tar
+DIRS=`find . -type d`
+cd /cit200
+mkdir -p $DIRS
+cd -
+for f in `find . -type f`; do 
+	sync_file "$tmpapp/$f" "/cit200/$f"
+done
+sync_file "/home/ftp/install" "/cit200/install"
+chmod +x /cit200/install
+cd /cit200
+rm -rf $tmpapp
 
 if test "$1" = "-r"; then
 	sleep 2
@@ -80,6 +67,6 @@ if test "$1" = "-r"; then
 elif ! test "$1" = "-i"; then
 	sleep 2
 	set -x
-	lua main.lua $1 $2 $3 $4 $5 2>&1 &
+	./cit -D start
 fi
 

@@ -63,6 +63,9 @@ prefixes = {
    --{ name = "touch16",            prefix_out = config:get("/dev/touch16/prefix") }, -- default = "K"
    --{ name = "gpio",               prefix_out = config:get("/dev/gpio/prefix") }, -- default = "I"
    --{ name = "warning",            prefix_out = "W" }, -- some kind of warning about the state of the nquire (eg fs low)
+   --{ name = "status",             prefix_out = "NS" }, -- the (volatile status of the nquire)
+   --{ name = "info",               prefix_out = "NI" }, -- (discovery) info as a message (reply in escape cmd \x1b\xfc
+   --{ name = "offlinedb",          prefix_out = "ND" }, -- database event
 }
 
 -- codes to turn on and off scanner codes

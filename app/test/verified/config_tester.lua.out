@@ -64,6 +64,7 @@ After:
 "
 
 # *** Start test 'save_db'
+[inf] : Saved configuration database.
 Configfile:
 
 # Settings
@@ -80,8 +81,10 @@ Configfile:
 
 before set: bla
 after set, now pop:
+[inf] : Saved configuration database.
 on_group1_string1, data=mydata, value=blabla
 before set: direct
+[inf] : Saved configuration database.
 on_group1_string1, data=mydata, value=direct
 after set
 
@@ -101,3 +104,42 @@ match("15:3") = true
 match("16:0") = true
 match("0:0,0:1,0:2") = true
 match("15:0,15:1,15:2") = true
+
+# *** Start test 'test_volatile'
+[wrn] : Trying to register unknown node "/dev/mmcblk"
+
+# *** Start test 'config:set_config_item('/settings/volatile_item')'
+Before:
+[wrn] : Could not read line '/settings/volatile_item'
+After:
+
+# *** Start test 'save_db'
+[inf] : Saved configuration database.
+Saved configfile:
+
+# Settings
+
+
+# group one
+
+/group1/enum1 = "two"
+/group1/number1 = 5
+/group1/string1 = "abcd"
+
+# End
+
+
+1 before set: one
+1 after set : two
+[inf] : Loading config from ftp
+[inf] : Saved configuration database.
+on_volatile_item, data=myvolatiledata, value=two
+[inf] : Loading config from ftp
+[inf] : Saved configuration database.
+on_group1_string1, data=mydata, value=abcd
+[inf] : Loading config from ftp
+2 before set: two
+[inf] : Saved configuration database.
+on_volatile_item, data=myvolatiledata, value=one
+2 after set : one
+[inf] : Loading config from ftp

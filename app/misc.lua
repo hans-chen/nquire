@@ -504,5 +504,109 @@ function find_file( filename, path )
 	return nil
 end
 
+
+function has_usb()
+	local fd = io.open("/proc/mounts","r")
+	if fd then
+		local l = fd:read("*a")
+		fd:close()
+		return l:find("udisk") ~= nil
+	else 
+		return false
+	end
+	
+end
+
+
+-- non-blocking function for lookup of addresses for hostnames
+-- return nil     : hostname not cached. Lookup started, try again later
+--        { .. }  : array with found addresses
+local resolved_addresses = {} -- { [name] = { addresses = { }, busy = true|false, t_last_get=time, t_last_lookup=time }
+function get_host_by_name( name )
+
+	-- literals don't have to be cached:
+	local n0,n1,n2,n3 = name:match("^%s*([12]?%d?%d)%.([12]?%d?%d)%.([12]?%d?%d)%.([12]?%d?%d)%s*$")
+	if n0 and tonumber(n0)<256 and tonumber(n1)<256 and tonumber(n2)<256 and tonumber(n3)<256 then
+		logf(LG_DBG,lgid,"get host by name literal: %s", name)
+		return { n0 .. "." .. n1 .. "." .. n2 .. "." .. n3 }
+	end
+
+	if resolved_addresses[name] == nil then
+		resolved_addresses[name] = { addresses = nil, busy = false, t_last_get = 0, t_last_lookup = 0 }
+	end
+
+	local now = sys.hirestime()
+	resolved_addresses[name].t_last_get = now
+
+	if not resolved_addresses[name].busy
+		and (resolved_addresses[name].addresses == nil 
+				or now > resolved_addresses[name].t_last_lookup + 60*60)
+	then
+		resolved_addresses[name].busy = true
+
+		logf(LG_DBG,lgid,"Starting 'gethostbyname' for %s", name)
+		runbg("/cit200/gethostbyname " .. name,
+			function(rv,hostname)
+				logf(LG_DBG,lgid,"get_host_by_name(%s): %s ==> [1]=%s", hostname, rv == 0 and "success" or "failed", resolved_addresses[hostname].addresses and resolved_addresses[hostname].addresses[1] or "nil");
+				
+				resolved_addresses[hostname].busy=false
+				resolved_addresses[hostname].t_last_lookup = sys.hirestime()
+
+				-- when there are more then 5 cached addresses: clean up by removing
+				-- the one that is longest not requested (smallest t_last_get)
+				local oldest = nil
+				local count = 0
+				for name,resolved_address in ipairs(resolved_addresses) do
+					count = count + 1
+					if not oldest or resolved_addresses[oldest].t_last_get > resolved_address.t_last_get then
+						oldest = name
+					end
+				end
+				if oldest and count > 5 then
+					resolved_addresses[oldest] = nil
+				end
+			end,
+			function(data,hostname_expected)
+				local hostname = data:match("^(%S+) ")
+				logf(LG_DBG,lgid,"hostname_expected=%s, hostname=%s (from '%s')", hostname_expected or "nil", hostname or "nil", data or "nil")
+				resolved_addresses[hostname].addresses = {}
+				data:gsub(" (%d+%.%d+%.%d+%.%d+)", function (addr) table.insert( resolved_addresses[hostname].addresses, addr ) end )
+			end,
+			name)
+	end
+	
+	return resolved_addresses[name].addresses
+end
+
+
+function get_memfree()
+	local f = io.open("/proc/meminfo", "r")
+	if not f then
+		logf(LG_WRN,lgid,"Could not determine memory status")
+		return nil
+	end
+	local l = f:read("*all")
+	f:close()
+	return tonumber(l:match("MemFree:%s+(%d+)%s+kB"))
+end
+
+function table.copy(t, deep, seen)
+    seen = seen or {}
+    if t == nil then return nil end
+    if seen[t] then return seen[t] end
+
+    local nt = {}
+    for k, v in pairs(t) do
+        if deep and type(v) == 'table' then
+            nt[k] = table.copy(v, deep, seen)
+        else
+            nt[k] = v
+        end
+    end
+    setmetatable(nt, table.copy(getmetatable(t), deep, seen))
+    seen[t] = nt
+    return nt
+end
+
 -- vi: ft=lua ts=3 sw=3
 

@@ -5,8 +5,9 @@
 LG_FTL = 1
 LG_WRN = 2
 LG_INF = 3
-LG_DBG = 4
-LG_DMP = 5
+LG_EVT = 4
+LG_DBG = 5
+LG_DMP = 6
 
 
 local logf_level = LG_INF
@@ -19,7 +20,8 @@ local level_info = {
 	[LG_FTL] = { "ftl", "\027[7;31m",  2 },
  	[LG_WRN] = { "wrn", "\027[31m",  4 },
  	[LG_INF] = { "inf", "\027[1m",  5 },
- 	[LG_DBG] = { "dbg", "\027[22m", 7 },
+  	[LG_EVT] = { "evt", "\027[1m", 6 },
+	[LG_DBG] = { "dbg", "\027[22m", 7 },
  	[LG_DMP] = { "dmp", "\027[1;30m", 7 },
 }
 

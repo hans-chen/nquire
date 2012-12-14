@@ -25,6 +25,7 @@
 #include <dirent.h>
 #include <pty.h>
 #include <malloc.h>
+#include <sys/inotify.h>
 
 #include <lua.h>
 #include <lualib.h>
@@ -115,9 +116,10 @@ static int l_meminfo(lua_State *L)
 }
 
 /*
- * Takes and returns a table like { r = { <fd>=true, <fd>=true}, w = { <fd> = true }, e = { <fd> = true }}
+ * Takes a table like { r={ [fd]=true }, w={ [fd]=true }, e={ [fd]=true }}
+ * return: [1] nil | table like { r={ [fd]=true }, w={ [fd]=true }, e={ [fd]=true }}
+ *         [2] true when an interupt is received, otherwise nil
  */
-
 static int l_select(lua_State *L)
 {
 	const char *what[] = { "r", "w", "e" };
@@ -138,17 +140,17 @@ static int l_select(lua_State *L)
 		lua_getfield(L, 1, what[i]);
 		if(!lua_istable(L, -1)) return 0;
 
-		TRACE_NB("select fds=");
+		//TRACE_NB("select fds[%s]=",what[i] );
 		FD_ZERO(&fds[i]);
 		lua_pushnil(L);
 		while (lua_next(L, -2) != 0) {
 			fd = lua_tonumber(L, -2);
-			TRACE_PRINTF("%d ", fd);
+			//TRACE_PRINTF("%d ", fd);
 			FD_SET(fd, &fds[i]);
 			if(fd > fd_max) fd_max = fd;
 			lua_pop(L, 1);
 		}
-		TRACE_PRINTF("\n");
+		//TRACE_PRINTF("\n");
 
 		lua_pop(L, 1);
 	}
@@ -166,7 +168,26 @@ static int l_select(lua_State *L)
 	
 	r = select(fd_max+1, &fds[0], &fds[1], &fds[2], have_timeout ? &tv : NULL);
 
-	if(r <= 0) return 0;	/* timeout or signaled */
+	if( r == -1 )
+	{
+		if( errno == EINTR )
+		{
+			TRACE("EINTR signal received!!");
+			lua_pushnil(L);
+			lua_pushboolean(L,1);
+			return 2;
+		}
+		else
+		{
+			TRACE("Select error!!");
+			return 0;
+		}
+	}
+	else if( r == 0 )
+	{
+		TRACE("Select timeout");
+		return 0;
+	}
 
 	/* Return table with all fd's that have data ready per 'what' (r, w, e) */
 		
@@ -179,10 +200,12 @@ static int l_select(lua_State *L)
 				lua_pushnumber(L, fd);
 				lua_pushboolean(L, 1);
 				lua_settable(L, -3);
+				TRACE("event: fd %d %s", fd, what[i]);
 			}
 		}
 		lua_setfield(L, -2, what[i]);
 	}
+
 
 	return 1;
 }
@@ -231,7 +254,7 @@ static int l_sleep(lua_State *L)
 // IN: [1] - the id of the interface for which the macaddres is requested
 // return: the macaddress of the indicated interface (format: nn:nn:nn:nn:nn:nn)
 // return: nil if macaddress could not be determined (wrong interface id or interface has no macaddress)
-static int l_macaddr(lua_State *L)
+static int l_get_macaddr(lua_State *L)
 {
 	int fd;
 	struct ifreq ifr;
@@ -243,7 +266,7 @@ static int l_macaddr(lua_State *L)
 
 	ifname = luaL_checkstring(L, 1);
 
-	fd = socket(PF_INET, SOCK_DGRAM, 0);
+	fd = socket(AF_INET, SOCK_DGRAM, 0);
 
     memset(&ifr, 0, sizeof(ifr));
 	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
@@ -302,6 +325,16 @@ static int l_open(lua_State *L)
 	return 1;
 }
 
+static int l_rewind(lua_State *L)
+{
+	int fd = luaL_checknumber(L, 1);
+	int r = lseek( fd, 0, SEEK_SET );
+
+	if( r == 0 )
+		return 0;
+	else
+		BARF(L, "Failed rewind" );
+}
 
 static int l_close(lua_State *L)
 {
@@ -390,6 +423,8 @@ static int l_tcflush(lua_State *L)
 // l[1] fd
 // l[2] max lenth of data to be received
 // l[3] maximum time to wait for first data (milliseconds)
+// return: [1] string: received data
+//         [2] bool  : signal received
 static int l_readport(lua_State *L)
 {
 	int no=0;
@@ -424,13 +459,20 @@ static int l_readport(lua_State *L)
 
 		if(no>0)
 		{
-			TRACE("fd=%d buflen=%d", fd, no);
 			lua_pushlstring(L, buf, no);
-			free(buf);
-			return 1;
 		}
 	}
-	return 0;	
+	else
+	{
+		lua_pushnil(L);
+	}
+
+	int interupt_rcv = rc == EINTR;
+	TRACE("fd=%d buflen=0 interupt%d=%d", fd, no, interupt_rcv);
+
+	lua_pushnumber(L, interupt_rcv);
+	free(buf);
+	return 2;	
 }
 
 
@@ -570,7 +612,6 @@ static int l_set_baudrate(lua_State *L)
 static int l_daemonize(lua_State *L)
 {
 	setsid();
-	if(fork()) exit(0);
 	if(fork()) exit(0);
 	close(1);
 	close(2);
@@ -914,6 +955,112 @@ static int l_ioctl_gpio_get( lua_State* L )
 	return 1;
 }
 
+/* init a filesystem (inotify) filedescriptor
+ */
+static int l_inotify_init( lua_State* L )
+{
+	int fd = inotify_init( );
+	
+	if( fd>=0 ) 
+	{
+		int r = fcntl(fd, F_GETFL);
+		if (r!=-1) 
+			fcntl(fd, F_SETFL, r | O_NONBLOCK);
+
+		lua_pushinteger( L, fd );
+		return 1;
+	}
+	else
+	{
+		lua_pushnil( L );
+		lua_pushstring( L, strerror(errno) );
+		return 2;
+	}
+}
+
+/* add a watch to an inotify (currently only IN_MODIFY events)
+ * Param: [1] descriptor of inotify_init fd
+ *        [2] filename to be watched
+ */        
+static int l_inotify_add_watch( lua_State* L )
+{
+	int fd = luaL_checkinteger(L, 1);
+	const char* fname = luaL_checkstring(L, 2);
+
+	int fd_watch = inotify_add_watch(fd, fname, IN_MODIFY);
+
+	if( fd_watch == -1 )
+	{
+		lua_pushnil( L );
+		lua_pushstring( L, strerror(errno) );
+		return 2;
+	}
+	lua_pushinteger( L, fd_watch );
+	return 1;
+}
+
+/* remove a watch from an inotify
+ * Param: [1] inotify descriptor
+ *        [2] watch descriptor
+ */        
+static int l_inotify_rm_watch( lua_State* L )
+{
+	int fd = luaL_checkinteger(L, 1);
+	int wd = luaL_checkinteger(L, 2);
+
+	int r = inotify_rm_watch(fd, wd);
+
+	if( r == -1 )
+	{
+		lua_pushstring( L, strerror(errno) );
+		return 1;
+	}
+	return 0;
+}
+
+/* read from an inotify fd
+	in: [1] inotify filedescriptor
+	return: 
+		nil, errstr
+		watch_descriptor
+	TODO: add event-mask and name
+ */
+static int l_inotify_read_event( lua_State* L )
+{
+	int fd = luaL_checkinteger(L, 1);
+
+	struct inotify_event evt;
+	ssize_t n = read( fd, &evt, sizeof(evt) );
+
+	if( n==-1 )
+	{
+		if( errno == EAGAIN )
+			return 0;
+
+		// error!
+		lua_pushnil( L );
+		lua_pushstring( L, strerror(errno) );
+		return 2;
+	}
+	if( n>0 && evt.len>0 )
+	{
+		char *buf = (char*)malloc( evt.len );
+		n = read( fd, buf, evt.len );
+		free(buf);
+		if( n==-1 )
+		{
+			// error!
+			lua_pushnil( L );
+			lua_pushstring( L, strerror(errno) );
+			return 2;
+		}
+	}
+
+	lua_pushinteger( L, evt.wd );
+
+	return 1;
+}
+
 
 /***************************************************************************
 * Lua binding
@@ -926,14 +1073,19 @@ static struct luaL_Reg sys_table[] = {
 	{ "hirestime",		l_hirestime },
 	{ "realtime",		l_realtime },
 	{ "sleep",			l_sleep },
-	{ "get_macaddr",	l_macaddr },
+	{ "get_macaddr",	l_get_macaddr },
 	{ "open",       	l_open },
+	{ "rewind",			l_rewind },
 	{ "close",      	l_close },
 	{ "pipe",	      	l_pipe },
 	{ "dup2",	      	l_dup2 },
 	{ "tcflush",		l_tcflush },
 	{ "read",       	l_read },
 	{ "readport",		l_readport },
+	{ "inotify_init",   l_inotify_init },
+	{ "inotify_add_watch",  l_inotify_add_watch },
+	{ "inotify_rm_watch",   l_inotify_rm_watch },
+	{ "inotify_read_event", l_inotify_read_event },
 	{ "write",       	l_write },
 	{ "fork",       	l_fork },
 	{ "set_noncanonical",	l_set_noncanonical },

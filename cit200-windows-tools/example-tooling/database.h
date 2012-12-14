@@ -14,6 +14,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+#include "misc.h"
+
 class Tag_value
 {
 public:

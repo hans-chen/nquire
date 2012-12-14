@@ -97,18 +97,26 @@ end
 
 --
 -- Load config database from file
+-- No watches will be called when nowatch~=nil (only meant for initial database 
+-- loading to prevent superflous save_db)
+-- return: false - nothing is changed (either due to an error or because nothing actually changed)
+--         true  - some item got a new value
+--         nil   - could not open fname_db
 --
-
-local function load_db(config, fname_db)
+local function load_db(config, fname_db, nowatch, comment)
 
 	local fd, err = io.open(fname_db, "r")
 	if not fd then
-		return false
+		return nil
 	end
-	logf(LG_INF, lgid, "Loading config file %s", fname_db)
 
+	local changed = false
+
+	logf(LG_INF, lgid, "Loading config %s", (comment or ""))
 	for l in fd:lines() do
-		config:set_config_item( l:gsub("\r$","") )
+		if config:set_config_item( l:gsub("\r$",""), nowatch ) then
+			changed = true
+		end
 	end
 
 	fd:close()
@@ -116,7 +124,7 @@ local function load_db(config, fname_db)
 	local s = sys.lstat(fname_db)
 	config.mtime = s.mtime
 
-	return true
+	return changed
 end
 
 --
@@ -126,18 +134,22 @@ end
 -- /nodename = "value x" /group/name2 = y
 -- or:
 -- /nodename = "value x" ; /group/name2 = y
+-- return: false - nothing is changed (either due to an error or because nothing actually changed)
+--         true  - some item got a new value
 --
-local function set_config_item( config, l )
+local function set_config_item( config, l, nowatch )
+
+	local changed = false
 
 	if l:match("^#") then 
-		return 
+		return changed
 	end
 	while l and #l>0 do
 		local fid, rest = l:match("[;%s]*(%S+)%s*=%s*(.*)")
 		local next_tv = ""
 		if not fid then
 			logf(LG_WRN,lgid,"Could not read line '%s'" , l )
-			return
+			return changed
 		else
 			local node = config:lookup(fid)
 			if node then
@@ -158,8 +170,8 @@ local function set_config_item( config, l )
 						-- backward compatible reading of number-values surrounded with quotes
 						vvalue = value:sub(2,-2)
 					end
-					if not node:set( vvalue ) then
-						logf(LG_WRN,lgid,"Incorrect node-value: %s = \"%s\"", fid, vvalue )
+					if node:set( vvalue, nil, nowatch ) then
+						changed = true
 					end
 				else
 					logf(LG_WRN,lgid,"Could not read value for node %s", fid)
@@ -171,15 +183,14 @@ local function set_config_item( config, l )
 		l = next_tv
 	end
 	
+	return changed
 end
 
 --
 -- Save config database to file
 --
-
-local function save_db(config)
-
-	logf(LG_DBG, lgid, "Saving configuration to %s", config.fname_db)
+-- @param dup_only   nil, true = only duplicate the current /cit/cit.conf
+local function save_db(config, dup_only)
 
 	local function s(fd, node, prefix)
 		
@@ -189,7 +200,7 @@ local function save_db(config)
 				local prefix2 = prefix:gsub("^%.", "")
 				if node.type == "string" or (node.type == "enum" and node.config_type ~= "number") or 
 							node.type == "password" or node.type == "pattern" or node.type == "custom" then
-					-- CHECK: whether this also works with high utf8 charracters
+					-- TODO CHECK: whether this also works with high utf8 charracters
 					fd:write(prefix2 .. "/" .. node.id .. " = \"" .. binstr_to_escapes(node.value, 32, 256, "\"" ) .. "\"\n")
 				else
 					fd:write(prefix2 .. "/" .. node.id .. " = " .. node.value .. "\n")
@@ -209,34 +220,31 @@ local function save_db(config)
 		end
 	end
 
-	local fname_tmp = "/tmp/cit.conf.tmp" -- config.fname_db .. ".tmp"
-	local fd, err = io.open(fname_tmp, "w")
-	if not fd then
-		logf(LG_WRN,lgid, "Could not write to config db %s: %s", fname_tmp or "nil", err or "nil")
-		return
-	end
+	if dup_only ~= true then
+		local fname_tmp = config.fname_db .. ".tmp"
+		local fd, err = io.open(fname_tmp, "w")
+		if not fd then
+			logf(LG_WRN,lgid, "Could not write to config db %s: %s", fname_tmp or "nil", err or "nil")
+			return
+		end
 
-	s(fd, config.db, "")
+		s(fd, config.db, "")
 
-	fd:write("\n")
-	fd:write("# End\n")
-	fd:write("\n")
-	fd:close()
+		fd:write("\n")
+		fd:write("# End\n")
+		fd:write("\n")
+		fd:close()
 
-	-- copy temporary file to new file name (atomic)
-	local res = os.execute("cp -a " .. fname_tmp .. " " .. config.fname_db)
-	if res ~= 0 then
-		logf(LG_WRN, lgid, "File system full: removing images from ftp:/img/*")
-		os.execute("rm -f /home/ftp/img/*")
-		res = os.execute("cp -a " .. fname_tmp .. " " .. config.fname_db)
-		if res ~= 0 then
-			logf(LG_WRN, lgid, "File system full: configuration might not be saved!")
-			logf(LG_INF, lgid, "Please remove files using ftp from the 'log' directory")
+		-- copy temporary file to new file name (atomic)
+		if os.rename(fname_tmp, config.fname_db) == nil then
+			logf(LG_WRN, lgid, "Error saving configuration database.")
+		else
+			logf(LG_INF, lgid, "Saved configuration database.")
 		end
 	end
-	local res = os.execute("rm -f " .. fname_tmp)
-	
+
 	-- Create a copy of the configuration in /home/ftp to allow backup/restore
+	logf(LG_DBG, lgid, "Duplicating configuration database to %s.", config.fname_db_ext)
 	
 	os.execute("rm -f " .. config.fname_db_ext)
 	os.execute("cp -a " .. config.fname_db .. " " .. config.fname_db_ext)
@@ -245,14 +253,13 @@ local function save_db(config)
 
 	-- Remember the mtime of the config file for automatic reloading
 	
-	local s = sys.lstat(config.fname_db)
+	local s = sys.lstat(config.fname_db_ext)
 	if s then
 		config.mtime = s.mtime
 	else
 		config.mtime = os.time()
 	end
 
-	
 end
 
 
@@ -343,10 +350,14 @@ local function on_config_timer(event, config)
 	
 	local s = sys.lstat(config.fname_db_ext)
 
-	if s and s.mtime > config.mtime then
-		logf(LG_DBG, lgid, "FTP Config file was modified, rereading")
-		if config:load_db(config.fname_db_ext) then
-			config:save_db()
+	if not s then
+		config:save_db(true)
+	elseif s.mtime ~= config.mtime then
+		-- Save is automatically done when something did change,
+		-- so we only have to make a duplicate in case the configfile only 
+		-- contained a partial configuration
+		if config:load_db(config.fname_db_ext,nil,"from ftp")~=true then
+			config:save_db(true)
 		end
 	end
 
@@ -403,6 +414,7 @@ function new(fname_schema, fname_db, fname_db_extern)
 
 	config:add_watch("//", "set", 
 		function(node, config)
+			logf(LG_DBG,lgid,"Node '//' change ==> saving configuration")
 			config:save_db()
 		end,
 		config

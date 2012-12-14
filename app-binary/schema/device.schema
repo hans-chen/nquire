@@ -551,7 +551,7 @@ return group {
 			id = "sector_data_format",
 			label = "Sector data format",
 			type = "enum",
-			default = "binary",
+			default = "base 64",
 			range = "binary,base 64,hex escapes,hex",
 			comment = "The formatting of the read data.<br/><code>binary</code>: data is exactly send as read from the card.<br/>Most usefull are <code>base 64</code> and <code>hex</code>."
 		},
@@ -725,16 +725,26 @@ return group {
 			label = "Method",
 			type = "enum",
 			range = "On read GPIO,On change,Poll",
-			default = "On read GPIO"
+			default = "On read GPIO",
+			comment = "On read GPIO: only read GPI when issued by escape command<br/>On change: send only changes<br/>Send all changes and a regular GPI state update"
 		},
 		
 		object {
 			id = "poll_delay",
 			label = "Poll speed (seconds)",
 			type = "enum",
-			range = "1,2,3,5,7,10",
-			default = "5",
+			range = "10,15,20,30",
+			default = "15",
 			config_type = "number",
+			comment = "The number of seconds inbetween regular status updates for the GPI. Note that changes are still send immediately!"
+		},
+
+		object {
+			id = "event_counter",
+			label = "Append event counter",
+			type = "boolean",
+			default = "false",
+			comment = "true: an event counter value will be added to the gpi events. This is a round-robin counter with a modulo of 256. It can be used to detect missed events, or distinguish between events and poll updates."
 		},
 		
 	},

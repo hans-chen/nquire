@@ -42,7 +42,7 @@ cat << EOF | upload_conf
 
 /cit/messages/fontsize/small = 18
 /cit/messages/fontsize/large = 28
- 
+
 /cit/messages/idle/timeout = 3
 /cit/messages/error/timeout = 2
 /dev/mifare/suppress_beep = false

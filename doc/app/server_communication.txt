@@ -170,6 +170,17 @@ The x and y values start at 0x30 representing coordinate 0. 0,0 represents resp.
 
 The valid range is determined by the size of the display (for the nquire: 240x128).
 
+=== word wrap ===
+
+From app version 1.7 and higher.
+
+-----
+\x1b\x2d\x30	word wrap off (default)
+\x1b\x2d\x31	word wrap on
+-----
+
+When turned on, text will be wrapped to the next line instead of beeing cut off.
+
 === align string of text ===
 
 -----
@@ -317,6 +328,22 @@ E.g. with the default prefix for IN1, value high:
 I01
 ------
 
+It is possible to add a round-robin event counter (modulo 2^16) to the GPI event using configuration setting (application version 1.7 and higher):
+------
+/dev/gpio/event_counter = true
+------
+
+Each GPI has a separate counter. By using this counter it is possible to detect missed events and distinguish between change events and `poll' updates. 
+
+E.g. The following shows a missed (high) event between #38 and #40, and a change event #41 and #42. This means that the second #42 event is a polled status-update.
+
+-----
+I00 38
+I00 40
+I01 41
+I00 42
+I00 42
+-----
 
 == Extra escape codes, nquire specific ==
 	

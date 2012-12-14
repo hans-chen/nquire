@@ -3,6 +3,15 @@ return group {
 	label = "Settings",
 	id = "setting",
 
+	object {
+		mode = "rw",
+		id = "volatile_item",
+		label = "volatile item",
+		type = "enum",
+		default = "one",
+		range = "one,two",
+	},
+
 	group {
 		id = "group1",
 		label = "group one",

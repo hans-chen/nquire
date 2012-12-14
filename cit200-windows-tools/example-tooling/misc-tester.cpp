@@ -42,7 +42,7 @@ TEST_END
 
 TEST(test_get_local_ip_addresses)
 	std::vector<string> addresses = get_local_ip_addresses();
-	for(int i=0; i<addresses.size(); i++)
+	for(size_t i=0; i<addresses.size(); i++)
 	{
 		cout << "addr[" << i << "]=" << addresses[i] << endl;
 	}

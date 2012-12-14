@@ -233,16 +233,21 @@ local function pop(evq)
 
 		-- Call select function to watch fd's and sleep for the required timeout
 
-		local fds_out = sys.select(evq.fd_list, timeout)
+		local fds_out, interupted = sys.select(evq.fd_list, timeout)
 
-		-- Generate events for all ready file descriptors 
+		if interupted == true then
+			-- what to do?
+			logf( LG_EVT, lgid, "Interupt received" );
+		else
+			-- Generate events for all ready file descriptors 
 
-		if fds_out then
-			for what, fds in pairs(fds_out) do
-				if fds then
-					for fd, has_data in pairs(fds) do
-						logf(LG_DMP,lgid,"fd %d, event %s", fd, what)
-						evq:push("fd", { fd = fd, what = what }, 0)
+			if fds_out then
+				for what, fds in pairs(fds_out) do
+					if fds then
+						for fd, has_data in pairs(fds) do
+							logf(LG_DMP,lgid,"fd %d, event %s", fd, what)
+							evq:push("fd", { fd = fd, what = what }, 0)
+						end
 					end
 				end
 			end

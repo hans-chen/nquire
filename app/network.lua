@@ -332,7 +332,7 @@ end
 
 -- return true for carrier up, false for down, or nil for unknown
 local function get_carrier_status()
-	local fd_status = io.input ( "/sys/class/net/eth0/carrier" )
+	local fd_status = io.open ( "/sys/class/net/eth0/carrier", "r" )
 	if fd_status then
 		local status = fd_status:read(1)
 		fd_status:close()
@@ -593,11 +593,12 @@ local function on_check_network_status_timer( event, nw )
 		end
 	end
 
---	if interface == "wifi" and not upping_network and not current_ip_addr 
---			and Network:wlan_is_available() then
---		logf(LG_WRN,lgid,"Trying to re-init the network.")
--- 		up(nw)
---	end
+	-- reinit network in case of a wifi module failure
+	if interface == "wifi" and not upping_network and not current_ip_addr 
+			and Network:wlan_is_available() then
+		logf(LG_WRN,lgid,"Trying to re-init the network.")
+ 		up(nw)
+	end
 
 	return true;
 end
@@ -656,6 +657,11 @@ function wlan_is_available()
 end
 
 
+local function shutdown( self )
+	evq:unregister("check_network_status_timer", on_check_network_status_timer, self)
+	evq:signal_del("SIGCHLD")
+end
+
 --
 -- Constructor
 --
@@ -677,6 +683,7 @@ function new()
 		configure = configure,
 		up = up,
 		get_wpa_status = get_wpa_status,
+		shutdown = shutdown,
 	}
 	
 	evq:signal_add("SIGCHLD")

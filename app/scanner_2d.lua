@@ -43,18 +43,21 @@ local SCANNER_CMD_CONSTRAIN_MULTI_ALL  = "0313020"
 -- Scanner fd callback, used for both internal and external scanner
 --
 
-local busy=false;
 local function on_fd_scanner(event, scanner)
 
 	if event.data.fd ~= scanner.fd then
 		return
 	end
 
-	if busy then 
-		logf(LG_DBG, lgid, "multi threading bug: Busy" )
+	if event.data.what == "e" then
+		if scanner.reinit_counter == 0 then
+			logf(LG_WRN, lgid, "Internal scanner failure detected. Reinit in 10 seconds")
+			scanner.reinit_counter = 10
+			led:set("yellow","blink")
+			evq:push("reinit_scanner", nil, 10)
+		end
 		return
 	end
-	busy=true;
 
 	local dup_scan_timeout = tonumber( config:get("/dev/scanner/prevent_duplicate_scan_timeout") )
 
@@ -138,7 +141,6 @@ local function on_fd_scanner(event, scanner)
 		logf(LG_WRN, lgid, "Scanner data-timeout.")
 		beeper:beep_error()
 	end
-	busy=false
 end
 
 local function _write( scanner, txt )
@@ -158,7 +160,7 @@ local function _read( scanner, max )
 		end
 		return r
 	else
-		logf( LG_WRN, lgid, "Scanner read ignored (no fd): %s", txt or "nil" )
+		logf( LG_WRN, lgid, "Scanner read ignored (no fd)" )
 	end
 end
 
@@ -285,7 +287,7 @@ local function _configure_barcode( scanner, name )
 	local value = config:get(string.format("/dev/scanner/enable-disable/%s", name))
 	local code = find_by_name( enable_disable_HR200, name )
 	local layout = find_by_name( prefixes, name ).layout
-	logf(LG_DBG,lgid,"name=%s, value=%s, code.on=%s, code.off=%s, layout=%s", name, (value or "nil"), (code.on or "nil"), (code.off or "nil"), (layout or "nil"))
+	logf(LG_DMP,lgid,"name=%s, value=%s, code.on=%s, code.off=%s, layout=%s", name, (value or "nil"), (code.on or "nil"), (code.off or "nil"), (layout or "nil"))
 	
 	if code and does_firmware_support(code) then
 		if layout ~= "2D" or config:get("/dev/scanner/barcodes") == "1D and 2D"  then
@@ -295,11 +297,7 @@ local function _configure_barcode( scanner, name )
 			elseif value == "false" and code.off then
 				logf(LG_DBG, lgid, "Disabling barcode type %s", name)
 				_cmd(scanner,code.off)
-			else
-				logf(LG_DBG, lgid, "Using factory default %s for barcode type %s", (value=="true" and "enabled" or "disabled"), name)
 			end
-		else
-			logf(LG_DBG,lgid,"Skipping configuration of %s because layout = %s and %s is selected" , name, layout, config:get("/dev/scanner/barcodes") )
 		end
 	else
 		logf(LG_DBG, lgid, "%s not supported by firmware", (name or "nil"))
@@ -309,12 +307,13 @@ end
 --
 -- Open and configure scanner device
 --
-
+-- return true: success (or already opened)
+--        false: some error (the error is logged)
 local function open(scanner)
 
 	if scanner.fd then
 		logf(LG_WRN, lgid, "Scanner already opened: not initializing scanner")
-		return
+		return true
 	end
 
 	scanner.device = "/dev/scanner"
@@ -322,8 +321,9 @@ local function open(scanner)
 	logf(LG_DBG, lgid, "Opening scanner on device %s", scanner.device)
 	local fd, err = sys.open(scanner.device, "rw")
 	if not fd then
-		logf(LG_WRN, lgid, "Could not open scanner device %s: %s", scanner.device, err)
-		return
+		led:set("yellow","blink")
+		logf(LG_WRN, lgid, "Could not open scanner device %s: %s (possible em2027 internal usb error)", scanner.device, err or "nil")
+		return false
 	end
 
 	scanner.fd = fd
@@ -336,11 +336,9 @@ local function open(scanner)
 	logf(LG_INF, lgid, "Configuring scanner")
 	local ok = _ping(scanner)
 	if not ok then
-		scanner.retry_counter = scanner.retry_counter + 1
-		local dt = scanner.retry_counter ^ 2 + 10
-		logf(LG_WRN, lgid, "Scanner does not ping, retry in %d seconds", dt)
-		evq:push("reinit_scanner", scanner, dt)
-		return
+		led:set("yellow","blink")
+		logf(LG_WRN, lgid, "Scanner does not ping.")
+		return false
 	end
 	
 	local errors = false
@@ -489,20 +487,17 @@ local function open(scanner)
 	--_wait_ack(scanner)
 
 	evq:fd_add(fd)
+	evq:fd_add(fd, "e")
 	evq:register("fd", on_fd_scanner, scanner)
 
 	if errors == true then
 		logf(LG_WRN, lgid, "Finished configuring scanner, but there were errors.")
-		
 		led:set("yellow","blink")
-		scanner.retry_counter = scanner.retry_counter + 1
-		local dt = scanner.retry_counter ^ 2 + 10
-		logf(LG_WRN, lgid, "Retry configure in %d seconds", dt)
-		evq:push("reinit_scanner", scanner, dt)
+		return false
 	else
 		logf(LG_INF, lgid, "Successfully detected and configured scanner")
 		led:set("yellow","on")
-		scanner.retry_counter = 0
+		return true
 	end
 end
 
@@ -533,8 +528,14 @@ end
 
 local function close(scanner, quick)
 	if scanner.fd then
-		if not quick then scanner:disable() end
+		logf(LG_DBG,lgid,"closing em2027 scanner")
+		if not quick then 
+			scanner:disable() 
+		else
+			led:set("yellow","off")
+		end
 		evq:fd_del(scanner.fd)
+		evq:fd_del(scanner.fd,"e")
 		evq:unregister("fd", on_fd_scanner, scanner)
 		sys.set_noncanonical(scanner.fd, false)
 		sys.close(scanner.fd)
@@ -613,11 +614,11 @@ function new()
 		scanbuf = "",
 		type = "em2027", -- watch out when em3000 scanner modules are released
 		enable_disable = enable_disable_HR200,
-		retry_counter = 0,
 		commands = {}, -- the commands collected for cmd_commit
 		last_received_data_time = 0, -- the last time data was received from the scanner
 		last_barcode = "",
 		last_barcode_time = 0,
+		reinit_counter = 0,
 
 		-- scanner methods:
 		
@@ -630,11 +631,32 @@ function new()
 		reinit_2d = reinit_2d,
 	}
 
-	config:add_watch("/dev/scanner", "set", function (e) evq:push( "reinit_scanner" ) end)
+	config:add_watch("/dev/scanner", "set", 
+		function (e,scanner) 
+			if scanner.reinit_counter==0 then
+				scanner:close()
+				scanner.reinit_counter = 2 -- only retry 2 times in case of open failure
+				evq:push("reinit_scanner", nil, 2)
+			end
+		end, scanner)
+
 	evq:register("reinit_scanner", 
-		function (e,s) 
-			s:close() 
-			s:open() 
+		function (e,scanner) 
+			scanner:close(true) 
+			if not scanner:open() then
+				if e.data and e.data.retry then
+					scanner.reinit_counter = e.data.retry
+				end
+				if scanner.reinit_counter > 0 then
+					logf(LG_WRN, lgid, "Retry %d configuring scanner in 10 seconds", scanner.reinit_counter)
+					scanner.reinit_counter = scanner.reinit_counter - 1
+					evq:push("reinit_scanner", nil, 10)
+				else
+					logf(LG_WRN, lgid, "Fatal failure trying to open and configure the internal scanner.")
+				end
+			else
+				scanner.reinit_counter = 0
+			end
 		end, scanner)
 	
 	return scanner

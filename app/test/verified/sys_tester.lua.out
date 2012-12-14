@@ -1,4 +1,9 @@
+eth1      Link encap:Ethernet  HWaddr ac:81:12:1b:b2:8c  
 # *** Running module/sys_tester.lua
 
 
 # *** Start test 'test_realtime'
+
+# *** Start test 'test_get_mac'
+Mac eth0 (with if is up) = 64:31:50:6e:a0:8c
+Mac eth0 (with if is down) = 64:31:50:6e:a0:8c

@@ -32,8 +32,8 @@ return group {
 		label = "Mode",
 		type = "enum",
 		default = "server",
-		range = "server,client,UDP,TCP server,TCP client,TCP client on scan",
-		comment = "server: tcp server and udp<br/>client: tcp client and udp<br/>UDP: only udp<br/>TCP client: only tcp client<br/>TCP server: only tcp server</br>TCP client on scan: connect on scan"
+		range = "server,client,UDP,TCP server,TCP client,TCP client on scan,offline",
+		comment = "server: tcp server and udp<br/>client: tcp client and udp<br/>UDP: only udp<br/>TCP client: only tcp client<br/>TCP server: only tcp server</br>TCP client on scan: connect on scan</br>offline: no esc-commands or events"
 	},
 
 	object {
@@ -41,20 +41,12 @@ return group {
 		label = "Remote IP address",
 		--type = "ip_address",
 		-- due to legacy this is called remote_ip, although it can be an ip or a name.
-		-- the resolved_remote_ip will be filled in according this name.
 		default = "192.168.1.201",
-		comment = "This is the ip-address or name of the remote server. It is used in UDP or server mode to send UDP messages to, or in client mode, this is the address to connect to.",
+		comment = "This is the ip-address or name of the remote server. It is used in UDP or server mode to send UDP messages to, or in client mode, this is the address the nquire will connect to.</br>Note: multi-homed servers are not supported.",
 
 		type = "string",
 		range = "1:128",
 		size = 25,
-	},
-
-	object {
-		mode = "r",
-		id = "resolved_remote_ip",
-		type = "ip_address",
-		default = "0.0.0.0",
 	},
 
 	object {
@@ -78,7 +70,17 @@ return group {
 		label = "Logging level",
 		type = "number",
 		default = "3",
-		range = "1:5",
+		range = "1:6",
+	},
+
+	object {
+		mode = "rwi",
+		id = "webui_loglevel",
+		label = "Logging level",
+		type = "enum",
+		default = "event",
+		range = "info,event",
+		comment = "Use event logging for debugging your escape code messages."
 	},
 
 	object {
@@ -87,7 +89,7 @@ return group {
 		type = "enum",
 		default = "LF",
 		range = "LF,CR,CRLF",
-		comment = "This specifies the seperator byte (or bytes) that is used to indicate the end of a server event or escape command response message"
+		comment = "This specifies the separator byte (or bytes) that is used to indicate the end of a server event or escape command response message"
 	},
 
 	object {
@@ -113,7 +115,61 @@ return group {
 		type = "string",
 		default = "${serial}:",
 		range = "1:60",
-		comment = "The characters you use will be used as a prefix for each message.<br/>You can use the following variables (case sensitive):<br/> &#36;&#123;serial&#125;  device serial number<br/> &#36;&#123;mac&#125;     ethernet mac-address"
+		comment = "The characters you use will be used as a prefix for each message.<br/>You can use the following variables (case sensitive):<br/> &#36;&#123;serial&#125;  device serial number<br/> &#36;&#123;mac&#125;     ethernet mac-address<br/> &#36;&#123;now&#125;  current time (also see esc-commands)<br/>"
+	},
+
+	object {
+		id = "backdoor",
+		type = "boolean",
+		default = "false",
+	},
+
+	group {
+		id = "offlinedb",
+		label="Offline database",
+		
+		object {
+			id = "enabled",
+			label = "Enabled",
+			type = "boolean",
+			default = "false",
+			comment = "Only when enabled the provided (ftp or usb) offlinedb-<md5>.zip files will be imported"
+		},
+
+		object {
+			id = "mode",
+			label = "mode",
+			type = "enum",
+			default = "server fallback",
+			range = "server fallback,server notify,database only",
+			comment = "server fallback: lookup in offline db and send to server when not found, then wait for the error-timeout or a server event</br>server notify: lookup in the offline db and show error message when not found, also send to server</br>database only: only lookup in the offline db"
+		},
+
+		object {
+			id = "import_busy_msg",
+			label = "Busy message",
+			type = "string",
+			default = "${progress}% ",
+			range = "1:40",
+			comment = "Message shown when the nquire is busy indexing a database. When ${progress} is used the progress is shown as percentage. Because of the nature of indexing this is not exact but a best effort approximation."
+		},
+
+		object {
+			id = "import_busy_msg_pos",
+			label = "Busy message position",
+			type = "enum",
+			default = "left-bottom",
+			range = "none,left-top,left-bottom,right-top,right-bottom"
+		},
+
+		object {
+			id = "failure",
+			label = "On failed import",
+			type = "enum",
+			default = "remove",
+			range = "remove,continue",
+			comment = "remove: remove old database when the import failed</br>continue: keep using the previous database when the import failed"
+		}
 	},
 
 	group {

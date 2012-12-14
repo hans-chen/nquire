@@ -11,252 +11,356 @@
     --suppressions=minimal.supp
     -v
  Contents of /proc/version:
-   Linux version 2.6.32-25-generic-pae (buildd@palmer) (gcc version 4.4.3 (Ubuntu 4.4.3-4ubuntu5) ) #45-Ubuntu SMP Sat Oct 16 21:01:33 UTC 2010
- Arch and hwcaps: X86, x86-sse1-sse2
+   Linux version 2.6.32-33-generic (buildd@allspice) (gcc version 4.4.3 (Ubuntu 4.4.3-4ubuntu5) ) #72-Ubuntu SMP Fri Jul 29 21:07:13 UTC 2011
+ Arch and hwcaps: AMD64, amd64-sse3-cx16
  Page sizes: currently 4096, max supported 4096
  Valgrind library directory: /usr/lib/valgrind
+ Reading syms from /usr/bin/lua5.1 (0x400000)
+ Reading debug info from /usr/bin/lua5.1 ..
+ .. CRC mismatch (computed b8449fa0 wanted e4390307)
+    object doesn't have a symbol table
  Reading syms from /lib/ld-2.11.1.so (0x4000000)
  Reading debug info from /lib/ld-2.11.1.so ..
- .. CRC mismatch (computed d005eb74 wanted 53dc8daf)
+ .. CRC mismatch (computed 14d842e7 wanted b05c9aeb)
  Reading debug info from /usr/lib/debug/lib/ld-2.11.1.so ..
- Reading syms from /usr/bin/lua5.1 (0x8048000)
- Reading debug info from /usr/bin/lua5.1 ..
- .. CRC mismatch (computed 711be85b wanted adfede43)
-    object doesn't have a symbol table
- Reading syms from /usr/lib/valgrind/memcheck-x86-linux (0x38000000)
+ Reading syms from /usr/lib/valgrind/memcheck-amd64-linux (0x38000000)
     object doesn't have a dynamic symbol table
  Reading suppressions file: /usr/lib/valgrind/debian-libc6-dbg.supp
  Reading suppressions file: minimal.supp
  Reading suppressions file: /usr/lib/valgrind/default.supp
- REDIR: 0x40160b0 (index) redirected to 0x3803e9b3 (vgPlain_x86_linux_REDIR_FOR_index)
- Reading syms from /usr/lib/valgrind/vgpreload_core-x86-linux.so (0x401f000)
- Reading syms from /usr/lib/valgrind/vgpreload_memcheck-x86-linux.so (0x4022000)
+ REDIR: 0x4018350 (strlen) redirected to 0x380402d7 (vgPlain_amd64_linux_REDIR_FOR_strlen)
+ Reading syms from /usr/lib/valgrind/vgpreload_core-amd64-linux.so (0x4a22000)
+ Reading syms from /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so (0x4c24000)
  WARNING: new redirection conflicts with existing -- ignoring it
-     new: 0x040160b0 (index               ) R-> 0x04025c30 index
- REDIR: 0x4016290 (strlen) redirected to 0x4026070 (strlen)
- Reading syms from /lib/tls/i686/cmov/libm-2.11.1.so (0x403e000)
- Reading debug info from /lib/tls/i686/cmov/libm-2.11.1.so ..
- .. CRC mismatch (computed a765a73c wanted 8d13be57)
- Reading debug info from /usr/lib/debug/lib/tls/i686/cmov/libm-2.11.1.so ..
- Reading syms from /lib/tls/i686/cmov/libdl-2.11.1.so (0x4065000)
- Reading debug info from /lib/tls/i686/cmov/libdl-2.11.1.so ..
- .. CRC mismatch (computed 6be1e729 wanted de5b14b0)
- Reading debug info from /usr/lib/debug/lib/tls/i686/cmov/libdl-2.11.1.so ..
- Reading syms from /lib/libreadline.so.6.1 (0x4069000)
+     new: 0x04018350 (strlen              ) R-> 0x04c28710 strlen
+ REDIR: 0x40181c0 (index) redirected to 0x4c28320 (index)
+ REDIR: 0x4018240 (strcmp) redirected to 0x4c28cf0 (strcmp)
+ Reading syms from /lib/libm-2.11.1.so (0x4e2d000)
+ Reading debug info from /lib/libm-2.11.1.so ..
+ .. CRC mismatch (computed 043548c3 wanted a081b93d)
+ Reading debug info from /usr/lib/debug/lib/libm-2.11.1.so ..
+ Reading syms from /lib/libdl-2.11.1.so (0x50b0000)
+ Reading debug info from /lib/libdl-2.11.1.so ..
+ .. CRC mismatch (computed b9cf0b07 wanted a7cc336e)
+ Reading debug info from /usr/lib/debug/lib/libdl-2.11.1.so ..
+ Reading syms from /lib/libreadline.so.6.1 (0x52b4000)
  Reading debug info from /lib/libreadline.so.6.1 ..
- .. CRC mismatch (computed d39b1ccd wanted 583e566d)
+ .. CRC mismatch (computed 8af42413 wanted 5c106017)
     object doesn't have a symbol table
- Reading syms from /lib/tls/i686/cmov/libc-2.11.1.so (0x409d000)
- Reading debug info from /lib/tls/i686/cmov/libc-2.11.1.so ..
- .. CRC mismatch (computed 0893b039 wanted f05c11b3)
- Reading debug info from /usr/lib/debug/lib/tls/i686/cmov/libc-2.11.1.so ..
- Reading syms from /lib/libncurses.so.5.7 (0x41f7000)
+ Reading syms from /lib/libc-2.11.1.so (0x54f5000)
+ Reading debug info from /lib/libc-2.11.1.so ..
+ .. CRC mismatch (computed 51f09164 wanted 9cdff916)
+ Reading debug info from /usr/lib/debug/lib/libc-2.11.1.so ..
+ Reading syms from /lib/libncurses.so.5.7 (0x5878000)
  Reading debug info from /lib/libncurses.so.5.7 ..
- .. CRC mismatch (computed 99b3a921 wanted 788a2112)
+ .. CRC mismatch (computed bec29619 wanted b67180b4)
     object doesn't have a symbol table
- REDIR: 0x4110b10 (rindex) redirected to 0x4025ae0 (rindex)
- REDIR: 0x410dec0 (realloc) redirected to 0x4024f4a (realloc)
- REDIR: 0x410ce60 (free) redirected to 0x4024ab5 (free)
- REDIR: 0x4110730 (strlen) redirected to 0x401f44c (_vgnU_ifunc_wrapper)
- REDIR: 0x4110770 (__strlen_sse2) redirected to 0x4026030 (strlen)
- REDIR: 0x4111f20 (memcpy) redirected to 0x401f44c (_vgnU_ifunc_wrapper)
- REDIR: 0x41ad000 (__memcpy_ssse3) redirected to 0x40267f0 (memcpy)
- REDIR: 0x410ffd0 (index) redirected to 0x4025ba0 (index)
- REDIR: 0x41107f0 (__GI_strlen) redirected to 0x4026050 (__GI_strlen)
- REDIR: 0x410cf40 (malloc) redirected to 0x4024e9b (malloc)
- REDIR: 0x410c660 (calloc) redirected to 0x402417f (calloc)
- Reading syms from /home/maarten/workspace/nquire/trunk/app/test/dpydrv.so (0x402a000)
- Reading syms from /usr/lib/libSDL-1.2.so.0.11.3 (0x4645000)
+ REDIR: 0x5579b00 (__GI_strrchr) redirected to 0x4c28140 (__GI_strrchr)
+ REDIR: 0x5572fc0 (realloc) redirected to 0x4c274d7 (realloc)
+ REDIR: 0x5572e10 (free) redirected to 0x4c27036 (free)
+ REDIR: 0x5578010 (strlen) redirected to 0x4a225dc (_vgnU_ifunc_wrapper)
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ REDIR: 0x5578040 (__GI_strlen) redirected to 0x4c286d0 (__GI_strlen)
+ REDIR: 0x557bc90 (memcpy) redirected to 0x4c28dc0 (memcpy)
+ REDIR: 0x5576520 (index) redirected to 0x4a225dc (_vgnU_ifunc_wrapper)
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ REDIR: 0x5576550 (__GI_strchr) redirected to 0x4c28220 (__GI_strchr)
+ REDIR: 0x5571520 (malloc) redirected to 0x4c27426 (malloc)
+ REDIR: 0x557b3b0 (mempcpy) redirected to 0x4c29a80 (mempcpy)
+ REDIR: 0x5573390 (calloc) redirected to 0x4c266e9 (calloc)
+ Reading syms from /home/maarten/workspace/nquire/trunk/app/test/dpydrv.so (0x5ebb000)
+ Reading syms from /usr/lib/libSDL-1.2.so.0.11.3 (0x60c2000)
  Reading debug info from /usr/lib/libSDL-1.2.so.0.11.3 ..
- .. CRC mismatch (computed 0668018e wanted 9151883a)
+ .. CRC mismatch (computed 2e1178e8 wanted 9faa77cf)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libfreetype.so.6.3.22 (0x46d4000)
+ Reading syms from /usr/lib/libfreetype.so.6.3.22 (0x635a000)
  Reading debug info from /usr/lib/libfreetype.so.6.3.22 ..
- .. CRC mismatch (computed 391cd31c wanted 83b4935f)
+ .. CRC mismatch (computed 3e8d96fa wanted a689bcbd)
     object doesn't have a symbol table
- Reading syms from /usr/lib/liblua5.1.so.0.0.0 (0x474a000)
+ Reading syms from /usr/lib/liblua5.1.so.0.0.0 (0x65e0000)
  Reading debug info from /usr/lib/liblua5.1.so.0.0.0 ..
- .. CRC mismatch (computed d0be6323 wanted b8a93af9)
+ .. CRC mismatch (computed b36a55d8 wanted caf30025)
     object doesn't have a symbol table
- Reading syms from /lib/tls/i686/cmov/librt-2.11.1.so (0x4030000)
- Reading debug info from /lib/tls/i686/cmov/librt-2.11.1.so ..
- .. CRC mismatch (computed f70850a2 wanted 90f5e596)
- Reading debug info from /usr/lib/debug/lib/tls/i686/cmov/librt-2.11.1.so ..
- Reading syms from /usr/lib/libgif.so.4.1.6 (0x4771000)
+ Reading syms from /lib/librt-2.11.1.so (0x680c000)
+ Reading debug info from /lib/librt-2.11.1.so ..
+ .. CRC mismatch (computed 9d1dc963 wanted be79b66e)
+ Reading debug info from /usr/lib/debug/lib/librt-2.11.1.so ..
+ Reading syms from /usr/lib/libgif.so.4.1.6 (0x6a14000)
  Reading debug info from /usr/lib/libgif.so.4.1.6 ..
- .. CRC mismatch (computed 2900552c wanted 3b8946e9)
+ .. CRC mismatch (computed 846d81cf wanted 8c57bfac)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libSDL_image-1.2.so.0.8.2 (0x477a000)
+ Reading syms from /usr/lib/libSDL_image-1.2.so.0.8.2 (0x6c1d000)
  Reading debug info from /usr/lib/libSDL_image-1.2.so.0.8.2 ..
- .. CRC mismatch (computed 6b54ea87 wanted 183b7727)
+ .. CRC mismatch (computed 6eac270a wanted 1072cf9c)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libpulse-simple.so.0.0.3 (0x4039000)
+ Reading syms from /usr/lib/libpulse-simple.so.0.0.3 (0x6e3a000)
  Reading debug info from /usr/lib/libpulse-simple.so.0.0.3 ..
- .. CRC mismatch (computed ad4b88a5 wanted f6f38d28)
+ .. CRC mismatch (computed 81f5e0c6 wanted f3c6ae87)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libpulse.so.0.12.2 (0x4797000)
+ Reading syms from /usr/lib/libpulse.so.0.12.2 (0x703e000)
  Reading debug info from /usr/lib/libpulse.so.0.12.2 ..
- .. CRC mismatch (computed c1594a4c wanted 7e90f792)
+ .. CRC mismatch (computed f036faa4 wanted 666ea6b3)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libdirectfb-1.2.so.0.8.0 (0x47d9000)
+ Reading syms from /usr/lib/libdirectfb-1.2.so.0.8.0 (0x7280000)
  Reading debug info from /usr/lib/libdirectfb-1.2.so.0.8.0 ..
- .. CRC mismatch (computed 79882033 wanted f58a12b5)
+ .. CRC mismatch (computed 06e105a6 wanted feb686e6)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libfusion-1.2.so.0.8.0 (0x4850000)
+ Reading syms from /usr/lib/libfusion-1.2.so.0.8.0 (0x7503000)
  Reading debug info from /usr/lib/libfusion-1.2.so.0.8.0 ..
- .. CRC mismatch (computed 011c6917 wanted a01b6622)
+ .. CRC mismatch (computed 762b3b51 wanted a599a15f)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libdirect-1.2.so.0.8.0 (0x485a000)
+ Reading syms from /usr/lib/libdirect-1.2.so.0.8.0 (0x770d000)
  Reading debug info from /usr/lib/libdirect-1.2.so.0.8.0 ..
- .. CRC mismatch (computed d58537cd wanted 9acb443b)
+ .. CRC mismatch (computed 871e1feb wanted f8c94248)
     object doesn't have a symbol table
- Reading syms from /lib/tls/i686/cmov/libpthread-2.11.1.so (0x4870000)
- Reading debug info from /lib/tls/i686/cmov/libpthread-2.11.1.so ..
- .. CRC mismatch (computed 38da17dd wanted d3835c81)
- Reading debug info from /usr/lib/debug/lib/tls/i686/cmov/libpthread-2.11.1.so ..
- Reading syms from /lib/libz.so.1.2.3.3 (0x4889000)
+ Reading syms from /lib/libpthread-2.11.1.so (0x7926000)
+ Reading debug info from /lib/libpthread-2.11.1.so ..
+ .. CRC mismatch (computed 74530e89 wanted 9c52fb5e)
+ Reading debug info from /usr/lib/debug/lib/libpthread-2.11.1.so ..
+ Reading syms from /lib/libz.so.1.2.3.3 (0x7b43000)
  Reading debug info from /lib/libz.so.1.2.3.3 ..
- .. CRC mismatch (computed 53909dc3 wanted dc0e37c9)
+ .. CRC mismatch (computed 86f1fa27 wanted 5f1ca823)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libtiff.so.4.3.2 (0x489e000)
+ Reading syms from /usr/lib/libtiff.so.4.3.2 (0x7d5a000)
  Reading debug info from /usr/lib/libtiff.so.4.3.2 ..
- .. CRC mismatch (computed 56a76e38 wanted 02aa0460)
+ .. CRC mismatch (computed 68b21a99 wanted d83f7898)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libjpeg.so.62.0.0 (0x48f9000)
+ Reading syms from /usr/lib/libjpeg.so.62.0.0 (0x7fbc000)
  Reading debug info from /usr/lib/libjpeg.so.62.0.0 ..
- .. CRC mismatch (computed 877fbbd6 wanted 6d843cf6)
+ .. CRC mismatch (computed 889c6cdd wanted 4063fdf8)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libpulsecommon-0.9.21.so (0x491a000)
+ Reading syms from /usr/lib/libpulsecommon-0.9.21.so (0x81e0000)
  Reading debug info from /usr/lib/libpulsecommon-0.9.21.so ..
- .. CRC mismatch (computed 4e604ee8 wanted 8dfb4096)
+ .. CRC mismatch (computed 5b1a26aa wanted 6a720f40)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libX11.so.6.3.0 (0x4965000)
+ Reading syms from /usr/lib/libX11.so.6.3.0 (0x842c000)
  Reading debug info from /usr/lib/libX11.so.6.3.0 ..
- .. CRC mismatch (computed d8f39467 wanted eab4db9c)
+ .. CRC mismatch (computed 8ec7a58a wanted 54bcb744)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libICE.so.6.3.0 (0x4a82000)
+ Reading syms from /usr/lib/libICE.so.6.3.0 (0x8762000)
  Reading debug info from /usr/lib/libICE.so.6.3.0 ..
- .. CRC mismatch (computed 7bb0138b wanted d6d18dc4)
+ .. CRC mismatch (computed f251de6d wanted 459ae5c1)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libSM.so.6.0.1 (0x4a9b000)
+ Reading syms from /usr/lib/libSM.so.6.0.1 (0x897d000)
  Reading debug info from /usr/lib/libSM.so.6.0.1 ..
- .. CRC mismatch (computed 4af752d3 wanted a8a701ec)
+ .. CRC mismatch (computed 7400c3c3 wanted 7a0260c3)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libXtst.so.6.1.0 (0x4aa4000)
+ Reading syms from /usr/lib/libXtst.so.6.1.0 (0x8b86000)
  Reading debug info from /usr/lib/libXtst.so.6.1.0 ..
- .. CRC mismatch (computed 8c41a7c0 wanted b0c788fb)
+ .. CRC mismatch (computed da2db102 wanted 53bdf99f)
     object doesn't have a symbol table
- Reading syms from /lib/libwrap.so.0.7.6 (0x4aaa000)
+ Reading syms from /lib/libwrap.so.0.7.6 (0x8d8d000)
  Reading debug info from /lib/libwrap.so.0.7.6 ..
- .. CRC mismatch (computed af336af3 wanted cdc33226)
+ .. CRC mismatch (computed 7920a82f wanted e6c2c443)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libsndfile.so.1.0.21 (0x4ab3000)
+ Reading syms from /usr/lib/libsndfile.so.1.0.21 (0x8f98000)
  Reading debug info from /usr/lib/libsndfile.so.1.0.21 ..
- .. CRC mismatch (computed 8d60eeb4 wanted a84a3e00)
+ .. CRC mismatch (computed 751209d5 wanted b8112afa)
     object doesn't have a symbol table
- Reading syms from /lib/libdbus-1.so.3.4.0 (0x4b1b000)
+ Reading syms from /lib/libdbus-1.so.3.4.0 (0x91fd000)
  Reading debug info from /lib/libdbus-1.so.3.4.0 ..
- .. CRC mismatch (computed b6eb6a2f wanted 911b4dbf)
+ .. CRC mismatch (computed 6cc4bb0f wanted c29ce153)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libxcb.so.1.1.0 (0x4b54000)
+ Reading syms from /usr/lib/libxcb.so.1.1.0 (0x943c000)
  Reading debug info from /usr/lib/libxcb.so.1.1.0 ..
- .. CRC mismatch (computed ceba9c82 wanted df36d3ab)
+ .. CRC mismatch (computed 85801fb4 wanted 970f95a5)
     object doesn't have a symbol table
- Reading syms from /lib/libuuid.so.1.3.0 (0x4b6e000)
+ Reading syms from /lib/libuuid.so.1.3.0 (0x9658000)
  Reading debug info from /lib/libuuid.so.1.3.0 ..
- .. CRC mismatch (computed e4826a89 wanted a7845bd5)
+ .. CRC mismatch (computed 2f2013e6 wanted 8d19dde5)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libXext.so.6.4.0 (0x4b73000)
+ Reading syms from /usr/lib/libXext.so.6.4.0 (0x985d000)
  Reading debug info from /usr/lib/libXext.so.6.4.0 ..
- .. CRC mismatch (computed 36c2d64a wanted 8a3f8755)
+ .. CRC mismatch (computed 50858fa3 wanted 9abd2d2b)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libXi.so.6.1.0 (0x4b83000)
+ Reading syms from /usr/lib/libXi.so.6.1.0 (0x9a6f000)
  Reading debug info from /usr/lib/libXi.so.6.1.0 ..
- .. CRC mismatch (computed eb77eeda wanted d653c7ce)
+ .. CRC mismatch (computed 94e15af1 wanted 21f567d8)
     object doesn't have a symbol table
- Reading syms from /lib/tls/i686/cmov/libnsl-2.11.1.so (0x4b91000)
- Reading debug info from /lib/tls/i686/cmov/libnsl-2.11.1.so ..
- .. CRC mismatch (computed 714ecdd4 wanted cc10114d)
- Reading debug info from /usr/lib/debug/lib/tls/i686/cmov/libnsl-2.11.1.so ..
- Reading syms from /usr/lib/libFLAC.so.8.2.0 (0x4ba8000)
+ Reading syms from /lib/libnsl-2.11.1.so (0x9c7f000)
+ Reading debug info from /lib/libnsl-2.11.1.so ..
+ .. CRC mismatch (computed d10f9a00 wanted b4c620a0)
+ Reading debug info from /usr/lib/debug/lib/libnsl-2.11.1.so ..
+ Reading syms from /usr/lib/libFLAC.so.8.2.0 (0x9e99000)
  Reading debug info from /usr/lib/libFLAC.so.8.2.0 ..
- .. CRC mismatch (computed 5f0ff336 wanted a6088e60)
+ .. CRC mismatch (computed 2af40004 wanted 7411de40)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libvorbisenc.so.2.0.6 (0x4bf5000)
+ Reading syms from /usr/lib/libvorbisenc.so.2.0.6 (0xa0e4000)
  Reading debug info from /usr/lib/libvorbisenc.so.2.0.6 ..
- .. CRC mismatch (computed f6cf8d80 wanted 2cf4e195)
+ .. CRC mismatch (computed 0bdad99a wanted 4789f2b2)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libvorbis.so.0.4.3 (0x4cf1000)
+ Reading syms from /usr/lib/libvorbis.so.0.4.3 (0xa4bf000)
  Reading debug info from /usr/lib/libvorbis.so.0.4.3 ..
- .. CRC mismatch (computed 1d7d4e0e wanted 999391dc)
+ .. CRC mismatch (computed 95d659e3 wanted 4dfe7192)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libogg.so.0.6.0 (0x4d1a000)
+ Reading syms from /usr/lib/libogg.so.0.6.0 (0xa6ec000)
  Reading debug info from /usr/lib/libogg.so.0.6.0 ..
- .. CRC mismatch (computed 62def25e wanted 55724006)
+ .. CRC mismatch (computed 5418ca87 wanted e39e185b)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libXau.so.6.0.0 (0x4d21000)
+ Reading syms from /usr/lib/libXau.so.6.0.0 (0xa8f3000)
  Reading debug info from /usr/lib/libXau.so.6.0.0 ..
- .. CRC mismatch (computed 2954fc44 wanted a01d7e0e)
+ .. CRC mismatch (computed e52a5817 wanted b3cc5c76)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libXdmcp.so.6.0.0 (0x4d25000)
+ Reading syms from /usr/lib/libXdmcp.so.6.0.0 (0xaaf7000)
  Reading debug info from /usr/lib/libXdmcp.so.6.0.0 ..
- .. CRC mismatch (computed 54d43d46 wanted 2ccc11c6)
+ .. CRC mismatch (computed 94fa5a42 wanted 687e8eb2)
     object doesn't have a symbol table
- REDIR: 0x4111870 (memmove) redirected to 0x401f44c (_vgnU_ifunc_wrapper)
- REDIR: 0x4111930 (memset) redirected to 0x401f44c (_vgnU_ifunc_wrapper)
- REDIR: 0x41109e0 (strncmp) redirected to 0x401f44c (_vgnU_ifunc_wrapper)
- REDIR: 0x4111540 (bcmp) redirected to 0x401f44c (_vgnU_ifunc_wrapper)
- REDIR: 0x4110140 (strcmp) redirected to 0x401f44c (_vgnU_ifunc_wrapper)
- REDIR: 0x41119e0 (mempcpy) redirected to 0x401f44c (_vgnU_ifunc_wrapper)
- REDIR: 0x417d440 (__memcpy_chk) redirected to 0x401f44c (_vgnU_ifunc_wrapper)
- REDIR: 0x41113a0 (memchr) redirected to 0x40267b0 (memchr)
- Reading syms from /home/maarten/workspace/nquire/trunk/app/test/sys.so (0x4631000)
- Reading syms from /lib/tls/i686/cmov/libutil-2.11.1.so (0x4637000)
- Reading debug info from /lib/tls/i686/cmov/libutil-2.11.1.so ..
- .. CRC mismatch (computed 1b622e88 wanted a391f9f3)
- Reading debug info from /usr/lib/debug/lib/tls/i686/cmov/libutil-2.11.1.so ..
- REDIR: 0x410fe20 (strcat) redirected to 0x4025cc0 (strcat)
- REDIR: 0x41abef0 (__memset_sse2) redirected to 0x4027420 (memset)
- REDIR: 0x40cbf90 (setenv) redirected to 0x4027800 (setenv)
- REDIR: 0x4116e00 (__GI_strncmp) redirected to 0x40265c0 (__GI_strncmp)
- REDIR: 0x4016700 (stpcpy) redirected to 0x4027260 (stpcpy)
- REDIR: 0x4111c20 (stpcpy) redirected to 0x40270a0 (stpcpy)
- REDIR: 0x41132b0 (strchrnul) redirected to 0x4027510 (strchrnul)
- REDIR: 0x417d600 (__strcpy_chk) redirected to 0x4027ab0 (__strcpy_chk)
- REDIR: 0x41b66b0 (__strncmp_ssse3) redirected to 0x4026550 (strncmp)
- REDIR: 0x41aeef0 (__memmove_ssse3) redirected to 0x4027490 (memmove)
- REDIR: 0x4110a30 (strncpy) redirected to 0x4026270 (strncpy)
- REDIR: 0x4110200 (strcpy) redirected to 0x40260b0 (strcpy)
- REDIR: 0x41b5240 (__strcmp_ssse3) redirected to 0x4026630 (strcmp)
- REDIR: 0x4110190 (__GI_strcmp) redirected to 0x4026690 (__GI_strcmp)
- REDIR: 0x41108b0 (strnlen) redirected to 0x4025fb0 (strnlen)
- REDIR: 0x41131e0 (rawmemchr) redirected to 0x4027540 (rawmemchr)
- Reading syms from /usr/lib/libXcursor.so.1.0.2 (0x4ea4000)
+ REDIR: 0x5578210 (strncmp) redirected to 0x4a225dc (_vgnU_ifunc_wrapper)
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ REDIR: 0x5577a60 (strcpy) redirected to 0x4a225dc (_vgnU_ifunc_wrapper)
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ REDIR: 0x5579ad0 (rindex) redirected to 0x4a225dc (_vgnU_ifunc_wrapper)
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ REDIR: 0x55765d0 (strcmp) redirected to 0x4a225dc (_vgnU_ifunc_wrapper)
+ REDIR: 0x557a290 (bcmp) redirected to 0x4a225dc (_vgnU_ifunc_wrapper)
+ REDIR: 0x557b9c0 (stpcpy) redirected to 0x4a225dc (_vgnU_ifunc_wrapper)
+ REDIR: 0x557d1f0 (rawmemchr) redirected to 0x4a225dc (_vgnU_ifunc_wrapper)
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x0557d220 (__GI___rawmemchr    ) R-> 0x04c29a40 rawmemchr
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ REDIR: 0x5579aa0 (strncpy) redirected to 0x4a225dc (_vgnU_ifunc_wrapper)
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x0557d220 (__GI___rawmemchr    ) R-> 0x04c29a40 rawmemchr
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x0557d220 (__GI___rawmemchr    ) R-> 0x04c29a40 rawmemchr
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05576550 (__GI_strchr         ) R-> 0x04c281e0 index
+ Reading syms from /home/maarten/workspace/nquire/trunk/app/test/sys.so (0xacfd000)
+ Reading syms from /lib/libutil-2.11.1.so (0xaf04000)
+ Reading debug info from /lib/libutil-2.11.1.so ..
+ .. CRC mismatch (computed 4e2dddfb wanted 59f59bc3)
+ Reading debug info from /usr/lib/debug/lib/libutil-2.11.1.so ..
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05578040 (__GI_strlen         ) R-> 0x04c286b0 strlen
+ WARNING: new redirection conflicts with existing -- ignoring it
+     new: 0x05579b00 (__GI_strrchr        ) R-> 0x04c28110 rindex
+ REDIR: 0x5576360 (strcat) redirected to 0x4c28360 (strcat)
+ REDIR: 0x557a880 (memset) redirected to 0x4c29930 (memset)
+ REDIR: 0x552de90 (setenv) redirected to 0x4c29d80 (setenv)
+ REDIR: 0x5578250 (__GI_strncmp) redirected to 0x4c28be0 (__GI_strncmp)
+ REDIR: 0x4018e80 (stpcpy) redirected to 0x4c29860 (stpcpy)
+ REDIR: 0x557b9f0 (__GI_stpcpy) redirected to 0x4c296c0 (__GI_stpcpy)
+ REDIR: 0x557d270 (strchrnul) redirected to 0x4c29a10 (strchrnul)
+ REDIR: 0x55f1f90 (__strcpy_chk) redirected to 0x4c2a100 (__strcpy_chk)
+ REDIR: 0x5623840 (__strncmp_ssse3) redirected to 0x4c28b70 (strncmp)
+ REDIR: 0x557a6c0 (memmove) redirected to 0x4c299a0 (memmove)
+ REDIR: 0x561fa60 (???) redirected to 0x4c288d0 (strncpy)
+ REDIR: 0x561f040 (???) redirected to 0x4c28730 (strcpy)
+ REDIR: 0x557a210 (memchr) redirected to 0x4c28d90 (memchr)
+ REDIR: 0x56225e0 (__strcmp_ssse3) redirected to 0x4c28c50 (strcmp)
+ REDIR: 0x5576610 (__GI_strcmp) redirected to 0x4c28ca0 (__GI_strcmp)
+ REDIR: 0x5578090 (strnlen) redirected to 0x4c28630 (strnlen)
+ REDIR: 0x5577a90 (__GI_strcpy) redirected to 0x4c28800 (__GI_strcpy)
+ REDIR: 0x557d220 (__GI___rawmemchr) redirected to 0x4c29a60 (__GI___rawmemchr)
+ Reading syms from /usr/lib/libXcursor.so.1.0.2 (0xb107000)
  Reading debug info from /usr/lib/libXcursor.so.1.0.2 ..
- .. CRC mismatch (computed 83e73d1b wanted 397791fd)
+ .. CRC mismatch (computed f0879e08 wanted 480f8f1b)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libXrender.so.1.3.0 (0x4eae000)
+ Reading syms from /usr/lib/libXrender.so.1.3.0 (0xb311000)
  Reading debug info from /usr/lib/libXrender.so.1.3.0 ..
- .. CRC mismatch (computed e7abb3b8 wanted fcef2c68)
+ .. CRC mismatch (computed f98e58ff wanted 14e0cafa)
     object doesn't have a symbol table
- Reading syms from /usr/lib/libXfixes.so.3.1.0 (0x4eb8000)
+ Reading syms from /usr/lib/libXfixes.so.3.1.0 (0xb51b000)
  Reading debug info from /usr/lib/libXfixes.so.3.1.0 ..
- .. CRC mismatch (computed 590592d4 wanted d3400741)
+ .. CRC mismatch (computed f51a7f95 wanted 928bdeef)
     object doesn't have a symbol table
- Discarding syms at 0x4632660-0x4634ad8 in /home/maarten/workspace/nquire/trunk/app/test/sys.so due to munmap()
- Discarding syms at 0x4637a00-0x46382a8 in /lib/tls/i686/cmov/libutil-2.11.1.so due to munmap()
- Discarding syms at 0x402b400-0x402d958 in /home/maarten/workspace/nquire/trunk/app/test/dpydrv.so due to munmap()
- Discarding syms at 0x477b920-0x47840b8 in /usr/lib/libSDL_image-1.2.so.0.8.2 due to munmap()
- Discarding syms at 0x464a580-0x46a12e8 in /usr/lib/libSDL-1.2.so.0.11.3 due to munmap()
- Discarding syms at 0x46daf30-0x4732d08 in /usr/lib/libfreetype.so.6.3.22 due to munmap()
- Discarding syms at 0x474e680-0x476c258 in /usr/lib/liblua5.1.so.0.0.0 due to munmap()
- Discarding syms at 0x4772350-0x4777168 in /usr/lib/libgif.so.4.1.6 due to munmap()
- Discarding syms at 0x47e58a0-0x4844008 in /usr/lib/libdirectfb-1.2.so.0.8.0 due to munmap()
- Discarding syms at 0x4852950-0x4856cc8 in /usr/lib/libfusion-1.2.so.0.8.0 due to munmap()
- Discarding syms at 0x485df10-0x486b338 in /usr/lib/libdirect-1.2.so.0.8.0 due to munmap()
- Discarding syms at 0x48a2c00-0x48d5638 in /usr/lib/libtiff.so.4.3.2 due to munmap()
- Discarding syms at 0x488a9a0-0x4897928 in /lib/libz.so.1.2.3.3 due to munmap()
- Discarding syms at 0x48fb750-0x4915f18 in /usr/lib/libjpeg.so.62.0.0 due to munmap()
+ REDIR: 0xffffffffff600000 (???) redirected to 0x380402c3 (vgPlain_amd64_linux_REDIR_FOR_vgettimeofday)
 # *** Running module/display_tester.lua
 
 
@@ -291,47 +395,17 @@ XX....XX
 XX....XX	24
 Close driver
 
-# *** Start test 'test_text'
-Open driver
-w=12	h=12	x=12	y=0
-............
-.X.....X..X.
-.X.....X....
-.X.....X..X.
-.X.....X..X.
-.XXXXXXX..X.
-.X.....X..X.
-.X.....X..X.
-.X.....X..X.
-.X.....X..X.
-............
-............	31
-w=13	h=12	x=13	y=6
-X..X........
-XXXXX.......
-X..XX.......
-X..XX.......
-............
-............
-X.X.........
-X.XXXXXXXXX.
-X.X.XXXXX.X.
-X.X.XX.XX.X.
-......X.....
-............	41
-Close driver
-
 # *** Start test 'test_fonts'
 Open driver
 w=11	h=6	x=11	y=0
-XX.XXXX..
-.XX.X.X..
-XXX.X.X..
-.XXXX.X..
+XX.XXXX.X
+.XX.X.X.X
+XXX.X.X.X
+.XXXX.X.X
 .....X...
 .........
 .........
-.........	21
+.........	25
 Close driver
 Open driver
 w=22	h=12	x=22	y=0
@@ -339,7 +413,7 @@ w=22	h=12	x=22	y=0
 ..XX.X..X....X..X.
 ..X.X.XXXXXX.X..X.
 .X.XX..X...X.X..X.
-...X.XX.X.X..X..XX
+X..X.XX.X.X..X..XX
 ..X...X.X....X..X.
 .XXXXX..X....X..X.
 ...X.X..XX...X..X.
@@ -348,7 +422,7 @@ w=22	h=12	x=22	y=0
 ...X..X....X......
 ..................
 ..................
-..................	69
+..................	70
 Close driver
 Open driver
 w=32	h=18	x=32	y=0
@@ -360,8 +434,8 @@ w=32	h=18	x=32	y=0
 ..XX.X...XX....X...XX..XX..
 ..X.XX....X....X...XX..XX..
 ....XXXX.X..X.X....XX..XX.X
-...XX..XX...X......XX..XXXX
-..XX.....X..X......XX..XXX.
+X..XX..XX...X......XX..XXXX
+X.XX.....X..X......XX..XXX.
 .XXXXXXXX...X......XX..XX..
 ...X....X...XX.....XX..XX..
 ...X....X...XX.....XX..XX..
@@ -371,7 +445,7 @@ w=32	h=18	x=32	y=0
 ...X.....XX.....X..........
 ...........................
 ...........................
-...........................	136
+...........................	138
 Close driver
 Open driver
 w=44	h=24	x=44	y=0
@@ -386,8 +460,8 @@ w=44	h=24	x=44	y=0
 ...X..XXX....XX.....XXX...XX....XX..
 .....XXXXXX.XXX.XX..XX....XX....XX..
 ....XXX..XXX.X..XX.XX.....XX....XX.X
-....XXX....XX...XX........XX....XXXX
-...XXX......XX..XX........XX....XXXX
+X...XXX....XX...XX........XX....XXXX
+X..XXX......XX..XX........XX....XXXX
 .XXXX........X..XX........XX....XX..
 ..XXXXXXXXXX....XX........XX....XX..
 ....XX....XX....XXX.......XX....XX..
@@ -400,7 +474,7 @@ w=44	h=24	x=44	y=0
 ....XX.....XX.........X.............
 ....................................
 ....................................
-....................................	256
+....................................	258
 Close driver
 
 # *** Start test 'image_too_big'
@@ -461,62 +535,232 @@ XXXX....
 ........
 ........	16
 Close driver
+
+# *** Start test 'test_text_normal'
+Open driver
+w=22	h=24	x=22	y=0	,n=2
+............................
+............................
+............................
+............................
+............................
+..XX.........XX....XX.......
+..XX.........XX....XX.......
+..XX.........XX.............
+..XX.........XX.............
+..XX.........XX....XX.......
+..XX.........XX....XX.......
+..XX.........XX....XX.......
+..XXXXXXXXXXXXX....XX.......
+..XXXXXXXXXXXXX....XX.......
+..XX.........XX....XX.......
+..XX.........XX....XX.......
+..XX.........XX....XX.......
+..XX.........XX....XX.......
+..XX.........XX....XX.......
+..XX.........XX....XX.......
+..XX.........XX....XX.......
+..XX.........XX....XX.......
+............................
+............................	116
+w=28	h=24	x=28	y=12	,n=7
+............................
+.X.....X..X.................
+.X.....X....................
+.X.....X..X............ Discarding syms at 0xacff600-0xad01b58 in /home/maarten/workspace/nquire/trunk/app/test/sys.so due to munmap()
+ Discarding syms at 0xaf04e10-0xaf05688 in /lib/libutil-2.11.1.so due to munmap()
+ Discarding syms at 0x5ebcd90-0x5ebf6a8 in /home/maarten/workspace/nquire/trunk/app/test/dpydrv.so due to munmap()
+ Discarding syms at 0x6c1f3a0-0x6c27118 in /usr/lib/libSDL_image-1.2.so.0.8.2 due to munmap()
+ Discarding syms at 0x60c9510-0x611a2b8 in /usr/lib/libSDL-1.2.so.0.11.3 due to munmap()
+ Discarding syms at 0x63657d0-0x63bd808 in /usr/lib/libfreetype.so.6.3.22 due to munmap()
+ Discarding syms at 0x65e7450-0x6602328 in /usr/lib/liblua5.1.so.0.0.0 due to munmap()
+ Discarding syms at 0x6a15880-0x6a1a218 in /usr/lib/libgif.so.4.1.6 due to munmap()
+ Discarding syms at 0x7292260-0x72eaac8 in /usr/lib/libdirectfb-1.2.so.0.8.0 due to munmap()
+ Discarding syms at 0x75063e0-0x7509fa8 in /usr/lib/libfusion-1.2.so.0.8.0 due to munmap()
+ Discarding syms at 0x7712280-0x771e9a8 in /usr/lib/libdirect-1.2.so.0.8.0 due to munmap()
+ Discarding syms at 0x7d60fb0-0x7d93578 in /usr/lib/libtiff.so.4.3.2 due to munmap()
+ Discarding syms at 0x7b45260-0x7b51d38 in /lib/libz.so.1.2.3.3 due to munmap()
+ Discarding syms at 0x7fbf960-0x7fd96b8 in /usr/lib/libjpeg.so.62.0.0 due to munmap()
+.....
+.X.....X..X.................
+.XXXXXXX..X.................
+.X.....X..X.................
+.X.....X..X.................
+.X.....X..X.................
+.X.....X..X.................
+............................
+............................
+............................
+.X..X.......................
+.X..X.......................
+XXX.X.XX....XXX...X.X..XXX..
+.X..XX..X..X...X..XX..X...X.
+.X..X...X..X...X..X...X...X.
+.X..X...X..XXXXX..X...XXXXX.
+.X..X...X..X......X...X.....
+.X..X...X..X...X..X...X...X.
+.XX.X...X...XXX...X....XXX..
+............................
+............................	106
+Close driver
+
+# *** Start test 'test_text_mode1'
+Open driver
+w=22	h=12	x=22	y=0	,n=4
+.........................
+.X.....X.........X..X....
+.X.....X.........X..X....
+.X.....X...XXX...X..X....
+.X.....X..X...X..X..X....
+.XXXXXXX..X...X..X..X....
+.X.....X..XXXXX..X..X....	41
+Close driver
+
+# *** Start test 'test_text_opaque'
+Open driver
+w=45	h=12	x=45	y=0	,n=6
+........................................
+...X.....XXX....XXX.....X....XXXXX.....X
+X.XX....X...X..X...X...X.X...X....X...X.
+.X.X........X......X...X.X...X....X..X..
+...X........X......X...X.X...X....X..X..
+...X.......X.....XX...X...X..XXXXXX..X..
+...X.......X.......X..XXXXX..X....X..X..
+...X......X........X..X...X..X....X..X..
+...X.....X.....X...X.X.....X.X....X...X.
+...X....XXXXX...XXX..X.....X.XXXXX.....X
+X.......................................
+........................................	102
+w=41	h=12	x=41	y=0	,n=6
+........................................
+....X....XXXX...XXX..........X..........
+...XX....X.....X...X.........X..........
+...XX...X......X.......XXX...X.XX....XX.
+..X.X...XXXX...X.XX...X...X..XX..X..X..X
+..X.X...X...X..XX..X......X..X...X..X...
+.X..X.......X..X...X...XXXX..X...X..X...
+.XXXXX......X..X...X..X...X..X...X..X...
+....X...X...X..X...X..X..XX..XX..X..X..X
+....X....XXX....XXX....XX.X..X.XX....XX.
+........................................
+........................................	107
+Close driver
+
+# *** Start test 'test_text_invisible'
+Text dimensions should be the same on clipping boundaries
+Open driver
+w=7	h=12	x=7	y=0	,n=1
+...............
+...X...........
+..XX...........
+.X.X...........
+...X...........
+...X...........
+...X...........
+...X...........
+...X...........
+...X...........
+...............
+...............	11
+w=7	h=12	x=7	y=0	,n=1
+...............
+...............
+...............
+...............
+...............
+...............
+...............
+...............
+...............
+...............
+...............
+...............	0
+Close driver
+Open driver
+w=16	h=12	x=16	y=0	,n=2
+................
+...X............
+..XX............
+.X.X...X...X...X
+...X...X...X...X
+...X....X.X.X.X.
+...X....X.X.X.X.
+...X....X.X.X.X.
+...X.....X...X..
+...X.....X...X..
+................
+................	33
+w=16	h=12	x=16	y=0	,n=2
+................
+................
+................
+................
+................
+................
+................
+................
+................
+................
+................
+................	0
+Close driver
 End
  
  HEAP SUMMARY:
-     in use at exit: 123,263 bytes in 1,881 blocks
+     in use at exit: 199,879 bytes in 2,074 blocks
  
- Searching for pointers to 1,881 not-freed blocks
- Checked 353,696 bytes
+ Searching for pointers to 2,074 not-freed blocks
+ Checked 467,416 bytes
  
  LEAK SUMMARY:
     definitely lost: 0 bytes in 0 blocks
     indirectly lost: 0 bytes in 0 blocks
       possibly lost: 0 bytes in 0 blocks
     still reachable: 0 bytes in 0 blocks
-         suppressed: 123,263 bytes in 1,881 blocks
+         suppressed: 199,879 bytes in 2,074 blocks
  
- ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 290 from 24)
+ ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 220 from 19)
  
  used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      2 <insert_a_suppression_name_here>
- used_suppression:      2 <insert_a_suppression_name_here>
+ used_suppression:      3 <insert_a_suppression_name_here>
+ used_suppression:      4 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      3 <insert_a_suppression_name_here>
  used_suppression:      3 <insert_a_suppression_name_here>
+ used_suppression:      1 <insert_a_suppression_name_here>
+ used_suppression:      1 <insert_a_suppression_name_here>
+ used_suppression:      2 <insert_a_suppression_name_here>
+ used_suppression:      1 <insert_a_suppression_name_here>
+ used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      2 <insert_a_suppression_name_here>
  used_suppression:      8 <insert_a_suppression_name_here>
- used_suppression:      3 <insert_a_suppression_name_here>
  used_suppression:      2 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
- used_suppression:      1 <insert_a_suppression_name_here>
- used_suppression:      1 <insert_a_suppression_name_here>
- used_suppression:      1 <insert_a_suppression_name_here>
- used_suppression:      2 <insert_a_suppression_name_here>
- used_suppression:      1 <insert_a_suppression_name_here>
+ used_suppression:     12 <insert_a_suppression_name_here>
+ used_suppression:      6 <insert_a_suppression_name_here>
+ used_suppression:     12 <insert_a_suppression_name_here>
+ used_suppression:      6 <insert_a_suppression_name_here>
  used_suppression:      6 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
- used_suppression:      7 <insert_a_suppression_name_here>
- used_suppression:      7 <insert_a_suppression_name_here>
- used_suppression:     11 <insert_a_suppression_name_here>
- used_suppression:     11 <insert_a_suppression_name_here>
+ used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      2 <insert_a_suppression_name_here>
  used_suppression:      2 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
+ used_suppression:      1 <insert_a_suppression_name_here>
+ used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      2 <insert_a_suppression_name_here>
- used_suppression:      1 <insert_a_suppression_name_here>
- used_suppression:      1 <insert_a_suppression_name_here>
- used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      3 <insert_a_suppression_name_here>
  used_suppression:      2 <insert_a_suppression_name_here>
  used_suppression:      2 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      2 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
- used_suppression:      7 <insert_a_suppression_name_here>
- used_suppression:     16 <insert_a_suppression_name_here>
+ used_suppression:      2 <insert_a_suppression_name_here>
+ used_suppression:      6 <insert_a_suppression_name_here>
+ used_suppression:     15 <insert_a_suppression_name_here>
  used_suppression:      4 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
@@ -527,8 +771,8 @@ End
  used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
  used_suppression:      1 <insert_a_suppression_name_here>
- used_suppression:      1 <insert_a_suppression_name_here>
- used_suppression:     68 X on SUSE11 writev uninit padding
- used_suppression:    212 dl-hack3-cond-1
+ used_suppression:     94 X on SUSE11 writev uninit padding
+ used_suppression:    113 dl-hack3-cond-1
+ used_suppression:      2 glibc-2.5.x-on-SUSE-10.2-(PPC)-2a
  
- ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 290 from 24)
+ ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 220 from 19)

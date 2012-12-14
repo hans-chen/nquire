@@ -110,8 +110,8 @@ local function gen_reply_v1(self)
 	local device_name = config:lookup("/dev/serial"):get()
 	local firmware_major, firmware_minor = string.match( config:lookup("/dev/version"):get(), "(%d+).(%d+)" )
 
-	local host = config:get("/cit/resolved_remote_ip")
-	local ips, errstr = net.gethostbyname( host )
+	local host = config:get("/cit/remote_ip")
+	local ips = get_host_by_name( host )
 	if ips==nil then
 		logf(LG_WRN,lgid,"Could not resolve host %s: %s", host, errstr)
 	else

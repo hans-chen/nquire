@@ -45,6 +45,6 @@ deploy:
 	# make
 	# make test    (optional)
 	# sudo make prefix=/usr install
-	curl -v --user newland-ftp:Secret314 sftp://server.mbarc.nl/home/newland-ftp/nquire/doc/app/ -T "{$(deploy_root_files)}"
-	curl -v --user newland-ftp:Secret314 sftp://server.mbarc.nl/home/newland-ftp/nquire/doc/app/img/ -T "{$(deploy_img_files)}"
+	curl -v --user Newlandid_Internal ftp://85.17.235.165/NQuire-tech-documetation/app/ -T "{$(deploy_root_files)}"
+	curl -v --user Newlandid_Internal ftp://85.17.235.165/NQuire-tech-documetation/app/img/ -T "{$(deploy_img_files)}"
 

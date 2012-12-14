@@ -1,11 +1,18 @@
 #!/bin/sh
 
 if test -z "$1" -o "$1" = "-h"; then
-	echo "usage: cit start|stop"
+	echo "usage: cit [-D] start|stop"
 	echo
 	echo "This starts or stops the cit-application."
 	echo "Stop will only exit when then application is completely stopped"
 	exit
+fi
+
+
+if test "$1" = "-D"; then
+	echo Found debug flag
+	shift
+	DEBUG="-D"
 fi
 
 case $1 in
@@ -24,7 +31,7 @@ case $1 in
 		else
 
 			# mount depends on availablity of an mmc card:
-			if test -z "`df /mnt/mmc | grep mmcblk`"; then
+			if test -z "`grep mnt/mmc /proc/mounts`"; then
 				# no mmc card, use /dev/mtdblock/6
 
 				mkdir -p /mnt/img /mnt/log
@@ -39,7 +46,7 @@ case $1 in
 				# remove possibly superflous directories:
 				rm -rf /mnt/img /mnt/log 
 
-				mkdir -p /mnt/mmc/img /mnt/mmc/log /mnt/mmc/fonts /home/ftp/fonts
+				mkdir -p /mnt/mmc/img /mnt/mmc/log /mnt/mmc/fonts /home/ftp/fonts /mnt/mmc/offline
 
 				mount --bind /mnt/mmc/img /home/ftp/img
 				mount --bind /mnt/mmc/log /home/ftp/log
@@ -52,23 +59,65 @@ case $1 in
 			mkdir -p /home/ftp/img/default
 			mount --bind /cit200/img/ftp /home/ftp/img/default
 		fi
-			
+		
+		# copy and remove backup or legacy configuration files
+		cit_conf=/cit200/cit.conf
+		if test -f /mnt/cit.conf; then
+			# copy the legacy configuration file
+			# (only after upgrade from 1.6 or 1.6.1)
+			cp -f /mnt/cit.conf $cit_conf
+			rm -f /mnt/cit.conf
+		elif test -f /mnt/cit.conf.bkup; then
+			# copy the backup configuration file
+			# (only after a nice reboot == upgrade) 
+			cp -f /mnt/cit.conf.bkup $cit_conf
+			rm -f /mnt/cit.conf.bkup
+		elif test -f /mnt/mmc/cit.conf.bkup; then
+			# handle legacy mountpoint (/mnt) for mmc-card:
+			cp -f /mnt/mmc/cit.conf.bkup $cit_conf
+			rm -f /mnt/mmc/cit.conf.bkup
+		fi
+
 		cd /cit200
-		lua main.lua &
+
+		# start general purpose input scanner deamon:
+		./scangpi -d
+
+		# and start the app
+		if test "$DEBUG" -o -f /etc/nowatchdog; then
+			echo "Starting with debug output to stdout"
+			lua main.lua &
+		else
+			lua main.lua -d
+		fi
+			
 	;;
 
 	"stop")
-		while killall lua 2> /dev/null; do sleep .5; done
-		# sync data (eg the config or log file) to disk/mmc
-		sync
-		# give mmc time to write the data (for cheap memory cards)
-		sleep 2
-		# unmount nquire app specific mounts
+		# this only happens when the device is upgraded: 
+		# power off or a webui initiated reboot will not result in a 'cit stop'
+
+		# stop the app:		
+		while killall lua scangpi gethostbyname offline_import_csv 2> /dev/null; do sleep .5; done
 		umount /home/ftp/img/default /home/ftp/img /home/ftp/log /home/ftp/fonts
+
+		# backup configuration is only required when doing a firmware or app upgrade:
+		if test -f /home/ftp/cit-firmware-*.image -o -f /home/ftp/cit-app-*.image; then
+			# backup cit.conf to flash:
+			if ! cp -f /cit200/cit.conf /mnt/cit.conf.bkup; then
+				# remove user data when backup failed and try again:
+				rm -rf /mnt/img /mnt/log
+				sync
+				sleep 2
+				cp -f /cit200/cit.conf /mnt/cit.conf.bkup
+			fi
+			sync
+			sleep 2
+		fi
 	;;
 
 	"restart")
 		/cit200/cit stop
-		/cit200/cit stop
-	;;	
+		/cit200/cit ${DEBUG} start
+	;;
 esac

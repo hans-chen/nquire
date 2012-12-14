@@ -106,11 +106,13 @@ packd()
 {
     set -e 
 	 if [ $1 != "app" -a $1 != "firmware" ] ; then	 
-		BuildVersion=build.r`svn info $Pack_path | grep "Last Changed Rev:" | awk '{print $NF}'`
-		changes=`svn status $Pack_path | grep ^[!AMD] | wc -l`
-		if [ $changes != 0 ] ; then
-			BuildVersion=${BuildVersion}M
-		fi
+		 if [ $1 != "firmwareex" ]; then
+			 BuildVersion=build.r`svn info $Pack_path | grep "Last Changed Rev:" | awk '{print $NF}'`
+			 changes=`svn status $Pack_path | grep ^[!AMD] | wc -l`
+			 if [ $changes != 0 ] ; then
+				 BuildVersion=${BuildVersion}M
+			 fi
+		 fi
 	fi
     case "$1" in
 		"em2027app")

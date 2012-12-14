@@ -19,5 +19,5 @@ mac(none)=nil, err=Error requesting mac-address
 localhost = 	127.0.0.1
 www.vdtai.nl = 	85.17.131.4
 www.vdtai.nl/index.html= Error: No address associated with hostname
-www.newland-id.nl = 	194.150.208.116
+www.newland-id.nl = 	194.150.208.92
 www.unknown42.nl= Error: No address associated with hostname

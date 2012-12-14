@@ -184,7 +184,7 @@ end
 --
 -- @param fmt Format string or text to draw
 -- @param ... Variables to be expanded if 'fmt' is a printf-like format string
-
+-- @return w,h,x,y
 local function draw_text(display, fmt, ...)
 	local buf
 	if #{...} > 0 then
@@ -193,9 +193,64 @@ local function draw_text(display, fmt, ...)
 		buf = fmt
 	end
 
-	local w, h, x, y = display.drv:draw_text(buf)
-	logf(LG_DBG,lgid,"txt='%s':w=%d,h=%d,x=%d,y=%d", buf,w,h,x,y)
-	return w, h, x, y
+	local w_total = 0
+	local h_total = 0
+	local x, y
+	if display.word_wrap then
+		local w_display, h_display = display.drv:getscreensize()
+		local words_on_line = 0
+		local x_start,y_start = display.drv:getpos()
+		x = x_start
+		y = y_start
+
+		for word in buf:gmatch("(%s*%S+)") do
+			if y>=h_display then 
+				break
+			end
+			
+			local w, h, drawn
+
+			if words_on_line>0 then
+				-- check if the word can be drawn complete
+				local x_tmp, y_tmp
+				w,h,x_tmp,y_tmp,drawn = display.drv:draw_text(word, true, false, 1)	
+				if drawn < #word then
+					-- next line:
+					x = x_start
+					y = y + h
+					words_on_line = 0
+					
+					-- remove leading spaces for the first word on a wrapped line:
+					word = word:match("^%s*(.*)")
+				end
+				display.drv:gotoxy( x, y )
+			end
+
+			-- then really draw the word, cutting it in parts when needed
+			drawn = 0
+			while drawn < #word and y<h_display do
+				local n
+				w,h,x,y,n = display.drv:draw_text(word:sub(drawn+1,-1), false, display.opaque, 1)
+				words_on_line = words_on_line + 1
+
+				if x-x_start > w_total then w_total = x-x_start end
+				if y-y_start > h_total then h_total = y-y_start end
+
+				drawn = drawn + n
+				if drawn < #word then
+					-- continue on next line:
+					x = x_start
+					y = y + h
+					display.drv:gotoxy( x, y )
+					words_on_line = 0
+				end	
+			end
+		end
+	else
+		w_total, h_total, x, y = display.drv:draw_text(buf,false,display.opaque)
+	end
+	logf(LG_DMP,lgid,"txt='%s':w=%d,h=%d,x=%d,y=%d", buf,w_total,h_total,x,y)
+	return w_total, h_total, x, y
 end
 
 
@@ -296,7 +351,6 @@ local function draw_filled_box(display, w, h, r)
 	display.drv:draw_filled_box(w, h, r)
 end
 
-
 --
 --- Clear screen
 -- when layer == nil: clear all layers
@@ -331,12 +385,16 @@ end
 -- align_v     - 't'|'m'|'b'|nil  this overrules ypos in case of 'm' or 'b'
 -- size        - n,nil            font size in pixels, nil=use current
 --
-local function format_text(display, text, xpos, ypos, align_h, align_v, size)
+local function format_text(display, text, xpos, ypos, align_h, align_v, size, opaque)
 
-	logf(LG_DBG,lgid,"format_text( xpos=%d, ypos=%d, align_h=%s, align_v=%s, size=%d )",xpos or 0, ypos or 0, align_h or 'nil', align_v or 'nil', size or display.font_size )
+	logf(LG_DMP,lgid,"format_text( xpos=%d, ypos=%d, align_h=%s, align_v=%s, size=%d )",xpos or 0, ypos or 0, align_h or 'nil', align_v or 'nil', size or display.font_size )
 	if size then
 		display.font_size = size;
 		display.drv:set_font_size(display.font_size)
+	end
+
+	if not opaque then
+		opaque = false
 	end
 
 	align_h = (align_h or "l"):sub(1, 1)
@@ -362,19 +420,21 @@ local function format_text(display, text, xpos, ypos, align_h, align_v, size)
 		if align_v == "m" then ypos = display.h/2 - n*text_h/2 + (i-1)*text_h end
 		if align_v == "b" then ypos = display.h   - n*text_h   + (i-1)*text_h end
 
-		logf(LG_DBG,lgid, "gotoxy(%d,%d)", xpos,ypos )
+		logf(LG_DMP,lgid, "gotoxy(%d,%d)", xpos,ypos )
 		display:gotoxy(xpos, ypos)
+		local prev_opaque = display.opaque
+		display.opaque = opaque
 		local lw, lh
-		lw, lh , x, y = display:draw_text(l)
+		lw, lh , x, y = display:draw_text("%s",l)
 		if lw>w then w = lw end
 		h = h + lh
+		display.opaque = prev_opaque
 
 		if i ~= n and align_v ~= "m" and align_v ~= "b" then ypos = ypos + lh end
 		
 	end
 	return w, h, x, y
 end
-
 
 --
 -- display a message of (max) 6 lines (actual possible lines depends on the 
@@ -436,6 +496,8 @@ function new()
 		font_family = "Sans",
 		font_size = 8,  
 		font_attr = "",
+		word_wrap = false,
+		opaque = false,
 
 		-- methods
 
@@ -455,6 +517,7 @@ function new()
 		draw_filled_box = draw_filled_box,
 		clear = clear,
 		update = update,
+		enable_word_wrap = function ( display, enable ) display.word_wrap = enable end,
 	
 		format_text = format_text,
 		show_message = show_message,
