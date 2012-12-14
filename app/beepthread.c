@@ -76,7 +76,7 @@ static void bip_console(struct beep *beep, double freq, double duration, double 
 	int l;
 
 	l = snprintf(buf, sizeof(buf), "\e[10;%.0f]\e[11;%.0f]\x7", freq, duration * 1000);
-	write(beep->fd_dev, buf, l);
+	if(write(beep->fd_dev, buf, l)) {}
 	usleep(duration * 1E6);
 }
 
@@ -96,7 +96,7 @@ static void bip_dsp(struct beep *beep, double freq, double duration, double volu
 	}
 
 	ioctl(beep->fd_dev, SNDCTL_DSP_SETFRAGMENT, &frag);
-	write(beep->fd_dev, buf, i);
+	if(write(beep->fd_dev, buf, i)) {}
 }
 
 
@@ -125,7 +125,7 @@ static int l_new(lua_State *L)
 
 	dev = luaL_checkstring(L, 1);
 
-	pipe(fd);
+	if(pipe(fd)) {}
 
 	beep = lua_newuserdata(L, sizeof *beep);
 	if(beep == NULL) {
@@ -173,7 +173,7 @@ static int l_beep(lua_State *L)
 	beepmsg.duration = luaL_checknumber(L, 3);
 	beepmsg.volume = luaL_optnumber(L, 4, 1.0);
 
-	write(beep->fd_client, &beepmsg, sizeof(beepmsg));
+	if(write(beep->fd_client, &beepmsg, sizeof(beepmsg))) {}
 
 	return 0;
 }

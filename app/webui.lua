@@ -155,51 +155,79 @@ local function draw_css(client)
 
 	</style>
 	</head>
-
 	]])
+end
+
+
+local function body_begin(client)
+client:add_data([[
+<body>
+<script type="text/javascript"> 
+function toggle(tf, group) 
+{ 
+    document.getElementById(group).style.visibility = (tf) ? "block" : "none"; 
+}
+function set_visibility(tf, group)
+{
+    document.getElementById(group).style.display = (tf) ? "block" : "none"; 
+} 
+function enable_disable(tf, element) 
+{ 
+    document.getElementById(element).disabled = ! tf; 
+}
+</script> 
+]])
+end
+
+local function body_end(client)
+client:add_data([[
+</body>
+]])
 end
 
 ---------------------------------------------------------------------------
 -- Draw a config node
 ---------------------------------------------------------------------------
 
+local function draw_node_label_start(client, node)
+	client:add_data("<td width=30%>\n")
+	client:add_data("<span class=label>" .. node.label .. "</span>\n")
+end
+
+local function draw_node_label_end(client)
+	client:add_data("</td>\n")
+end
 
 local function draw_node_label(client, node)
-	client:add_data("<td width=30%>\n")
-	client:add_data("<span class=label>\n")
-	client:add_data(node.label)
-	client:add_data("</span>\n")
-	client:add_data("</td>\n")
+	draw_node_label_start( client, node )
+	draw_node_label_end( client )
 end
 
 local errors = {}
 
-local function draw_node_value(client, node, ro)
-
+local function draw_node_value_data( client, node, ro, optarg )
 	local id = node:full_id()
 
-	if errors[id] then
-		class = "node-error"
-	else
-		class = "node"
-	end
+	if not optarg then optarg="" end
 
-	client:add_data("<td class=%s>\n" % class)
 	if node:has_data() then
 		local value = node:get()
 
 		if node:is_writable() and not ro then
 
 			client:add_data("<input type=hidden name='id' value=%q/>\n" % id)
-			if node.type == "boolean" then
+			if node.type == "boolean" and node.appearance=="checkbox" then
+				logf(LG_DBG,"webui","displaying checkbox " .. id .. " = " .. value)
+				local is_checked = (value == "true") and "checked" or ""
+				client:add_data("<input type='hidden' name='default-%s' value='off'/>\n" % { id })
+				client:add_data("<input type='checkbox' name='set-%s' %s %s/>\n" % { id, optarg, is_checked })
+			elseif node.type == "boolean" then
 				local c1 = (value == "false") and "checked" or ""
 				local c2 = (value == "true") and "checked" or ""
-				client:add_data("<input type='radio' name='set-%s' value='false' %s> No " % { id, c1 })
-				client:add_data("</input>")
-				client:add_data("<input type='radio' name='set-%s' value='true' %s> Yes " % { id, c2 })
-				client:add_data("</input>")
+				client:add_data("<input type='radio' name='set-%s' value='false' %s %s/> No\n" % { id, c1, optarg })
+				client:add_data("<input type='radio' name='set-%s' value='true' %s %s/> Yes\n" % { id, c2, optarg })
 			elseif node.type == "enum" then
-				client:add_data("<select name='set-%s'>\n" % id)
+				client:add_data("<select name='set-%s' %s >\n" % {id, optarg})
 				for item in node.range:gmatch("([^,]+)") do
 					local sel = (item == value) and " selected" or ""
 					client:add_data("<option value=%q%s>%s</option>\n" % { item, sel, item })
@@ -221,23 +249,35 @@ local function draw_node_value(client, node, ro)
 						end
 					end
 				end
-				client:add_data("<input name='set-%s' size=%d value=%q/>\n" % {id, size, value })
+				client:add_data("<input name='set-%s' size=%d value=%q %s/>\n" % {id, size, value, optarg })
 			end
 
 		else
 			client:add_data(value)
 		end
 	end
-			
+end
+
+
+local function draw_node_value(client, node, ro, optarg)
+	local id = node:full_id()
+	if errors[id] then
+		class = "node-error"
+	else
+		class = "node"
+	end
+
+	client:add_data("<td class=%s>\n" % class)
+	draw_node_value_data( client, node, ro, optarg )
 	client:add_data("</td>")
 end
 
 
 
-local function draw_node(client, node, ro)
+local function draw_node(client, node, ro, optarg)
 	client:add_data("<tr>\n")
 	draw_node_label(client, node)
-	draw_node_value(client, node, ro)
+	draw_node_value(client, node, ro, optarg)
 	client:add_data("</tr>\n")
 end
 
@@ -256,10 +296,10 @@ function humanize(s)
 end
 
 
-function box_start(client, page, title)
-	client:add_data("<fieldset>\n")
+function box_start(client, page, title, extra)
+	client:add_data("<fieldset " .. (extra or "") .. ">\n")
 	client:add_data("<legend>" .. title .. "</legend>\n")
-	client:add_data("<input type=hidden name='p' value='%s'>\n" % page)
+	client:add_data("<input type=hidden name='p' value='%s'/>\n" % page)
 	client:add_data("<table>\n")
 end
 
@@ -278,7 +318,7 @@ end
 
 local function form_end(client)
 	client:add_data("<center>")
-	client:add_data("<input type='submit' class=submit value='Apply settings'>")
+	client:add_data("<input type='submit' class=submit value='Apply settings'/>")
 	client:add_data("</center>\n")
 	client:add_data("</form>\n")
 end
@@ -358,9 +398,8 @@ end
 
 
 local function page_network(client, request)
-
+	
 	-- Find out if a wlan adapter is available. Dirty but this works:
-
 	local have_wlan = false
 
 	local fd = io.popen("iwconfig", "r")
@@ -374,14 +413,16 @@ local function page_network(client, request)
 	end
 
 	draw_css(client)
+	body_begin(client);
 	form_start(client)
 
 	if have_wlan then
 		box_start(client, "network", "Network interface")
-		draw_node(client, config:lookup("/network/interface"))
+		draw_node(client, config:lookup("/network/interface"), false,"onclick='set_visibility(this.value==\"wifi\",\"wifisettings\")'")
 		box_end(client)
 		
-		box_start(client, "wifi", "Wifi")
+		box_start(client, "wifi", "Wifi", "id='wifisettings' " .. 
+		     (config:lookup("/network/interface"):get()=="ethernet" and "style=\"display:none\"" or "" ))
 		draw_node(client, config:lookup("/network/wifi/essid"))
 		draw_node(client, config:lookup("/network/wifi/keytype"))
 		draw_node(client, config:lookup("/network/wifi/key"))
@@ -390,11 +431,15 @@ local function page_network(client, request)
 		config:lookup("/network/interface"):set("ethernet")
 	end
 
+
 	box_start(client, "network", "IP Settings")
-	draw_node(client, config:lookup("/network/dhcp"))
-	draw_node(client, config:lookup("/network/ip/address"))
-	draw_node(client, config:lookup("/network/ip/netmask"))
-	draw_node(client, config:lookup("/network/ip/gateway"))
+	draw_node(client, config:lookup("/network/dhcp"),false,"onclick='set_visibility(this.value==\"false\",\"static_ip_settings\")'")
+	client:add_data("<table id='static_ip_settings' " .. 
+			(config:lookup("/network/dhcp"):get()=="true" and "style=\"display:none\"" or "") .. ">")
+		draw_node(client, config:lookup("/network/ip/address"))
+		draw_node(client, config:lookup("/network/ip/netmask"))
+		draw_node(client, config:lookup("/network/ip/gateway"))
+	client:add_data("</table>")
 	box_end(client)
 
 	box_start(client, "network", "NQuire protocol settings")
@@ -405,6 +450,7 @@ local function page_network(client, request)
 	box_end(client)
 	
 	form_end(client)
+	body_end(client);
 end
 
 
@@ -412,6 +458,7 @@ end
 
 local function page_messages(client, request)
 	draw_css(client)
+	body_begin(client);
 
 	local msg_list = { 
 		{ count=3, id="idle" },
@@ -419,10 +466,11 @@ local function page_messages(client, request)
 	}
 	local key_list = { "text", "xpos", "ypos", "valign", "halign", "size" }
 
+	form_start(client)
+	
 	for _,msg in ipairs(msg_list) do
 
 		local node = config:lookup("/cit/messages/%s" % msg.id)
-		form_start(client)
 		box_start(client, "messages", node.label)
 
 		client:add_data("<tr>")
@@ -433,30 +481,73 @@ local function page_messages(client, request)
 		for row = 1, msg.count do
 			client:add_data("<tr>")
 			for _,item in ipairs(key_list) do
-				draw_node_value(client, config:lookup("/cit/messages/%s/%s/%s" % { msg.id, row, item } ))
+				local extra = ""
+				if item == "xpos" or item == "ypos" then 
+					extra = "id='" .. msg.id .. item .. row .. "'"; 
+					if item=="xpos" and config:lookup("/cit/messages/%s/%s/halign" % { msg.id, row } ).value~="left" then
+						extra = extra .. " disabled"
+					end
+					if item=="ypos" and config:lookup("/cit/messages/%s/%s/valign" % { msg.id, row } ).value~="top" then
+						extra = extra .. " disabled"
+					end
+				end
+				if item == "valign" then 
+					extra = "onchange='enable_disable(value==\"top\", \"" .. msg.id .. "ypos" .. row .. "\")'"; 
+				end
+				if item == "halign" then 
+					extra = "onchange='enable_disable(value==\"left\", \"" .. msg.id .. "xpos" .. row .. "\")'";
+				end
+				local node = config:lookup("/cit/messages/%s/%s/%s" % { msg.id, row, item } )
+				draw_node_value(client, node, false, extra)
 			end
 			client:add_data("</tr>")
 		end
-		-- 'dirty' trick but it won't work otherwise
-		client:add_data("</table><table>\n")
 
 		if msg.id == "idle" then
-			draw_node(client, config:lookup("/cit/messages/idle/show_idle_picture"))
+			client:add_data("<tr>")
+			
+			local idle_picture_show = config:lookup("/cit/messages/idle/picture/show")
+			draw_node_label_start(client, idle_picture_show)
+			draw_node_value_data(client, idle_picture_show,false, "onclick=\"enable_disable(this.checked,'xpos');enable_disable(this.checked,'ypos')\" id='show_idle_picture'")
+			draw_node_label_end( client )
+			--local enabled = config:lookup("/cit/messages/idle/picture/show"):get() == "true"
+			draw_node_value(client, config:lookup("/cit/messages/idle/picture/xpos"), false, "id='xpos'")
+			draw_node_value(client, config:lookup("/cit/messages/idle/picture/ypos"), false, "id='ypos'")
+
+			client:add_data("</tr>\n")
 		end
+
+		client:add_data("</tr>\n")
 		box_end(client)
-		form_end(client)
 	end
 
+	box_start(client, "messages", config:lookup("/cit/messages/fontsize").label)
+		draw_node(client, config:lookup("/cit/messages/fontsize/small"))
+		draw_node(client, config:lookup("/cit/messages/fontsize/large"))
+	box_end(client)
+
+	form_end(client)
+
+client:add_data([[
+<script type="text/javascript"> 
+	enable_disable(document.getElementById('show_idle_picture').checked, 'xpos');
+	enable_disable(document.getElementById('show_idle_picture').checked, 'ypos');
+</script> 
+]])
+
+	body_end(client);
 end
 
 local function page_scanner( client, request )
 
 	draw_css(client)
+	body_begin(client);
 	form_start(client)
 
 	box_start(client, "scanner", "Barcodes")
 	if scanner.type == "2d" then
-		draw_node(client, config:lookup("/dev/scanner/barcodes"))
+		draw_node(client, config:lookup("/dev/scanner/barcodes"), false,
+				"onclick='set_visibility(this.value==\"1D and 2D\",\"2d_codes\")'" )
 	end
 	draw_node(client, config:lookup("/dev/scanner/enable_barcode_id"))
 	box_end(client)
@@ -475,6 +566,47 @@ local function page_scanner( client, request )
 		box_end(client)
 	end
 
+	-- enable/disbale scanning codes
+	box_start(client, "scanner", "Barcodes")
+	local enable_disable_code_list = scanner.type == "1d" and enable_disable_HR100 or enable_disable_HR200;
+
+	client:add_data("<table id='1d_codes'>")
+	for _,code in ipairs(enable_disable_code_list) do
+		if not is_2d_code(code.name) then
+			logf(LG_DMP, "webui", "showing code " .. code.name)
+			local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
+			if not node then
+				logf(LG_WRN, "webui", "Code '" .. code.name .. "' not found in the configuration")
+			else
+				draw_node(client, node)
+			end
+		end
+	end
+	client:add_data("</table>")
+
+	if scanner.type == "2d" then
+		if config:lookup("/dev/scanner/barcodes").value == "1D only" then
+			client:add_data("<table id='2d_codes' style='display:none'>")
+		else
+			client:add_data("<table id='2d_codes'>")
+		end
+
+		for _,code in ipairs(enable_disable_code_list) do
+			if is_2d_code(code.name) then
+				logf(LG_DMP, "webui", "showing code " .. code.name)
+				local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
+				if not node then
+					logf(LG_WRN, "webui", "Code '" .. code.name .. "' not found in the configuration")
+				else
+					draw_node(client, node)
+				end
+			end
+		end
+		client:add_data("</table>")
+	end
+
+	box_end(client)
+
 	form_end(client)
 
 end
@@ -482,6 +614,7 @@ end
 local function page_miscellaneous(client, request)
 	
 	draw_css(client)
+	body_begin(client);
 	form_start(client)
 
 	box_start(client, "miscellaneous", "Device")
@@ -489,9 +622,10 @@ local function page_miscellaneous(client, request)
 	box_end(client)
 
 	box_start(client, "miscellaneous", "Authentication")
-	draw_node(client, config:lookup("/dev/auth/enable"))
-	draw_node(client, config:lookup("/dev/auth/username"))
-	draw_node(client, config:lookup("/dev/auth/password"))
+	draw_node(client, config:lookup("/dev/auth/enable"),false,"onclick=\"enable_disable(value=='true', 'auth_username');enable_disable(value=='true', 'auth_password')\"")
+	local extra = config:lookup("/dev/auth/enable").value=="true" and "" or " disabled";
+	draw_node(client, config:lookup("/dev/auth/username"), false, " id='auth_username'" .. extra)
+	draw_node(client, config:lookup("/dev/auth/password"), false, " id='auth_password'" .. extra)
 	box_end(client)
 	
 	box_start(client, "miscellaneous", "Text and messages")
@@ -622,22 +756,45 @@ local function on_webserver(client, request)
 	local applied_setting;
 
 	errors = {}
+	-- since a checkbox is only received when it is checked, the false value 
+	-- is faked with a hidden value with a key starting with "default-" instead of "set-"
+	local keyvalues = {}
 	for key, val in pairs(request.param) do
-		local id = key:match("^set%-(.+)")
+		--logf(LG_DBG,"webui","scanning request.param " .. key .. "=" .. val)
+		local id = key:match("^set%-(.+)$")
 		if id then
-			local node = config:lookup(id)
-			if node then 
-				local ok = node:set(val)
-				applied_setting = true		
+			--logf(LG_DBG,"webui","Inserting " .. id .. "=" .. val)
+			keyvalues[id] = val
+		else
+			local cb_id = key:match("^default%-(.+)$")
+			if cb_id and not request.param["set-" .. cb_id] then
+				--logf(LG_DBG,"webui","Inserting " .. cb_id .. "=\"false\"")
+				keyvalues[cb_id] = "false"
+			end
+		end
+	end
+
+	-- now actualy set all values
+	for key, value in pairs(keyvalues) do
+		local node = config:lookup(key)
+		if node then 
+			if node.type=="boolean" and node.appearance=="checkbox" and value~="false" then
+				value="true"
+			end
+			if node:get() ~= value then
+				logf(LG_DBG,"webui","changing node " .. key .. " from '" .. node:get() .. "' to '" .. value .. "'")
+				local ok = node:set( value )
 				if not ok then 
 					errors[id] = true
+				else
+					applied_setting = true
 				end
 			end
 		end
 	end
 
+	-- TODO: should this also be done when there are errors?
 	if applied_setting then
-		logf(LG_DMP,"webui","Initiating cit_idle_msg in 4 seconds")
 		cit:show_message("Applying", "settings")
 		evq:push("cit_idle_msg", nil, 4.0)
 	end

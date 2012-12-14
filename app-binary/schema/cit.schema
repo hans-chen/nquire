@@ -42,9 +42,31 @@ return group {
 		default = "192.168.1.201"
 	},
 
+
 	group {
 		id = "messages",
 		label = "Messages",
+
+		group {
+			id = "fontsize",
+			label = "Font sizes",
+			
+			object {
+				id = "small",
+				label = "Font size small",
+				type = "enum",
+				default = "18",
+				range = "18,24",
+			},
+
+			object {
+				id = "large",
+				label = "Font size large",
+				type = "enum",
+				default = "28",
+				range = "28,32",
+			},
+		},
 
 		group {
 			id = "idle",
@@ -58,13 +80,34 @@ return group {
 				range = "1:15",
 			},
 			
-			object {
-				id = "show_idle_picture",
-				label = "Show idle image",
-				type = "boolean",
-				default = "false",
+			group {
+				id = "picture",
+				
+				object {
+					id = "show",
+					label = "Picture",
+					type = "boolean",
+					appearance = "checkbox",
+					default = "false",
+				},
+
+				object {
+					id = "xpos",
+					label = "X Pos",
+					type = "number",
+					default = "0",
+					range = "0:240",
+				},
+
+				object {
+					id = "ypos",
+					label = "Y Pos",
+					type = "number",
+					default = "0",
+					range = "0:128",
+				},
 			},
-			
+         	
 			group {
 				id = "1",
 				label = "Line 1",
@@ -74,7 +117,7 @@ return group {
 					label = "Text",
 					type = "string",
 					default = "Welcome",
-					range = "0:20",
+					range = "0:25",
 				},
 
 				object {
@@ -127,7 +170,7 @@ return group {
 					label = "Text",
 					type = "string",
 					default = "Scan your product",
-					range = "0:20",
+					range = "0:25",
 				},
 
 				object {
@@ -180,7 +223,7 @@ return group {
 					label = "Text",
 					type = "string",
 					default = "↓ ↓ ↓ ↓",
-					range = "0:20",
+					range = "0:25",
 				},
 
 				object {
@@ -224,7 +267,7 @@ return group {
 				},
 			}
 		},
-		
+
 		group {
 			id = "error",
 			label = "Error message",
@@ -342,7 +385,7 @@ return group {
 					default = "small"
 				},
 			},
-		}
+		},
 	}
 }
 	

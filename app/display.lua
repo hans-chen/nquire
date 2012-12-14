@@ -93,12 +93,12 @@ end
 -- @param fname Filename of the image to display
 --
 
-local function draw_image(display, fname)
+local function draw_image(display, fname, xpos, ypos)
 	if not fname then
 		logf(LG_WRN, "display", "No image fname given")
 		return
 	end
-	local ok, err = display.drv:draw_image(fname)
+	local ok, err = display.drv:draw_image(fname, xpos, ypos)
 	if not ok then
 		logf(LG_WRN, "display", "draw_image: %s", err)
 	end

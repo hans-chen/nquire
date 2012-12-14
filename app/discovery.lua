@@ -22,15 +22,20 @@ local function gen_reply_v1(self)
 	end
 
 	-- Get current network address
-	
-	local fd = io.popen("/sbin/ifconfig eth0")
+	local fd;
+	if config:get("/network/interface") == "ethernet" then
+		fd = io.popen("/sbin/ifconfig eth0")
+	else
+		fd = io.popen("/sbin/ifconfig wlan0")
+	end
 	if fd then
 		local data = fd:read("*a")
-		local addr = data:match("inet addr:(%S+)")
+		local addr;
+		addr = data:match("inet addr:(%S+)")
 		if addr then
 			table.insert(reply, "IP-Address: " .. addr)
 		end
-		local addr = data:match("HWaddr (%S+)")
+		addr = data:match("HWaddr (%S+)")
 		if addr then
 			table.insert(reply, "MAC-Address: " .. addr)
 		end
@@ -38,6 +43,8 @@ local function gen_reply_v1(self)
 	end
 
 	local reply = table.concat(reply, "\n")
+	logf(LG_DMP,"discovery", "Discover Reply=%s", reply)
+
 	return reply
 end
 

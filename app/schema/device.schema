@@ -157,7 +157,174 @@ return group {
 			default = "Sensor mode",
 			range = "Blinking,Always ON,Sensor mode"
 		},
-			
+		
+		group {
+			label = "Barcodes", 
+			id = "enable-disable",
+
+			object {
+				id = "Code128",
+				label = "Code 128",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "UCC_EAN-128",
+				label = "UCC/EAN 128",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "EAN-8",
+				label = "EAN-8",
+				type = "boolean",
+				default = "true",
+			},
+			object {
+				id = "EAN-13",
+				label = "EAN-13",
+				type = "boolean",
+				default = "true",
+			},
+			object {
+				id = "UPC-E",
+				label = "UPC-E",
+				type = "boolean",
+				default = "true",
+			},
+			object {
+				id = "UPC-A",
+				label = "UPC-A",
+				type = "boolean",
+				default = "true",
+			},
+			object {
+				id = "Interleaved-2_of_5",
+				label = "Interleaved 2 of 5",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "Code39",
+				label = "Code 39",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "Codabar",
+				label = "Codabar",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "Code93",
+				label = "Code 93",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "GS1_Databar",
+				label = "GS1 Databar",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "ISBN",
+				label = "ISBN",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "Code-11",
+				label = "Code 11",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "2_5-Matrix",
+				label = "2/5 Matrix",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "ITF14",
+				label = "ITF14",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "MSI-Plessey",
+				label = "MSI Plessey",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "Plessey",
+				label = "Plessey",
+				type = "boolean",
+				default = "true",
+			},
+			object {
+				id = "2_5-Standard",
+				label = "2/5 Standard",
+				type = "boolean",
+				default = "true",
+			},
+			object {
+				id = "2_5-Industrial",
+				label = "2/5 Industrial",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "PDF417",
+				label = "PDF417",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "QR_Code",
+				label = "QR Code",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "Aztec",
+				label = "Aztec",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "DataMatrix",
+				label = "DataMatrix",
+				type = "boolean",
+				default = "true",
+			},
+
+			object {
+				id = "Chinese-Sensible",
+				label = "Chinese Sensible",
+				type = "boolean",
+				default = "true",
+			},
+
+		},
 	},
 	
 	group {

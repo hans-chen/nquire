@@ -1,0 +1,12 @@
+#!/bin/bash
+
+make clean
+make
+
+ftp -i cit << EOF
+mkdir img
+mkdir schema
+mput *.lua *.so arial.ttf schema/* img/* install
+bye
+EOF
+

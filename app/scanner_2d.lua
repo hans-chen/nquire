@@ -4,7 +4,7 @@
 
 module("Scanner_2d", package.seeall)
 
-
+--  scanner programminc codes as defined in "HR200 User Guide 090720"
 local SCANNER_CMD_SET_DEFAULTS      = "0001000"
 local SCANNER_CMD_TERMINATOR_CR     = "0310000=0x0D00"
 local SCANNER_CMD_TERMINATOR_ENABLE = "0309010"
@@ -49,29 +49,35 @@ end
 
 local busy=false;
 local function on_fd_scanner(event, scanner)
+	if event.data.fd ~= scanner.fd then
+		return
+	end
+
 	if busy then 
 		logf(LG_DBG, "scanner", "multi threading bug: Busy" )
 		return
 	end
-	
-	if event.data.fd ~= scanner.fd then
-		return
-	end
 	busy=true;
 
+	logf(LG_DBG, "scanner", "Start retrieving data from scanner.")
+	local t_start = sys.hirestime()
+	local err_count = 0;
 	local data = sys.read(scanner.fd, 5003)
+	while data and #data==0 and t_start+2>sys.hirestime() do
+		err_count = err_count+1
+		data = sys.read(scanner.fd, 5003)
+	end
+	logf(LG_DBG, "scanner", "#Futile reads=" .. err_count)
 
 	if data and data ~= "" then
-		logf(LG_DBG, "scanner", "Recieved scanner data: '%s'", data)
 		scanner.scanbuf = data
 
-		-- TODO: fetch the longest match
 		local t1, t2 = match_max(scanner.scanbuf)
 		if t1 then
 			local barcode = t1
 			scanner.scanbuf = "" -- t2 or ""
 		
-			logf(LG_DBG, "scanner", "Barcode from data='%s'", barcode)
+			logf(LG_DBG, "scanner", "Barcode: '%s'", barcode)
 
 			-- Barcode is complete. Fixup the barcode type prefix to be the
 			-- compatible format
@@ -81,27 +87,32 @@ local function on_fd_scanner(event, scanner)
 
 			for _, i in ipairs(prefixes) do
 				if prefix_in == i.prefix_2d then
-					logf(LG_DBG, "scanner", "Scanned %q barcode type", i.name)
+					logf(LG_DBG, "scanner", "Barcode type = %q", i.name)
 					prefix_out = i.prefix_out
 					break
 				end
 			end
-
+		
 			if not prefix_out then
-				logf(LG_DBG, "scanner", "Scanned unknown barcode type")
+				logf(LG_WRN, "scanner", "Barcode type = Unknown")
 				prefix_out = "?"
 			end
 
 			evq:push("scanner", { result = "ok", barcode = barcode, prefix=prefix_out })
 		else
-			logf(LG_WRN, "scanner", "Scanned barcode data is not processed because it is not terminated. Possible cause: message too long >= 5003 chars")
+			logf(LG_WRN, "scanner", 
+					"Scanned barcode data is not processed \n" ..
+					"because it is not terminated.\n" ..
+					"Possible cause: message too long (>= 5003 chars)")
 			beeper:play( "o3g16c16" )
 		end
 		if t2 then
-			logf(LG_WRN, "scanner", "More data is scanned than is processed. This data is ignored:")
+			logf(LG_WRN, "scanner", "More data is scanned than is processed.\n" ..
+											"The following data is ignored:")
 			logf(LG_WRN, "scanner", "'%s'", t2)
 		end
-		
+	else
+		logf(LG_WRN, "scanner", "Scanner data-timeout.")
 	end
 	busy=false
 end
@@ -148,30 +159,38 @@ end
 
 
 --
--- Wait for ACK, recoriding all data read until the ACK
+-- Wait for ACK, recording all data read until the ACK
 --
 
 local function wait_ack(scanner, time)
 	local buf = ""
 	local tstart = sys.hirestime()
 	repeat
-		local data = sys.read(scanner.fd, 1024)
+		local data = sys.read(scanner.fd, 5003)
 		if data and #data > 0 then
 			buf = buf .. data
 			if data:find("\006") then
-				logf(LG_DMP, "scanner", "< ACK")
+				logf(LG_DMP, "scanner", "ACK")
 				if #buf > 1 then
 					logf(LG_DMP, "scanner", "< " .. buf)
 				end
 				return buf
 			end
 			sys.sleep(0.1)
-		else
-			buf = buf .. data
 		end
-	until sys.hirestime() - tstart > 2.0
-	logf(LG_WRN, "scanner", "Timeout waiting for ack")
-	return false
+	until sys.hirestime() - tstart > 4.0
+	logf(LG_WRN, "scanner", "Timeout waiting for ACK")
+	return nil
+end
+
+local function cmd_noack(scanner, command)
+
+	-- Create and send out command
+
+	local buf = "!NLS" .. command .. ";"
+	sys.write(scanner.fd, buf)
+	logf(LG_DMP, "scanner", "> %s", buf)
+
 end
 
 
@@ -183,17 +202,26 @@ local function cmd(scanner, ...)
 
 	-- Create and send out command
 
+	scanner:flush()
+
 	for _, cmd in ipairs({...}) do
-		local buf = "!NLS" .. cmd .. ";"
-		scanner:flush()
-		sys.write(scanner.fd, buf)
-		logf(LG_DMP, "scanner", "> %s", buf)
+		cmd_noack( scanner, cmd )
 	end
 
 	return scanner:wait_ack()
 
 end
 
+
+function get_illumination_mode_code( mode )
+	if mode == "Always ON" then
+		return SCANNER_CMD_ILLUMINATION_ON;
+	elseif mode == "Always OFF" then
+		return SCANNER_CMD_ILLUMINATION_OFF;
+	else
+		return SCANNER_CMD_ILLUMINATION_WINK;
+	end
+end
 
 --
 -- Open and configure scanner device
@@ -225,19 +253,23 @@ local function open(scanner)
 	logf(LG_INF, "scanner", "Configuring scanner")
 	local ok = scanner:ping()
 
+	local errors = false
+
 	if not ok then
 		logf(LG_WRN, "scanner", "Scanner does not ping, can not configure")
 		return
 	end
 
-	scanner:cmd(
-		SCANNER_CMD_SET_DEFAULTS,
-		SCANNER_CMD_TERMINATOR_CR,
-		SCANNER_CMD_TERMINATOR_ENABLE,
-		SCANNER_CMD_AUTO_SCAN,
-		SCANNER_CMD_CODE_ID_ON
-	)
-	scanner:flush()
+	if not scanner:cmd(
+				SCANNER_CMD_SET_DEFAULTS,
+				SCANNER_CMD_TERMINATOR_CR,
+				SCANNER_CMD_TERMINATOR_ENABLE,
+				SCANNER_CMD_AUTO_SCAN,
+				SCANNER_CMD_CODE_ID_ON
+			) then
+		logf( LG_WRN, "scanner", "Error setting scanner defaults." )
+		errors = true
+	end
 	
 	-- Get version info. We need to match some stuff in a blob of free formatted text to 
 	-- get the proper info
@@ -254,6 +286,7 @@ local function open(scanner)
 		config:lookup("/dev/scanner/version"):setraw(version)
 	else
 		logf(LG_WRN, "scanner", "Could not acquire scanner version information")
+		errors = true
 	end
 
 	-- Disable 2D codes if configured
@@ -261,59 +294,73 @@ local function open(scanner)
 	local barcodes = config:get("/dev/scanner/barcodes")
 	
 	if barcodes == "1D only" then
-		scanner:cmd(SCANNER_CMD_2D_DISABLE)
+		scanner:cmd_noack(SCANNER_CMD_2D_DISABLE)
 	else
-		scanner:cmd(SCANNER_CMD_2D_ENABLE)
+		scanner:cmd_noack(SCANNER_CMD_2D_ENABLE)
 	end
-	scanner:flush()
+
+	-- disable barcodes when this is configured)
+	for _,code in ipairs(enable_disable_HR200) do
+		local id = code.name
+		local node = config:get("/dev/scanner/enable-disable/" .. id )
+		if node then
+			if node=="false" and code.off then
+				logf(LG_DBG, "scanner", "disabling barcode " .. id)
+				scanner:cmd_noack(code.off)
+			elseif node=="true" and code.on then
+				logf(LG_DBG, "scanner", "enabling barcode " .. id)
+				scanner:cmd_noack(code.on)
+			end
+		end
+	end
+	if not scanner:wait_ack() then
+		logf( LG_WRN, "scanner", "Error disabling/enabling barcodes." )
+		errors = true
+	end
 
 	-- Configure code prefixes
 
-	local cmd_list = {}
 	for _,i in ipairs(prefixes) do
-		if i.cmd then
-			table.insert(cmd_list, i.cmd .. '="' .. i.prefix_2d .. '"')
+		if i.cmd_HR200 then
+			scanner:cmd_noack( i.cmd_HR200 .. '="' .. i.prefix_2d .. '"' )
 		end
 	end
-	scanner:cmd(unpack(cmd_list))
-	scanner:flush()
 
 	-- Configure illumination mode: Blinking,Always ON,Always OFF
-	local illumination_led_mode = config:get("/dev/scanner/illumination_led")
-	if illumination_led_mode == "Always ON" then
-		scanner:cmd( SCANNER_CMD_ILLUMINATION_ON )
-	elseif illumination_led_mode == "Always OFF" then
-		scanner:cmd( SCANNER_CMD_ILLUMINATION_OFF )
-	else
-		scanner:cmd( SCANNER_CMD_ILLUMINATION_WINK )
-	end
-	scanner:flush()
+	scanner:cmd_noack( get_illumination_mode_code( config:get("/dev/scanner/illumination_led") ) )
 
 	-- Configure aiming mode: Blinking,Always ON,Sensor mode
 	local aiming_led_mode = config:get("/dev/scanner/aiming_led")
 	if aiming_led_mode == "Always ON" then
-		scanner:cmd( SCANNER_CMD_AIM_ON )
+		scanner:cmd_noack( SCANNER_CMD_AIM_ON )
 	elseif aiming_led_mode == "Sensor mode" then
-		scanner:cmd( SCANNER_CMD_AIM_SMART )
+		scanner:cmd_noack( SCANNER_CMD_AIM_SMART )
 	else
-		scanner:cmd( SCANNER_CMD_AIM_WINK )
+		scanner:cmd_noack( SCANNER_CMD_AIM_WINK )
 	end
-	scanner:flush()
 
 	-- Configure sensitivity: Low,Medium,High
 	local reading_sensitivity = config:get("/dev/scanner/reading_sensitivity")
 	if reading_sensitivity == "Low" then
 	   -- Low sensitivity moet geprogrammeerd staan op 20:
-		scanner:cmd( "0312040", "0000020", "0000000", "0000160" )
-		scanner:cmd( SCANNER_CMD_SENSITIVITY_LOW )
+		scanner:cmd_noack( "0312040", "0000020", "0000000", "0000160" )
+		scanner:cmd_noack( SCANNER_CMD_SENSITIVITY_LOW )
 	elseif reading_sensitivity == "High" then
-		scanner:cmd( SCANNER_CMD_SENSITIVITY_HIGH )
+		scanner:cmd_noack( SCANNER_CMD_SENSITIVITY_HIGH )
 	else
-		scanner:cmd( SCANNER_CMD_SENSITIVITY_NORMAL )
+		scanner:cmd_noack( SCANNER_CMD_SENSITIVITY_NORMAL )
+	end
+	if not scanner:wait_ack() then
+		logf( LG_WRN, "scanner", "Error setting illumination, aiming mode or sensitivity." )
+		errors = true
 	end
 	scanner:flush()
 
-	logf(LG_DBG, "scanner", "Successfully detected and configured scanner, enabled %s" % barcodes)
+	if errors then
+		logf(LG_WRN, "scanner", "Finnished configuring scanner, but there were errors.")
+	else
+		logf(LG_DBG, "scanner", "Successfully detected and configured scanner, enabled %s" % barcodes)
+	end
 end
 
 
@@ -342,6 +389,8 @@ local function enable(scanner)
 	if scanner.fd then
 		sys.write(scanner.fd, "\0272")
 		scanner:wait_ack()
+		scanner:cmd( get_illumination_mode_code(config:get("/dev/scanner/illumination_led")) )
+		led:set("yellow","on")
 	end
 end
 
@@ -355,6 +404,8 @@ local function disable(scanner)
 	if scanner.fd then
 		sys.write(scanner.fd, "\0270")
 		scanner:wait_ack()
+		scanner:cmd( get_illumination_mode_code("Always OFF") )
+		led:set("yellow","off")
 	end
 end
 
@@ -383,12 +434,12 @@ function new()
 		flush = flush,
 		wait_ack = wait_ack,
 		cmd = cmd,
+		cmd_noack = cmd_noack,
 		enable = enable,
 		disable = disable,
 	}
 
-	config:add_watch("/dev/scanner",    "set", function() scanner:open() end, scanner)
-
+	config:add_watch("/dev/scanner", "set", function() scanner:open() end, scanner)
 	scanner:open()
 
 	return scanner

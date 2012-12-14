@@ -3,7 +3,7 @@
 #
 
 NAME    := cit
-VERSION	:= 1.0
+VERSION	:= 1.1
 BUILD   := $(shell svnversion . | cut -d : -f 2)
 DIST	:= /tmp/$(NAME)-$(BUILD).tgz
 
@@ -14,7 +14,7 @@ DIST	:= /tmp/$(NAME)-$(BUILD).tgz
 PKGS			+= lua5.1 sdl freetype2
 
 MODULES			+= sys.so
-LDFLAGS_sys.so		+= -lrt -lutil -lm -ldl 
+LDFLAGS_sys.so	+= -lrt -lutil -lm -ldl 
 
 MODULES			+= net.so
 MODULES			+= base64.so

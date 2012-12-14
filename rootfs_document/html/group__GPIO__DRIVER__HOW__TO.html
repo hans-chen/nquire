@@ -42,12 +42,16 @@
 <hr><a name="_details"></a><h2>Detailed Description</h2>
 <div class="fragment"><pre class="fragment">
 Cit200 gpio driver provide a way to control gpio from userspace. The driver support open,close,ioctl function.
-Gate1：Eddy GPIO 1/Output  	GPIO1--&gt;PC16 (offset:1)
-Gate2：Eddy GPIO 3/Output  	GPIO3--&gt;PC18 (offset:3)
-Gate3：Eddy GPIO 5/Input		GPIO5--&gt;PC20 (offset:5)
-Gate4：Eddy GPIO 7/Input		GPIO7--&gt;PC22 (offset:7)
-				GPIO11 --&gt; PC26(offset:11)
-				PID1   --&gt; PC7 (offset:18)
+Gate1：Eddy GPIO 1/Output				GPIO1--&gt;PC16 (offset:1)
+Gate2：Eddy GPIO 3/Output				GPIO3--&gt;PC18 (offset:3)
+Gate3：Eddy GPIO 5/Input					GPIO5--&gt;PC20 (offset:5)
+Gate4：Eddy GPIO 7/Input					GPIO7--&gt;PC22 (offset:7)
+NQ201 whitelight(only for nQuire 201)			GPIO11 --&gt; PC26(offset:11)
+		High level disable ;	Low level enable	
+
+Peripheral power(usb,wifi,2027,GPRS,lcd-backlight)	PID1  --&gt; PC7 (offset:18)
+		High level enable ;	Low level disable
+
 You need create the device file node 
 #mknod  /dev/gpio c 99 0
 	</pre></div> <hr><h2>Typedef Documentation</h2>

@@ -94,7 +94,7 @@ local function handle_request(client, method, uri, headers, next_buf)
 				client.cache_time = -30758400;  -- 1 year ago 
 				client.resp_data = {}
 				client.resp_header = {}
-				local ok, err = pcall(handler.fn, client, request, handler.fndata)
+				local ok, err = safecall(handler.fn, client, request, handler.fndata)
 
 				-- Check if handler executed OK
 

@@ -1,14 +1,32 @@
-
-First release
-=============
+Release 1.1
+===========
 
 todo:
 
-- Support external HR100 scanner. Hans: fix bootup with HID connected
-- Support scan mode in web uit
+- cr: Device configuration through multicast protocol
+- ?: Support scan mode in web uit
+- pr: animated gif
+- cr: support for touch-screen
+- cr: add extra discovery protocol
+- pr: only show relevant items in the web-gui
 
 done:
 
+2009-09-29 cr: kleine font kleiner
+- cr: sleep mode (except for switching off lcd backlight + scanner LED's)
+
+Can not / Will not do
+=====================
+
+- ?: Switching off (LCD backlight + scanner LED's)
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Release 1.0
+===========
+
+done:
+
+- Support external HR100 scanner. Hans: fix bootup with HID connected
 - Watchdog support in kernel. Hans: fix watchdog driver
 - support configuration save/restore over FTP
 - Support internal CCD scanner
@@ -39,15 +57,3 @@ done:
 can't reproduce:
 
 - 'foute' barcodes
-
-Next release
-============
-
-- Device configuration through multicast protocol
-
-
-Can not / Will not do
-=====================
-
-- Switching off (LCD backlight + scanner LED's)
-

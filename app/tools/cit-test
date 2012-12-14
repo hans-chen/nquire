@@ -135,6 +135,16 @@ test_16 ()
 	echo -en "\e\x7e\x31\x30"			# GPIO 1 low
 }
 
+test_17 ()
+{
+	echo -en "\e\x53\x30"               # scanner sleep
+}
+
+test_18 ()
+{
+	echo -en "\e\x53\x31"               # scanner wake up
+}
+
 if test -z $1;
 then
 	echo "cit-test [<TCP addres> <testnr>]"

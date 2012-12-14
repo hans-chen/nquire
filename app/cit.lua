@@ -77,6 +77,7 @@ local function format_text(text, xpos, ypos, align_h, align_v, size)
 	if align_v == "m" then ypos = ypos - (text_h+2) / 2 end
 	if align_v == "b" then ypos = ypos - (text_h+2) end
 
+	logf(LG_DBG,"cit", "gotoxy(%d,%d)", xpos,ypos )
 	display:gotoxy(xpos, ypos)
 	display:draw_text(text)
 
@@ -109,7 +110,6 @@ local function show_configuration()
 		y = y + 14
 	end
 
-	logf(LG_DMP,"cit","Initiating cit_idle_msg in 10 seconds")
 	evq:push("cit_idle_msg", nil, 10.0)
 end
 
@@ -218,6 +218,7 @@ local barcode_mode = "normal"
 
 
 local function on_barcode(event, cit)
+	logf(LG_DMP, "cit", "on_barcode")
 
 	local barcode = event.data.barcode or "?"
 	local prefix = event.data.prefix or "?"
@@ -397,7 +398,7 @@ local command_list = {
 	},
 
 	[0x5d] = {
-		name = "slaap/wakeup barcode scanner",
+		name = "sleep/wakeup barcode scanner",
 		nparam = 1,
 		fn = function(cit, onoff)
 			if onoff == 0x30 then
@@ -464,7 +465,23 @@ local command_list = {
 			end
 			on_barcode( {data={barcode=barcode}}, cit)
 		end
-	}
+	},
+
+	-- 'S'
+	[0x53] = {
+		name = "sleep/wakeup whole device",
+		nparam = 1,
+		fn = function(cit, onoff)
+			if onoff == 0x30 then
+				scanner:disable()
+				-- TODO: turn off backlighting
+			end
+			if onoff == 0x31 then
+				scanner:enable()
+				-- TODO: turn on backlighting
+			end
+		end
+	},
 
 }
 
@@ -547,7 +564,6 @@ local function handle_bytes(cit, command)
 	end
 	
 	local timeout = tonumber(config:get("/cit/messages/idle/timeout"))
-	logf(LG_DMP,"cit","Initiating cit_idle_msg with timeout")
 	evq:push("cit_idle_msg", nil, timeout)
 	t_lastcmd = sys.hirestime()
 
@@ -675,14 +691,17 @@ local function draw_idle_msg(cit)
 	display:set_color("white")
 
 	-- first draw the 'background' image:
-	if config:lookup("/cit/messages/idle/show_idle_picture"):get() == "true" then
+	if config:lookup("/cit/messages/idle/picture/show"):get() == "true" then
 		local files, err = sys.readdir("/cit200/img")
 		if files then
 			for _, file in ipairs(files) do
 				if file == "welcome.gif" then
 					local image_path = "/cit200/img/" .. file
 					logf(LG_DMP,"cit", "using welcome image %s", image_path)
-					display:draw_image(image_path)
+					local xpos = config:lookup("/cit/messages/idle/picture/xpos"):get()
+					local ypos = config:lookup("/cit/messages/idle/picture/ypos"):get()
+					logf(LG_DBG,"cit","image xpos=%d, ypos=%d", xpos, ypos)
+					display:draw_image(image_path, xpos, ypos)
 				end
 			end
 		end
@@ -696,6 +715,7 @@ local function draw_idle_msg(cit)
 		local align_h = config:get("/cit/messages/idle/%s/halign" % row)
 		local align_v = config:get("/cit/messages/idle/%s/valign" % row)
 		local size    = config:get("/cit/messages/idle/%s/size" % row)
+		logf(LG_DBG,"cit","text %s : xpos=%d, ypos=%d", msg, xpos, ypos)
 		format_text(msg, xpos, ypos, align_h, align_v, size)
 	end
 
@@ -724,7 +744,6 @@ local function draw_error_msg(cit)
 		format_text(msg, xpos, ypos, align_h, align_v, size)
 	end
 
-	logf(LG_DMP,"cit","Initiating cit_idle_msg in 5 seconds")
 	evq:push("cit_idle_msg", nil, 5.0)
 end
 
@@ -854,7 +873,6 @@ local function start(cit)
 		y = y + 14
 	end
 
-	logf(LG_DMP,"cit","Initiating cit_idle_msg in 2 seconds")
 	evq:push("cit_idle_msg", nil, 2.0)
 
 	-- Led on, we're ready to scan
@@ -915,6 +933,10 @@ local function show_message(cit, msg1, msg2)
 	end
 end
 
+function set_fontsize() 
+	fontsize_small = config:lookup("/cit/messages/fontsize/small"):get()
+	fontsize_big = config:lookup("/cit/messages/fontsize/large"):get()
+end
 
 --
 -- Create cit
@@ -946,6 +968,9 @@ function new()
 		cit:stop()
 		cit:start()
 	end)
+
+	config:add_watch("/cit/messages/fontsize", "set", set_fontsize ) 
+	set_fontsize()
 
 	-- Check if there are any fonts on the sd card we can use
 	

@@ -340,8 +340,9 @@ static int l_draw_image(lua_State *L)
 	struct GifColorType *gif_colormap;
 	GifFileType *gif;
 	struct SavedImage *savedimage;
+	struct GifImageDesc *desc;
 	ExtensionBlock *eb;
-	int img_x, img_y;
+	lua_Number img_x, img_y;
 	int r;
 	int i, j;
 	int y;
@@ -353,6 +354,9 @@ static int l_draw_image(lua_State *L)
 	img_x = luaL_optnumber(L, 3, 0);
 	img_y = luaL_optnumber(L, 4, 0);
 
+	dd->x = (int)img_x;
+	dd->y = (int)img_y;
+	
 	/* Find empty image slot */
 	
 	for(i=0; i<MAX_IMAGES; i++) {
@@ -369,7 +373,8 @@ static int l_draw_image(lua_State *L)
 	/* Open and read GIF image */
 	
 	gif = DGifOpenFileName(fname);
-	if(gif == NULL) BARF(L, "Could not open image '%s'", fname);
+	if(gif == NULL) 
+		BARF(L, "Could not open image '%s', error '%d'", fname, GifLastError() );
 
 	r = DGifSlurp(gif);
 	if(r != GIF_OK) {
@@ -395,6 +400,7 @@ static int l_draw_image(lua_State *L)
 	for(i=0; i<image->nframes; i++) {
 
 		savedimage = gif->SavedImages + i;
+		desc = &savedimage->ImageDesc;
 	
 		/* Copy colormap from gif into surface */
 
@@ -409,10 +415,10 @@ static int l_draw_image(lua_State *L)
 
 		/* Copy pixel data */
 
-		for(y=0; y<image->h; y++) {
-			pfrom = savedimage->RasterBits + (image->w * y);
-			pto = surf->pixels + (surf->pitch * y);
-			memcpy(pto, pfrom, image->w);
+		for(y=0; y<desc->Height; y++) {
+			pfrom = savedimage->RasterBits + (desc->Width * y);
+			pto = surf->pixels + (surf->pitch * (y + desc->Top)) + desc->Left;
+			memcpy(pto, pfrom, desc->Width);
 		}
 
 		/* If animated gif, get delay time */
@@ -574,18 +580,18 @@ static int l_free(lua_State *L)
 ***************************************************************************/
 
 static struct luaL_Reg dpydrv_metatable[] = {
-	{ "open",		l_open },
-	{ "close",		l_close },
+	{ "open",			l_open },
+	{ "close",			l_close },
 	{ "draw_image",		l_draw_image },
 	{ "draw_video",		l_draw_video },
-	{ "gotoxy",		l_gotoxy },
-      	{ "set_font",		l_set_font },
+	{ "gotoxy",			l_gotoxy },
+	{ "set_font",		l_set_font },
 	{ "set_color",		l_set_color },
 	{ "draw_text",		l_draw_text },
 	{ "draw_box",		l_draw_box },
-	{ "draw_filled_box",	l_draw_filled_box },
-	{ "clear",		l_clear },
-	{ "update",		l_update },
+	{ "draw_filled_box",l_draw_filled_box },
+	{ "clear",			l_clear },
+	{ "update",			l_update },
 	{ "list_fonts",		l_list_fonts },
 	{ NULL },
 };

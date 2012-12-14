@@ -388,6 +388,7 @@ local function on_check_network_status_timer( network )
 		led:set("blue", led_status)
 		if led_status == "on" then
 			logf(LG_INF,"network","Network is up")
+			network.is_up = true
 			evq:push("network_up")
 		else
 			logf(LG_INF,"network","Network is down")

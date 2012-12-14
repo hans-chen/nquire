@@ -28,6 +28,7 @@ require "display"
 require "beepthread"
 require "sys"
 require "discovery"
+require "discovery_sg15"
 require "upgrade"
 require "versioninfo"
 require "led"
@@ -185,15 +186,18 @@ beeper:play(config:get("/dev/beeper/tune_startup"))
 -- Start discovery service as soon as network is up
 	
 discovery = Discovery:new()
+discovery_sg15 = Discovery_sg15:new()
 
 evq:register("network_up", function()
 	logf(LG_INF, "main", "Network is up, starting discovery service")
 	discovery:start()
+	discovery_sg15:start()
 end)
 
 evq:register("network_down", function()
 	logf(LG_INF, "main", "Network is down, stopping discovery service")
 	discovery:stop()
+	discovery_sg15:stop()
 end)
 
 -- Start upgrade process

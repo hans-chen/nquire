@@ -124,5 +124,130 @@ function runbg(cmd, cb_sigchld, cb_data, userdata)
 end
 
 
+--
+-- Protected call with stack traceback
+--
+
+function safecall(fn, ...)
+
+	local arg = {...}
+
+	-- xpcall() does not somehow not support function parameters, so we create a 
+	-- wrapper which gets called instead to pass the arguments to the given
+	-- function
+
+	local function wrapper()
+		return fn(unpack(arg))
+	end
+
+	local function errhandler(err)
+		local errmsg = debug.traceback("Error: " .. err, 3)
+		logf(LG_WRN, "safecall", errmsg)
+		return errmsg
+	end
+
+	return xpcall(wrapper, errhandler)
+
+end
+
+
+function ssub( s, start, insertion )
+	return s:sub( 1, start-1 ) .. insertion .. s:sub( start+#insertion )
+end
+
+-- fetch 2 byte coded little endian number from a string starting at start_pos
+-- in: data
+--     start_pos
+-- return: the value of the fetched little endian coded number
+function peek_little_endian_short( data, start_pos )
+	local g1, g2 = string.byte( data, start_pos, start_pos+1 )
+	return	g1 + g2*0x100;
+end
+
+-- set a 2 byte coded little endian number from a byte-array starting at pos
+function poke_little_endian_short( data, start_pos, value )
+	local v0 = value % 0x100;
+	local v1 = (value-v0) / 0x100;
+	return ssub( data, start_pos, string.char( v0,v1 ) )
+end
+
+-- fetch 4 byte coded little endian number from a string starting at start_pos
+-- in: data
+--     start_pos
+-- return: the value of the fetched little endian coded number
+function peek_little_endian_long( data, start_pos )
+	local g1, g2, g3, g4 = string.byte( data, start_pos, start_pos+3 )
+	return	g1 + g2*0x100 + g3*0x10000 + g4 *0x1000000;
+end
+
+-- set a 4 byte coded little endian number from a byte-array starting at pos
+function poke_little_endian_long( data, start_pos, value )
+	local v0 = value % 0x100;
+	local v1 = ((value-v0) / 0x100) % 0x100;
+	local v2 = ((value-v0-v1) / 0x10000) % 0x100;
+	local v3 = ((value-v0-v1-v2) / 0x1000000) % 0x100;
+	return ssub( data, start_pos, string.char( v0,v1,v2,v3 ) )
+end
+
+function ifconfig(interface)
+
+	local fd;
+	
+	fd = io.popen("/sbin/ifconfig " .. interface)
+	if fd then
+		local conf = {
+			interface = nil,
+			data = nil,
+			inet = nil,
+			mask = nil,
+			mac = nil
+		}
+		conf.interface = "eth0"
+		conf.data = fd:read("*a")
+		conf.inet = { conf.data:match("inet addr:(%d+)%.(%d+)%.(%d+)%.(%d+)") }
+		conf.mask = { conf.data:match("Mask:(%d+)%.(%d+)%.(%d+)%.(%d+)") }
+		local m1,m2,m3,m4,m5,m6 = conf.data:match("HWaddr (%x+):(%x+):(%x+):(%x+):(%x+):(%x+)")
+		conf.mac = { ("0x" .. m1)+0, ("0x" .. m2)+0, ("0x" .. m3)+0, ("0x" .. m4)+0, ("0x" .. m5)+0, ("0x" .. m6)+0 } 
+		
+		fd:close()
+		return conf
+	else
+		return nil
+	end
+end
+
+function dump( buf, maxlines )
+	local out = ""
+	for i=1,#buf do
+		if i % 8 == 1 then out = out .. (i-1) .. "\t" end
+		out = out .. string.format( "0x%02x ", string.byte( buf, i ) )
+		if i % 8 == 0 then 
+			if maxlines ~= nil then
+				maxlines = maxlines - 1
+				if maxlines==0 then 
+					return out
+				end
+			end
+			out = out .. "\n"
+		end
+	end
+	return out
+end
+
+-- table comparion
+-- return: ==0 --> tables are the same, ~=0 --> tables are not the same
+function tablecmp( t1, t2 )
+	if #t1 ~= #t2 then
+		return -1
+	end
+	for i=1, #t1 do
+		if t1[i] ~= t2[i] then
+			return -1
+		end
+	end
+	return 0
+end
+
+
 -- vi: ft=lua ts=3 sw=3
 

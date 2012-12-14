@@ -275,7 +275,7 @@ local function on_config_timer(event, config)
 	
 	local s = sys.lstat(config.fname_db)
 
-	if not s or s.mtime ~= config.mtime then
+	if not s or s.mtime > config.mtime then
 		logf(LG_DBG, "config", "Config file was modified, rereading")
 		config:load_db(config.fname_db)
 		config:save_db(config.fname_db)
@@ -285,7 +285,7 @@ local function on_config_timer(event, config)
 	
 	local s = sys.lstat("/home/ftp/cit.conf")
 
-	if s and s.mtime ~= config.mtime then
+	if s and s.mtime > config.mtime then
 		logf(LG_DBG, "config", "FTP Config file was modified, rereading")
 		config:load_db("/home/ftp/cit.conf")
 		config:save_db(config.fname_db)
