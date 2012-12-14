@@ -10,9 +10,6 @@ module("Display", package.seeall)
 
 local lgid="display"
 
-local dpy_w = 240
-local dpy_h = 128
-
 --
 --- Open display
 --
@@ -33,6 +30,10 @@ local function open(display)
 	-- resolution specific display settings
 
 	local dpyinfo = {
+		["128x64m"] = {
+			native_font_size = 12,
+			virtkbd_size = nil,	-- not enabled
+		},
 		["240x128m"] = {
 			native_font_size = 8,
 			virtkbd_size = nil,	-- not enabled
@@ -260,6 +261,7 @@ end
 local function set_color(display, v1, v2, v3)
 	
 	local r,g,b = get_rgb( v1, v2, v3 )
+	logf(LG_DMP,lgid,"r=%d, g=%d, b=%d", (r or -1),(g or -1),(b or -1))
 	if r ~= nil then
 		display.drv:set_color(r,g,b)
 	end
@@ -333,10 +335,10 @@ local function format_text(display, text, xpos, ypos, align_h, align_v, size)
 		-- (something to do with truncation errors????)
 		text_w = text_w + 1
 
-		if align_h == "c" then xpos = dpy_w/2 - text_w / 2 end
-		if align_h == "r" then xpos = dpy_w - text_w end
-		if align_v == "m" then ypos = dpy_h/2 - n*text_h/2 + (i-1)*text_h end
-		if align_v == "b" then ypos = dpy_h   - n*text_h   + (i-1)*text_h end
+		if align_h == "c" then xpos = display.w/2 - text_w / 2 end
+		if align_h == "r" then xpos = display.w - text_w end
+		if align_v == "m" then ypos = display.h/2 - n*text_h/2 + (i-1)*text_h end
+		if align_v == "b" then ypos = display.h   - n*text_h   + (i-1)*text_h end
 
 		logf(LG_DBG,lgid, "gotoxy(%d,%d)", xpos,ypos )
 		display:gotoxy(xpos, ypos)
@@ -353,8 +355,8 @@ end
 
 
 --
--- display a message of (max) 6 lines (actual possible lines depends on the size of the font)
--- All lines will be centered
+-- display a message of (max) 6 lines (actual possible lines depends on the 
+-- size of the font). All lines will be centered
 --
 local function show_message(display, msg1, msg2, msg3, msg4, msg5, msg6)
 	display:gotoxy(0, 0);
@@ -450,7 +452,9 @@ function new()
 
 	local function set_contrast()
 		local contrast = config:get("/dev/display/contrast")
-		contrast = 100 + contrast * 15
+		local min = config:get("/dev/display/contrast_min")
+		local max = config:get("/dev/display/contrast_max")
+		contrast = min + contrast * (max-min)/4
 		local fd,err = io.open("/sys/class/display/display0/contrast", "w")
 		if fd then
 			fd:write(contrast)

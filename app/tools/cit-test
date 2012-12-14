@@ -123,6 +123,10 @@ And the received parcode should be "A1234" ==
 
 test_6()
 {
+    cat 1>&2 << !EOF!
+Testing chinese charracters
+The extra fontset should be available in /mnt (micro sd card)
+!EOF!
 
 	echo -en "\e\x42\x31"				# Set font
 	echo -en "\e\x25"					# Clear display
@@ -191,6 +195,13 @@ test_11()
     cat 1>&2 << !EOF!
 Check operation with sloppy formatting 
 (not closing a string with \x03)
+The display should look like:
+------------------------
+
+   One of 2
+   Two of 2
+
+------------------------
 !EOF!
 	# test sloppy formatting without end of string (=\x03) chars
 	echo -en "\e\x42\x30"				# Font size 0
@@ -324,34 +335,68 @@ Required: utf8
 test_23 ()
 {
     cat 1>&2 << !EOF!
-Test use of line break in line with centered alignment and long text
+Test use of NL ('\n') in line with centered alignment and long text
+Should work independent of font set
 Expect on display:
 ------------------------------
         Line 1 part 1
   blabla line1 part 2 blabla
   
-  
+    line2 part 1
+    line2 part 2 blabla
   
 ------------------------------
 !EOF!
 
 	echo -en "\e\x25"     # clear screen
 	echo -en "\e\x42\x30" # font size small
-	echo -en "\e\x2e\x31Line1 part 1\nblabla line1 part 2 blabla\x03" 		# Center top
+	echo -en "\e\x2e\x31Line1 part 1\nblabla line1 part 2 blabla\x03" # Center top
+	echo -en "\e\x2753"    # charracter position at 5,3
+	echo -en "Line2 part 1\nline2 part 2 blabla\x03"
+	echo -en "\e\x2e\x38Line3 part 1\nline3 part 2 blabla\x03" # right bottom
 }
 
 test_24 ()
 {
     cat 1>&2 << !EOF!
+Testing SG15 compatebility for line breaks
+Test use of CR ('\x0d') in line with centered alignment and long text
+Should work independent of font set
+Expect on display:
+------------------------------
+        Line 1 part 1
+  blabla line1 part 2 blabla
+  
+    line2 part 1
+    line2 part 2 blabla
+  
+------------------------------
+!EOF!
+
+	echo -en "\e\x25"     # clear screen
+	echo -en "\e\x42\x30" # font size small
+	echo -en "\e\x2e\x31Line1 part 1\x0dblabla line1 part 2 blabla\x03"	# Center top
+	echo -en "\e\x2753"    # charracter position at 5,3
+	echo -en "Line2 part 1\x0dline2 part 2 blabla\x03"
+	echo -en "\e\x2e\x38Line3 part 1\x0dline3 part 2 blabla\x03" # right bottom
+}
+
+
+test_25 ()
+{
+    cat 1>&2 << !EOF!
 Test use of line break in text
 Just positioning on 10,21 px
+Should work independent of font-set
+Testing SG15 and unix line-breaks in the same testcase
 Expect on display:
 ------------------------------
 
    Line 1 part 1
    line 1 part 2
   
-  
+       Line 1 part 1
+       line 1 part 2
   
 ------------------------------
 !EOF!
@@ -360,9 +405,11 @@ Expect on display:
 	echo -en "\e\x42\x30" # font size small
 	echo -en "\e\x2c\x3a\x45"					# Set pixel position (10,21)
 	echo -en "Line1 part 1\nline1 part 2\x03"
+	echo -en "\e\x2c\x5a\x75"					# Set pixel position (42,21)
+	echo -en "Line2 part 1\x0dline2 part 2\x03"
 }
 
-test_25 ()
+test_26 ()
 {
     cat 1>&2 << !EOF!
 Test use of line break in text
@@ -383,10 +430,11 @@ Just positioning 4,2 (char pos)
 	echo -en "Line1 part 1\nline1 part 2\x03"
 }
 
-test_26 ()
+test_27 ()
 {
     cat 1>&2 << !EOF!
-Test use of line break in text with alignments
+Test use of NL (unix style) in text with alignments
+Should work independent of font set
 Expect on display:
 ------------------------
 lt         ct         rt
@@ -412,7 +460,37 @@ lb2       cb02       rb2
 	echo -en "\e\x2e\x38rb\nrb2\x03" 		# Right bottom
 }
 
-test_27 ()
+test_28 ()
+{
+    cat 1>&2 << !EOF!
+Test use of CR (SG15) in text with alignments
+Should work independent of font set
+Expect on display:
+------------------------
+lt         ct         rt
+lt2       ct02       rt2
+
+lm         cm         rm
+lm2       cm02       rm2
+                 
+lb         cb         rb
+lb2       cb02       rb2
+------------------------
+!EOF!
+	echo -en "\e\x42\x30"				# Set font
+	echo -en "\e\x25"					# Clear display
+	echo -en "\e\x2e\x30lt1\x0dlt2\x03" 		# Left top
+	echo -en "\e\x2e\x31ct\x0dct02\x03" 		# Centre top
+	echo -en "\e\x2e\x32rt\x0drt2\x03" 		# Right top
+	echo -en "\e\x2e\x33lm\x0dlm2\x03" 		# left middle
+	echo -en "\e\x2e\x34cm\x0dcm02\x03" 		# Centre middle
+	echo -en "\e\x2e\x35rm\x0drm2\x03" 		# Right middle
+	echo -en "\e\x2e\x36lb\x0dlb2\x03" 		# Left bottom
+	echo -en "\e\x2e\x37cb\x0dcb02\x03" 		# Centre bottom
+	echo -en "\e\x2e\x38rb\x0drb2\x03" 		# Right bottom
+}
+
+test_29 ()
 {
     cat 1>&2 << !EOF!
 Test use of line break in text with alignments
@@ -438,9 +516,35 @@ tbd
 	echo -en "\e\x2e\x3Bry\nry2\x03" 	# right keep y
 }
 
+test_30 ()
+{
+    cat 1>&2 << !EOF!
+Test use of NL (SG15 style) in text with alignments
+Expect on display:
+------------------------
+tbd
+------------------------
+!EOF!
+	echo -en "\e\x42\x30"				# Set font
+	echo -en "\e\x25"					# Clear display
+	echo -en "\e\x2c\xd0\x82X\x03"		# Write x at (
+	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2e\x3cxt\x0dxt2\x03" 	# Left keep x
+	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2e\x3dxm\x0dxm2\x03" 	# Centre keep x
+	echo -en "\e\x2c\xd0\x84"			# Set pixel position (
+	echo -en "\e\x2e\x3exb\x0dxb2\x03" 	# right keep x
+
+	echo -en "\e\x2c\x44\x44Y\x03"		# Write Y at (20,20)
+	echo -en "\e\x2c\x44\x44"			# Set pixel position (20,20)
+	echo -en "\e\x2e\x39ly\x0dly2\x03" 	# Left keep y
+	echo -en "\e\x2e\x3Acy\x0dcy2\x03" 	# Centre keep y
+	echo -en "\e\x2e\x3Bry\x0dry2\x03" 	# right keep y
+}
 
 
-test_28 ()
+
+test_31 ()
 {
     cat 1>&2 << !EOF!
 Test custom font size (very small and VERY BIG)
@@ -448,6 +552,34 @@ Test custom font size (very small and VERY BIG)
 	echo -en "\e\x25" 				# clear screen
 	echo -en "\e\x42\x32custom 32H\n\x03" # 6pt
 	echo -en "\e\x42\x4040H\x03" # 96pt
+	echo -en "\e\x42\x31" # big
+}
+
+
+test_utf8()
+{
+    cat 1>&2 << !EOF!
+Change to utf8 using fake barcode scan.
+!EOF!
+	echo -en "\e\xffF%#\$^*%\x03"					# Fake barcode scan: enter programming mode
+	sleep 3
+	echo -en "\e\xffF020705\x03"						# program settings
+	sleep 4
+	echo -en "\e\xffF/cit/codepage = utf8\x03"		# Fake barcode scan
+	sleep 1
+	echo -en "\e\xffF%*^\$#%\x03"					# Fake barcode scan: exit programming mode
+}
+
+
+test_ibm852()
+{
+    cat 1>&2 << !EOF!
+Change to utf8 using fake barcode scan.
+!EOF!
+	echo -en "\e\xffF%#\$^*%\x03"					# Fake barcode scan: enter programming mode
+	#echo -en "\e\xff020705\x03"						# program settings
+	#echo -en "\e\xff/cit/codepage = ibm852\x03"		# Fake barcode scan
+	#echo -en "\e\xff%*^\$\#%\x03"					# Fake barcode scan: exit programming mode
 }
 
 
@@ -478,11 +610,17 @@ then
 	echo "21           chinese"
 	echo "22           small and big chinese"
 	echo "23           newline in line"
-	echo "24           right align with same y"
-	echo "25           alignment tests"
+	echo "24           CR in line (SG15 compatebility)"
+	echo "25           right align with same y"
 	echo "26           alignment tests"
 	echo "27           alignment tests"
-	echo "28           alternative font sizes"
+	echo "28           alignment tests"
+	echo "29           alignment tests"
+	echo "30           alignment tests"
+	echo "31           alternative font sizes"
+	
+	echo "utf8         change to utf8 using fake barcode scan"
+	echo "ibm852       change to imb852 using fake barcode scan"
 
 	exit
 

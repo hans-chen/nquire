@@ -2,6 +2,7 @@
 #
 # usage: install [install options] [main.lua options]
 # install options: -a    all (first remove current installation completely)
+#                  -i    install only (do not start app)
 # e.g:
 # ./install -a -n
 # Start main without ethernet network (re)configuration
@@ -31,7 +32,9 @@ else
 
 fi
 
-sleep 2
-set -x
-lua main.lua -w -l 5 $1 $2 $3 $4 $5 2>&1 &
+if ! test "$1" == "-i"; then
+	sleep 2
+	set -x
+	lua main.lua -w -l 5 $1 $2 $3 $4 $5 2>&1 &
+fi
 

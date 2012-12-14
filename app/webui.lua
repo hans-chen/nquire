@@ -598,7 +598,7 @@ local function page_scanner( client, request )
 
 	client:add_data("<table id='1d_codes'>")
 	for _,code in ipairs(scanner.enable_disable) do
-		if not is_2d_code(code.name) then
+		if does_firmware_support( code ) and not is_2d_code(code.name) then
 			local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
 			if node then
 				logf(LG_DMP, "webui", "showing code " .. code.name)
@@ -618,7 +618,7 @@ local function page_scanner( client, request )
 		end
 
 		for _,code in ipairs(scanner.enable_disable) do
-			if is_2d_code(code.name) then
+			if does_firmware_support( code ) and is_2d_code(code.name) then
 				local node = config:lookup("/dev/scanner/enable-disable/" .. code.name)
 				if node then
 					logf(LG_DMP, "webui", "showing code " .. code.name)

@@ -263,9 +263,9 @@ end
 -- Close and restore tty settings
 --
 
-local function close(scanner)
+local function close(scanner, quick)
 	if scanner.fd then
-		scanner:disable()
+		if not quick then scanner:disable() end
 		evq:fd_del(scanner.fd)
 		evq:unregister("fd", on_fd_scanner, scanner)
 		sys.set_noncanonical(scanner.fd, false)

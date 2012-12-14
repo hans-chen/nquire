@@ -24,6 +24,8 @@
 -- id's are the names used in the database for enabling or disabling the code
 -- when no id is specified the name is used for database identification
 
+local lgid = "scanner"
+
 prefixes = {
    { name = "Code128",            prefix_2d = "j", prefix_1d = "j", prefix_out = "#"  },
    { name = "UCC_EAN-128",        prefix_2d = "J", prefix_1d = "u", prefix_out = "P", cmd_HR200 = "0004030" },
@@ -98,7 +100,18 @@ enable_disable_HR200 = {
    { name = "Aztec",              default="on",  off="0503010" },
    { name = "DataMatrix",         default="on",  off="0504010", on="0504020" },
    { name = "Chinese-Sensible",   default="on",  off="0508010" },
+   { name = "GS1_Databar",        default="on",  off="0413010", on="0413020", firmware_min="3.06.004" },
+   { name = "Code-11",            default="on",  off="0415010", on="0415020", firmware_min="3.06.004" },
 }
+
+function find_by_name( table, name )
+	for _,rec in ipairs( table ) do
+		if rec.name==name then
+			return rec
+		end
+	end
+	return nil
+end
 
 -- Return true when the layout of a code is 2d
 function is_2d_code(name)
@@ -115,13 +128,27 @@ end
 -- return: prefix_def
 --         nil when not found
 function find_prefix_def( name )
-	for _,pd in ipairs( prefixes ) do
-		if pd.name==name then
-			return pd
+	return find_by_name( prefixes, name )
+end
+
+-- @param: code - record in enable_disable_HR200 or enable_disable_HR100
+function does_firmware_support( code )
+	if code.firmware_min then
+		local major_req, minor_req, nn_req = string.match( code.firmware_min, "(%d+).(%d+).(%d+)" )
+		if major_req and minor_req and nn_req then
+			local major, minor, nn = string.match( config:get("/dev/scanner/version"), "fw:(%d+).(%d+).(%d+)" )
+			if major and minor and nn then
+				if		major<major_req or 
+						major==major_req and minor<minor_req or
+						major==major_req and minor==minor_req and nn<nn_req then
+					return false
+				end
+			end
 		end
 	end
-	return nil
+	return true
 end
+
 
 -- vi: ft=lua ts=3 sw=3
 

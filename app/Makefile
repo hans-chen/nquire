@@ -4,7 +4,7 @@
 
 NAME    := cit-app
 BUILD   := $(shell svnversion . | cut -d : -f 2)
-VERSION	:= 1.3.1
+VERSION	:= 1.3.2
 
 ###########################################################################
 # Modules 
@@ -27,7 +27,7 @@ MODULES			+= mifare.so
 CFLAGS_mifare.so += -I../lib/rfid
 LDFLAGS_mifare.so += ../lib/rfid/libnlrf.a
 
-LUA_FILES       = $(shell ls *.lua)
+LUA_SRC             = $(shell ls -1 *lua)
 
 INSTALL=../app-binary
 
@@ -62,7 +62,8 @@ endif
 
 OBJS    = $(subst .c,.o, $(SRC))
 CC 	= $(CROSS)gcc
-LD 	= $(CROSS)gcc
+AR  = $(CROSS)ar
+LD 	= $(CROSS)ld
 STRIP 	= $(CROSS)strip
 
 ###########################################################################
@@ -122,7 +123,7 @@ install: $(MODULES)
 	cp arial.ttf $(INSTALL)
 	cp schema/* $(INSTALL)/schema
 	cp img/* $(INSTALL)/img
-	for f in $(LUA_FILES); do luac -o $(INSTALL)/$$f $$f; done
+	for f in $(LUA_SRC); do luac -o $(INSTALL)/$$f $$f; done
 
 -include ../Debrules.inc
 

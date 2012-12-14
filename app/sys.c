@@ -811,6 +811,25 @@ static int l_gpio_set(lua_State *L)
 	return 1;
 }
 
+/* The next function reads a "struct input_event" from the file indicated by fd
+   It assumes there is data available.
+	@param L[1]   - fd : the filedescriptor from which input_event is to be read
+	@return       - nil | input_event.value
+*/
+static int l_read_input_event( lua_State *L )
+{
+	int kbd_fd = luaL_checkinteger(L, 1);
+
+	struct input_event event;
+	int ret = read(kbd_fd, &event, sizeof(struct input_event));
+	if( ret != sizeof(struct input_event) )
+		lua_pushnil(L);
+	else
+		lua_pushnumber(L, event.value);
+
+	return 1;
+}
+
 
 
 
@@ -821,9 +840,9 @@ static int l_gpio_set(lua_State *L)
 static struct luaL_Reg sys_table[] = {
 	{ "version",		l_version },
 	{ "meminfo",		l_meminfo },
-	{ "select",		l_select },
+	{ "select",			l_select },
 	{ "hirestime",		l_hirestime },
-	{ "sleep",		l_sleep },
+	{ "sleep",			l_sleep },
 	{ "get_macaddr",	l_macaddr },
 	{ "open",       	l_open },
 	{ "close",      	l_close },
@@ -837,16 +856,17 @@ static struct luaL_Reg sys_table[] = {
 	{ "set_noncanonical",	l_set_noncanonical },
 	{ "set_baudrate",	l_set_baudrate },
 	{ "daemonize",		l_daemonize },
-	{ "syslog",		l_syslog },
-	{ "isatty",		l_isatty },
-	{ "lstat",		l_lstat },
+	{ "syslog",			l_syslog },
+	{ "isatty",			l_isatty },
+	{ "lstat",			l_lstat },
 	{ "readdir",		l_readdir },
-	{ "signal",		l_signal },
+	{ "signal",			l_signal },
 	{ "signal_set_fd",	l_signal_set_fd },
 	{ "waitpid",		l_waitpid },
-	{ "exec",		l_exec },
+	{ "exec",			l_exec },
 	{ "forkpty",		l_forkpty },
 	{ "gpio_set",		l_gpio_set },
+	{ "read_input_event", l_read_input_event },
 	{ NULL },
 };
 
@@ -859,7 +879,7 @@ int luaopen_sys(lua_State *L)
 }
 
 
-/*
- * End
+/* 
+ * vi: ft=c ts=4 sw=4 
  */
 

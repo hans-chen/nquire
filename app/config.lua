@@ -124,10 +124,10 @@ local function set_config_item( config, l )
 			if type_check(node.type, node.range, vvalue) then
 				node:set(vvalue)
 			else
-				logf(LG_WRN,lgid,"Incorrect type for node " .. fid )
+				logf(LG_WRN,lgid,"Incorrect type for node %s with value '%s'", fid, vvalue )
 			end
 		else
-			logf(LG_WRN,lgid,"Unrecognized code " .. fid )
+			logf(LG_WRN,lgid,"Unrecognized node %s", fid )
 		end
 	end
 

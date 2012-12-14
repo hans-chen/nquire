@@ -49,7 +49,8 @@ struct dpydrv {
 	lua_State *L;
 
 	/* Geometry and color settings */
-
+	struct fb_var_screeninfo vinfo;
+	
 	int w, h;
 	char c;		/* Color mode, can be 'm' (mono) or 'c' (color) */
 
@@ -87,7 +88,7 @@ static double hirestime(void)
 static int l_new(lua_State *L)
 {
 	struct dpydrv *dd;
-TRACE(" ");
+	TRACE(" ");
 
 	dd = lua_newuserdata(L, sizeof *dd);
 	if(dd == NULL) {
@@ -104,11 +105,31 @@ TRACE(" ");
 }
 
 
+static int get_fb_info(struct dpydrv *dd)
+{
+	int fd = 0;
+	memset( &(dd->vinfo), 0, sizeof(dd->vinfo) );
+	
+	fd = open("/dev/fb0", O_RDWR);
+	if(fd<0) return -1; //BARF(L,"Error:Can't open /dev/fb0");
+
+	if (ioctl(fd,FBIOGET_VSCREENINFO,&(dd->vinfo)))
+	{
+		close(fd);
+		return -1;
+		//BARF(L,"Error: reading variable information");
+	}
+
+	TRACE("/dev/fb0: xsize=%d,ysize=%d\n", dd->vinfo.xres, dd->vinfo.yres );
+	close(fd);
+	return 0;
+}
+
+
 static int l_open(lua_State *L)
 {
 	int r;
 	struct dpydrv *dd;
-TRACE(" ");
 	dd = lua_touserdata(L, 1);
 
 	/* Parse arguments */
@@ -116,35 +137,37 @@ TRACE(" ");
 	dd->w = lua_tonumber(L, 2);
 	dd->h = lua_tonumber(L, 3);
 	dd->c = lua_tonumber(L, 4);
+	TRACE(" w=%d, h=%d", dd->w, dd->h);
 
 	/* Mute directfb */
-TRACE(" ");
-
 	setenv("DFBARGS", "quiet=info,no-banner", 1);
-TRACE(" ");
 
 	/* SDL */
+	if( SDL_Init(SDL_INIT_VIDEO) == -1 )
+		BARF(L, "SDL_Init failed: %s", SDL_GetError());
 
-	if (SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE) != 0)
-		BARF(L, "SDL_InitSubSystem failed: %s", SDL_GetError());
+//	if( SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE) != 0 )
+//		BARF(L, "SDL_InitSubSystem failed: %s", SDL_GetError());
 
-TRACE(" w=%d, h=%d", dd->w, dd->h);
-	dd->screen = SDL_SetVideoMode(
-				dd->w,
-				dd->h,
-				32, 
-				0);
-TRACE(" ");
+	if( get_fb_info(dd) == 0 && (dd->w != dd->vinfo.xres || dd->h != dd->vinfo.yres) )
+	{
+		TRACE("Actual display dimensions differ from choosen dimensions");
+		TRACE("Changing w from %d to %d, h from %d to %d", dd->w, dd->vinfo.xres, dd->h, dd->vinfo.yres);
+		dd->w = dd->vinfo.xres;
+		dd->h = dd->vinfo.yres;
+	}
+		
+	//dd->screen = SDL_SetVideoMode(dd->w, dd->h, 32, 0);
+	dd->screen = SDL_SetVideoMode(dd->w, dd->h, 0, SDL_SWSURFACE);
+	if(dd->screen ==  NULL)
+		BARF(L, "Can't SDL_SetVideoMode :%s\n", SDL_GetError());
 
-	if(!dd->screen) BARF(L, "Could not open dpydrv_tiny: %s", SDL_GetError());
-TRACE(" ");
+	//if(!dd->screen) BARF(L, "Could not open dpydrv_tiny: %s", SDL_GetError());
 
-	SDL_ShowCursor(0);
-TRACE(" ");
+	SDL_ShowCursor(SDL_DISABLE);
 	
 	r = FT_Init_FreeType(&dd->ft_library);
 	if(r) BARF(L, "Init_freetype failed");
-TRACE(" ");
 
 	lua_pushnumber(L, UPDATE_FREQ);
 	return 1;
@@ -154,10 +177,23 @@ TRACE(" ");
 static int l_close(lua_State *L)
 {
 	struct dpydrv *dd;
-TRACE(" ");
+	struct image *image;
 
 	dd = lua_touserdata(L, 1);
+	TRACE(" ");
 
+	// free current images
+	int i;
+	for(i=0; i<MAX_IMAGES; i++) {
+		image = &dd->image[i];
+		int j;
+		for(j=0; j<image->nframes; j++) {
+			SDL_FreeSurface(image->surf[j]);
+		}
+		image->nframes = 0;
+	}
+
+	// release fonts
 	if(dd->font_loaded) {
 		FT_Done_Face(dd->face);
 		dd->font_loaded = 0;
@@ -167,7 +203,7 @@ TRACE(" ");
 	if(r) BARF(L, "Done_FreeType failed");
 
 	SDL_FreeSurface(dd->screen);
-	SDL_QuitSubSystem(SDL_INIT_VIDEO);
+//	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 	SDL_Quit();
 
 	return 0;
@@ -177,11 +213,11 @@ TRACE(" ");
 static int l_gotoxy(lua_State *L)
 {
 	struct dpydrv *dd;
-TRACE(" ");
 
 	dd = lua_touserdata(L, 1);
 	dd->x = lua_tonumber(L, 2);
 	dd->y = lua_tonumber(L, 3);
+	TRACE("x=%d,y=%d", dd->x, dd->y);
 
 	lua_pushboolean(L, 1);
 	return 1;
@@ -216,7 +252,8 @@ static int draw_char(struct dpydrv *dd, int ch, int silent)
 				if( x+dd->x>=0 && x+dd->x < dd->w-1 ) {
 					v = bitmap->buffer[x/8 + y*bitmap->pitch] & (128>>(x%8));
 					if(v && !silent && p >= pmin && p < pmax) {
-						*p = SDL_MapRGB(dd->screen->format, 255, 255, 255);
+						//TRACE("x=%d,y=%d, color=%d", x,y,dd->color);
+						*p = dd->color;  //SDL_MapRGB(dd->screen->format, 255, 255, 255);
 					}
 				}
 				p++;
@@ -294,7 +331,7 @@ static int l_draw_text(lua_State *L)
 	dd = lua_touserdata(L, 1);
 	text = luaL_checkstring(L, 2);
 	silent = lua_toboolean(L, 3);
-TRACE(" ");
+	TRACE("text='%s', silent=%s", text, (silent ? "true" : "false"));
 
 	if(! dd->font_loaded) BARF(L, "Cant draw_text, no font loaded");
 
@@ -311,7 +348,6 @@ TRACE(" ");
 	while(*p) {
 		pi = 0;
 		ch = utf8_decode((char *)p, &pi);
-
 		if(ch == '\n') {
 			dd->x = text_x_start;
 			dd->y += dd->font_size;
@@ -346,12 +382,12 @@ static void image_blit(struct dpydrv *dd, struct image *image)
 	now = hirestime();
 	if(now < image->t_update) return;
 	if(image->nframes == 0) return;
-TRACE(" ");
 
 	rect.x = image->x;
 	rect.y = image->y;
 	rect.w = image->w;
 	rect.h = image->h;
+	TRACE("nframes=%d, x=%d, y=%d, w=%d, h=%d", image->nframes, rect.x, rect.y, rect.w, rect.h );
 
 	SDL_BlitSurface(image->surf[image->frame], NULL, dd->screen, &rect);
 	SDL_UpdateRects(dd->screen, 1, &rect);
@@ -391,7 +427,7 @@ static int l_draw_image(lua_State *L)
 	fname = luaL_optstring(L, 2, "");
 	img_x = luaL_optnumber(L, 3, 0);
 	img_y = luaL_optnumber(L, 4, 0);
-TRACE(" ");
+	TRACE("fname=%s, x=%d, y=%d", fname, (int)img_x, (int)img_y);
 
 	dd->x = (int)img_x;
 	dd->y = (int)img_y;
@@ -497,7 +533,7 @@ static int l_set_font(lua_State *L)
 	dd = lua_touserdata(L, 1);
 	font_name = luaL_checkstring(L, 2);
 	font_size = luaL_checknumber(L, 3);
-TRACE(" ");
+	TRACE("font_name=%s, size=%d", font_name, font_size);
 
 	if(dd->font_loaded) {
 		FT_Done_Face(dd->face);
@@ -529,7 +565,7 @@ static int l_set_font_size(lua_State *L)
 
 	dd = lua_touserdata(L, 1);
 	font_size = luaL_checknumber(L, 2);
-TRACE(" ");
+	TRACE("font_size=%d", font_size);
 
 	if(! dd->font_loaded) {
 		BARF(L, "No font loaded: Can't set fontsize");
@@ -553,13 +589,13 @@ static int l_list_fonts(lua_State *L)      { BARF(L, "Not implemented"); }
 static int l_set_color(lua_State *L)
 { 
 	struct dpydrv *dd;
-	double r, g, b;
+	int r, g, b;
 
 	dd = lua_touserdata(L, 1);
-	r = luaL_checknumber(L, 2) * 255;
-	g = luaL_checknumber(L, 3) * 255;
-	b = luaL_checknumber(L, 4) * 255;
-TRACE(" ");
+	r = (int)(luaL_checknumber(L, 2) * 255 +.5);
+	g = (int)(luaL_checknumber(L, 3) * 255 +.5);
+	b = (int)(luaL_checknumber(L, 4) * 255 +.5);
+	TRACE("r=%d, g=%d, b=%d", r,g,b);
 
 	dd->color = SDL_MapRGB(dd->screen->format, r, g, b);
 
@@ -569,13 +605,13 @@ TRACE(" ");
 static int l_set_background_color(lua_State *L)
 { 
 	struct dpydrv *dd;
-	double r, g, b;
+	int r, g, b;
 
 	dd = lua_touserdata(L, 1);
-	r = luaL_checknumber(L, 2) * 255;
-	g = luaL_checknumber(L, 3) * 255;
-	b = luaL_checknumber(L, 4) * 255;
-TRACE(" ");
+	r = (int)(luaL_checknumber(L, 2) * 255 +.5);
+	g = (int)(luaL_checknumber(L, 3) * 255 +.5);
+	b = (int)(luaL_checknumber(L, 4) * 255 +.5);
+	TRACE("r=%d, g=%d, b=%d", r,g,b);
 
 	dd->background_color = SDL_MapRGB(dd->screen->format, r, g, b);
 
@@ -626,6 +662,7 @@ static int l_clear(lua_State *L)
 
 	dd = lua_touserdata(L, 1);
 
+	TRACE(" ");
 	SDL_FillRect(dd->screen, NULL, dd->background_color);
 
 	dd->x = 0;
@@ -649,7 +686,7 @@ static int l_clear(lua_State *L)
 static int l_free(lua_State *L) 
 { 
 	struct dpydrv *dd;
-TRACE(" ");
+	TRACE(" ");
 	
 	l_close(L);
 
@@ -692,7 +729,7 @@ static struct luaL_Reg dpydrv_table[] = {
 
 int luaopen_dpydrv(lua_State *L)
 {
-TRACE(" ");
+	TRACE(" ");
 	luaL_newmetatable(L, "Dpydrv"); 
 	lua_pushstring(L, "__index");
 	lua_pushvalue(L, -2); 

@@ -234,22 +234,23 @@ function get_illumination_mode_code( mode )
 end
 
 -- enable/disable barcodes.
+-- TODO: refactor because this is ugly code
 local function barcode_on_off( scanner, name, on_off, wait_for_ack )
 	local programmed=false
 	logf(LG_DMP, lgid, "barcode_on_off(" .. name .. "," .. on_off .. ")")
-	for _,code in ipairs( enable_disable_HR200 ) do
-		--logf(LG_DMP, lgid, "code=" .. code.name)
-		if code.name == name then
-			if on_off == "on" and code.on then
-				logf(LG_DBG, lgid, "enabling barcode " .. name)
-				scanner:cmd_noack(code.on)
-				programmed=true
-			elseif on_off == "off" and code.off then
-				logf(LG_DBG, lgid, "disabling barcode " .. name)
-				scanner:cmd_noack(code.off)
-				programmed=true
-			end
+	local code = find_by_name( enable_disable_HR200, name )
+	if code and does_firmware_support(code) then
+		if on_off == "on" and code.on then
+			logf(LG_DBG, lgid, "enabling barcode " .. name)
+			scanner:cmd_noack(code.on)
+			programmed=true
+		elseif on_off == "off" and code.off then
+			logf(LG_DBG, lgid, "disabling barcode " .. name)
+			scanner:cmd_noack(code.off)
+			programmed=true
 		end
+	else
+		return
 	end
 	if wait_for_ack and programmed then
 		if not scanner:wait_ack() then
@@ -412,8 +413,8 @@ end
 -- Close and restore tty settings
 --
 
-local function close(scanner)
-	scanner:disable()
+local function close(scanner, quick)
+	if not quick then scanner:disable() end
 	if scanner.fd then
 		evq:fd_del(scanner.fd)
 		evq:unregister("fd", on_fd_scanner, scanner)

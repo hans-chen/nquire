@@ -288,11 +288,11 @@ end
 
 local function on_barcode(event, cit)
 
-	logf(LG_DMP, lgid, "on_barcode")
-
 	local barcode = event.data.barcode
 	local prefix = event.data.prefix or "?"
 	local success = true
+
+	logf(LG_DMP, lgid, "on_barcode(prefix='%s', barcode='%s')", prefix, barcode)
 
 	-- TODO: or should scanning really be disabled
 	led:set("yellow", "off")
@@ -411,6 +411,9 @@ local command_list = {
 			local text = string.char(...)
 			text = to_utf8(text, cit.codepage)
 			logf(LG_DBG,lgid,"text=%s", text)
+			-- transform such that the display handles CR (0x0d) the same as NL (0x0a=\n)
+			-- this is for SG15 compatebility!
+			text = string.gsub( text, string.char(0x0d), "\n" )
 			w, h , pixel_x, pixel_y = display:format_text(text, pixel_x, pixel_y, align_h, align_v, fontsize)
 		end
 	},
@@ -569,6 +572,11 @@ local command_list = {
 local function force_flush( cit )
 
 	local text = string.char(unpack( cit.param ))
+	
+-- transform such that the display handles CR (0x0d) the same as NL (0x0a='\n')
+	-- this is for SG15 compatebility!
+	text = string.gsub( text, string.char(0x0d), "\n" )
+			
 	cit.param = {}
 	text = to_utf8(text, cit.codepage)
 
@@ -1082,6 +1090,8 @@ function new()
 			end
 		end
 	end
+	
+	display:set_font( font, fontsize_small )
 	
 	-- Start connect timer for client mode
 

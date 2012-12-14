@@ -142,12 +142,12 @@ if mac == "00:05:f4:11:22:33" then
 	logf(LG_WRN,lgid, "Problematical mac-address detected (00:05:f4:11:22:33). Contact the heldpdesk.")
 end
 
--- beeper should be opened BEFORE display and other device allocations!
-beeper = Beeper.new()
-
 -- Open all peripherals
 
 logf(LG_INF,lgid,"Open all periferals")
+
+-- beeper should be opened BEFORE display and other device allocations!
+beeper = Beeper.new()
 
 led = Led:new()
 led:set("blue", "off")
@@ -170,6 +170,13 @@ elseif Scanner_2d:is_available() then
 else
 	logf(LG_ERR,lgid,"Unknown barcode scanner type.")
 end
+
+for _,rec in ipairs( scanner.enable_disable ) do
+	if not does_firmware_support( rec ) then
+		logf(LG_INF,lgid,"Barcode %s not supported by firmware %s", rec.name, config:get("/dev/scanner/version"))
+	end
+end
+
 
 Scanner_hid:new()
 
@@ -256,12 +263,10 @@ end
 -- Cleanup
 
 beeper:play(config:get("/dev/beeper/tune_shutdown"))
-scanner:close()
+scanner:close(true)
 if Scanner_rf.is_available() and scanner_rf then
-	scanner_rf:close()
+	scanner_rf:close(true)
 end
-display:clear()
-display:update()
 display:close()
 led:set("blue", "off")
 led:set("yellow", "off")

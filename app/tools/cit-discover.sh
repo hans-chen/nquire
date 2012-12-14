@@ -1,6 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 
-if test -z $1; then
+set -x
+
+if test -z "$1"; then
 	DEST=239.255.255.250
 else
 	DEST=$1
@@ -10,10 +12,10 @@ fi
 sudo echo Starting discovery
 
 # capture first 2 matching packets (discover request and response for 1 nquire):
-#sudo tcpdump -A -s 0 -c 2 -n -i eth0 udp port 19200 &
+sudo tcpdump -A -s 0 -c 2 -n -i eth0 udp port 19200 &
 
 # wait for tcpdump to start
-#sleep 1
+sleep 1
 
 echo "=== Start discover================="
 

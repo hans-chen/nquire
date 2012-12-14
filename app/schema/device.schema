@@ -378,8 +378,11 @@ return group {
 
 		object {
 			id = "has_hardware",
-			type = "string",
-			default = "auto" -- "yes","no","auto"  : use only via scanner_rf.is_available()
+			label = "Has GPRS hardware",
+			type = "enum",
+			default = "auto", -- "yes","no","auto"  : use only via scanner_rf.is_available()
+			range = "yes,no,auto",
+			mode = "r",
 		},
 
 		object {
@@ -416,9 +419,11 @@ return group {
 
 		group {
 			id = "msg",
+			label = "Error messages",
 			
 			group {
 				id = "incomplete_scan",
+				label = "Message for",
 
 				object {
 					id = "text",
@@ -432,6 +437,7 @@ return group {
 
 			group {
 				id = "access_violation",
+				label = "Message for",
 
 				object {
 					id = "text",
@@ -536,6 +542,20 @@ return group {
 			type = "enum",
 			default = "2",
 			range = "1,2,3,4",
+		},
+		object {
+			id = "contrast_min",
+			label = "Display contrast minimum",
+			type = "number",
+			default = "100",
+			range = "0:120",
+		},
+		object {
+			id = "contrast_max",
+			label = "Display contrast maximum",
+			type = "number",
+			default = "160",
+			range = "121:255",
 		},
 	},
 
