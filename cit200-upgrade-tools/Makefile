@@ -59,9 +59,9 @@ VERSION_ROOTFS		:= 1.5.3
 VERSION_KERNEL		:= 2.6.35.7
 VERSION_FIRMWARE	:= 2.0
 VERSION_LOGO		:= 1.0
-VERSION_EM2027_KRL	:= 3.06.024
+VERSION_EM2027_KRL	:= 3.06.038
 VERSION_EM2027_APP	:= 1.01.002
-VERSION_EM1300_KRL	:= 1.30.25
+VERSION_EM1300_KRL	:= 1.35.28
 
 LOGFILE				:= upgrade_log.txt
 ##################################################################

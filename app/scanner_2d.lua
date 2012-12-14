@@ -414,11 +414,17 @@ local function open(scanner)
 
 	logf( LG_INF, lgid, "Setting reading constraint and 2d/1d")
 	-- prohibit multi reading:
+	--chenliang edit 2012-08-27 begin
+	--disable command SCANNER_CMD_CONSTRAIN_MULTI_ON, the command should be a delay time parameter.
+	--the command is misunderstood.It's should be named as SCANNER_CMD_CONSTRAIN_DELAY
 	if config:get("/dev/scanner/multi_reading_constraint") == "On" then
-		_cmd(scanner,SCANNER_CMD_CONSTRAIN_MULTI_ON, SCANNER_CMD_CONSTRAIN_MULTI_ALL)
+		--_cmd(scanner,SCANNER_CMD_CONSTRAIN_MULTI_ON, SCANNER_CMD_CONSTRAIN_MULTI_ALL)
+		_cmd(scanner, SCANNER_CMD_CONSTRAIN_MULTI_ALL)
 	elseif config:get("/dev/scanner/multi_reading_constraint") == "Semi" then
-		_cmd(scanner,SCANNER_CMD_CONSTRAIN_MULTI_ON, SCANNER_CMD_CONSTRAIN_MULTI_SEMI)
+		--_cmd(scanner,SCANNER_CMD_CONSTRAIN_MULTI_ON, SCANNER_CMD_CONSTRAIN_MULTI_SEMI)
+		_cmd(scanner, SCANNER_CMD_CONSTRAIN_MULTI_SEMI)
 	end
+	--chenliang edit 2012-08-27 end
 
 	-- Disable 2D codes if configured
 	if config:get("/dev/scanner/barcodes") == "1D only" then
@@ -462,8 +468,12 @@ local function open(scanner)
 	-- Configure sensitivity: Low,Medium,High
 	local reading_sensitivity = config:get("/dev/scanner/reading_sensitivity")
 	if reading_sensitivity == "Low" then
-	   -- Low sensitivity moet geprogrammeerd staan op 20:
-		_cmd(scanner, "0312040", "0000020", "0000000", SCANNER_CMD_SAVE, SCANNER_CMD_SENSITIVITY_LOW )
+		-- Low sensitivity moet geprogrammeerd staan op 20:
+		--chenliang edit 2012-08-21 begin
+		--for new EM2027(from Ver3.06.038) command. delete some invalid command.
+		--_cmd(scanner, "0312040", "0000020", "0000000", SCANNER_CMD_SAVE, SCANNER_CMD_SENSITIVITY_LOW )
+		_cmd(scanner, SCANNER_CMD_SENSITIVITY_LOW )
+		--chenliang edit 2012-08-21 end
 	elseif reading_sensitivity == "High" then
 		_cmd(scanner, SCANNER_CMD_SENSITIVITY_HIGH )
 	else

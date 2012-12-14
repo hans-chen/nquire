@@ -257,6 +257,13 @@ local function open(scanner)
 		data, lgood = scanner:cmd( "#99904112;#99900000;#99900015;#99900020;", "Program Stop Suffix 0x0d")
 		good = lgood and good
 	end
+	--chenliang edit 2012-08-23 begin
+	--for EM1300(from Ver1.35.28). Add some initialise command just for CIT's work mode.
+	if good or scanner.retry_counter>=max_retry then 
+		data, lgood = scanner:cmd( "#99900167;#99900001;#99900006;#99900020;", "Read Same Code Interval")
+		good = lgood and good
+	end
+	--chenliang edit 2012-08-23 end
 	
 	if good or scanner.retry_counter>=max_retry then 
 		data, lgood = scanner:cmd( "#99904041;", "Allow Code ID Prefix")

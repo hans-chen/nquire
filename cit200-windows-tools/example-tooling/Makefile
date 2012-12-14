@@ -2,10 +2,17 @@
 # Makefile
 #
 # makefile for the example tooling for the nquire
+# This makefile is able to buld the executables on linux and windows.
+# On linux it can also build "install" and "dist"
+# Note that windows executables are much bigger because Windows linking is static.
+# 
 #
 # Author: M.R. van dootingh
 # Date: febr 5 2010
 #
+
+VERSION := 2.0
+BUILD   := $(shell svnversion -c . | cut -d : -f 2)
 
 # exe targets:
 ALL_EXE = nquire-server.exe nquire-cmd.exe nquire-discover.exe
@@ -21,6 +28,7 @@ database-tester_SRC = database.cpp database-tester.cpp misc.cpp
 CFLAGS = -g -Wall -Werror -O0
 CXXFLAGS =  -g -Wall -Werror -O0
 CPPFLAGS = -I../nquire-common
+LDFLAGS = 
 
 # auto vars:
 ALL_TESTRESULTS = $(ALL_TESTS:%=testresults/%.res)
@@ -36,7 +44,7 @@ PLATFORM=WIN32
 endif
 
 ifeq ($(PLATFORM),WIN32)
-LDFLAGS = -lws2_32 -liphlpapi
+LDFLAGS = -static --enable-auto-import -lws2_32 -liphlpapi 
 RM=del 
 else
 RM=rm -f
@@ -58,7 +66,11 @@ else
 	rm -f testresults/*.res
 endif
 
-install: nquire-server.exe nquire-cmd.exe
+# first compile on windows, than make dist on linux:
+dist: nquire-server.exe nquire-cmd.exe nquire-discover.exe
+	zip example_tooling-WIN32-$(VERSION).b$(BUILD)-static.zip $^ *\.cpp *\.h *ini *doc Makefile *log README.TXT *gif *png
+
+install: nquire-server.exe nquire-cmd.exe nquire-discover.exe
 	if test -d ~/bin; then cp nquire-server.exe nquire-cmd.exe nquire-discover.exe ~/bin; fi
 
 debug:
@@ -75,8 +87,9 @@ compare: $(ALL_TESTRESULTS)
 
 $(ALL_TARGETS): SRC=$($@_SRC)
 $(ALL_TARGETS): OBJ=$(SRC:.cpp=.o)
-$(ALL_TARGETS): 
-	$(CCC) -Wall -g $(CPPFLAGS) $(CFLAGS) $(OBJ) $(LDFLAGS) -o $@
+$(ALL_TARGETS): Makefile
+	echo "linking $@"
+	$(CCC) -Wall -g  $(CPPFLAGS) $(CFLAGS) $(OBJ) $(LDFLAGS) -o $@
 
 $(ALL_TESTRESULTS): EXE=$(notdir $(basename $@))
 $(ALL_TESTRESULTS):
