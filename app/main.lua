@@ -113,8 +113,8 @@ end
 logf_init(opt.l and #opt.l > 0 and opt.l or LG_INF, true, true)
 
 local mac = sys.get_macaddr("eth0")
-if mac == "00:05:f4:11:22:33" then
-	logf(LG_WRN,lgid, "Problematical mac-address detected (00:05:f4:11:22:33). Consult the heldpdesk.")
+if mac and mac == "00:05:f4:11:22:33" then
+	logf(LG_WRN,lgid, "Problematical mac-address (%s) detected. Consult the heldpdesk.", mac)
 end
 
 -- Create event queue (depends on: log)
@@ -160,10 +160,10 @@ display = Display.new()
 
 -- log hw and version info
 local mac_eth0 = sys.get_macaddr("eth0")
-logf(LG_INF, lgid, "Ethernet mac %s", mac_eth0)
+logf(LG_INF, lgid, "Ethernet mac %s", mac_eth0 or "<nil>")
 
 local mac_wlan0 = sys.get_macaddr("wlan0")
-if mac_wlan0 and mac_wlan0 ~= "??:??:??:??:??:??" then 
+if mac_wlan0 then 
 	logf(LG_INF, lgid, "Wifi mac %s", mac_wlan0) 
 end
 

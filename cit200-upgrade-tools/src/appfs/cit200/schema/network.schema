@@ -16,7 +16,23 @@ return group {
 		id = "macaddress",
 		label = "MAC address",
 		type = "string",
-		default = "??:??:??:??:??:??"
+		default = ""
+	},
+
+	object { 
+		mode = "r",
+		id = "macaddress_wlan0",
+		label = "MAC wlan",
+		type = "string",
+		default = ""
+	},
+
+	object { 
+		mode = "r",
+		id = "macaddress_eth0",
+		label = "MAC ethernet",
+		type = "string",
+		default = ""
 	},
 	
 	object { 

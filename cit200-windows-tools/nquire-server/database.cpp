@@ -43,7 +43,7 @@ Tag_value::Tag_value( const std::string tag, const std::string value )
 Tag_value::Tag_value( const std::string from )
 :   is_bad( false )
 {
-	unsigned i = from.find('=');
+	size_t i = from.find('=');
 	if( i == string::npos )
 		is_bad = true;
 	else
@@ -64,9 +64,9 @@ Format::Format( const string format_name, const string format )
 }
 
 // find first considering escapes
-unsigned Format::find_first( string key, unsigned from_pos ) const
+size_t Format::find_first( string key, size_t from_pos ) const
 {
-	unsigned i=from_pos;
+	size_t i=from_pos;
 	while( i<my_format.size()-1 )
 	{
 		if( my_format[i] == '\\' )
@@ -89,10 +89,10 @@ void Format::add_formatting( const std::string fmt )  const
 std::string Format::merge_tag_values( const Barcode_tags& tags ) const
 {
 	string result;
-	unsigned i=0;
+	size_t i=0;
 	while( i<my_format.size() )
 	{
-		unsigned begin = find_first( "${", i );
+		size_t begin = find_first( "${", i );
 		if(begin == string::npos)
 		{
 			result += my_format.substr(i);
@@ -102,7 +102,7 @@ std::string Format::merge_tag_values( const Barcode_tags& tags ) const
 		{
 			result += my_format.substr(i,begin-i);
 			begin += 2;
-			unsigned end = find_first( "}", begin );
+			size_t end = find_first( "}", begin );
 			if( end == string::npos )
 			{
 				LOG_WRN( "Format error: '${' not closed in format '" 

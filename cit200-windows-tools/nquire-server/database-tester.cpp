@@ -31,10 +31,10 @@ TEST( test_Format )
 	values1.insert( Tag_value("format=f1") );
 	values1.insert( Tag_value("tag.var1=variable value 1") );
 	values1.insert( Tag_value("tag.var2=variable value 2") );
-	
 	Format f1( "f1", "\\${var1}='${var1}'\\n\\${var2}='${var2}'" );
 	
-	cout << "f1.merge_tag_values(values1)=" << f1.merge_tag_values(values1) << endl;
+	cout << "f1.merge_tag_values(values1)=" << flush;
+	cout << f1.merge_tag_values(values1) << endl;
 TEST_END
 
 TEST( test_Barcode_db )

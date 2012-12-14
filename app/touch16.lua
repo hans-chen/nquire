@@ -280,7 +280,7 @@ local function on_get_touch16_name(node)
 	if fd then
 		name = fd:read("*l")
 		if name:find( "AT42QT2160" ) then
-			logf(LG_DBG,lgid,"/sys/class/input/event0/device/name = '%s'", name)
+			logf(LG_DMP,lgid,"/sys/class/input/event0/device/name = '%s'", name)
 		else
 			name = ""
 		end

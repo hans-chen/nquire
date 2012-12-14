@@ -102,9 +102,9 @@ void show_help()
 
 int main(int argc, char *argv[])
 {
-	int rr;
 
 #ifdef WIN32
+	int rr;
 	WSADATA data;
 	rr = WSAStartup( MAKEWORD( 1, 1 ), &data );
 	if ( rr != 0 ) {

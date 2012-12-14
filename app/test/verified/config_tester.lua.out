@@ -2,6 +2,7 @@
 
 
 # *** Start test 'test1'
+[wrn] : Trying to register unknown node "/dev/mmcblk"
 
 # *** Start test 'config:set_config_item('/group1/number1 = 3')'
 Before:
@@ -87,16 +88,16 @@ after set
 # *** Start test 'test2'
 /dev/mifare/key_A = FFFFFFFFFFFF
 /dev/mifare/relevant_sectors = 0:0,15:2
-match("1") = true
-match("0") = true
-match("15") = true
+match("1") = false
+match("0") = false
+match("15") = false
 match("16") = false
-match("0,15") = true
+match("0,15") = false
 match("0,16") = false
 match("0:0") = true
 match("15:2") = true
-match("0:3") = false
-match("15:3") = false
-match("16:0") = false
+match("0:3") = true
+match("15:3") = true
+match("16:0") = true
 match("0:0,0:1,0:2") = true
 match("15:0,15:1,15:2") = true

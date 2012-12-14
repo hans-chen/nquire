@@ -76,6 +76,8 @@ void show_help()
 		<< "         and send RESPONSE-TO-SENDER-PORT discovery option" << endl
 		<< " -r      do not send RESPONSE-TO-SENDER-PORT discovery option" << endl
 		<< " +r      force use of RESPONSE-TO-SENDER-PORT discovery option" << endl
+		<< " -R      do not send RESPONSE-TO-SENDER-ADDRESS discovery option" << endl
+		<< " +R      force use of RESPONSE-TO-SENDER-ADDRESS discovery option" << endl
 		<< " -v=n    logging level 3=inf, 4=debug, 5=trace" << endl << endl
 		<< "E.g.:  nquire-discover -n=2 -s" << endl << endl
 		<< "Note: you won't receive the response packets when using " << endl
@@ -99,6 +101,8 @@ int main(int argc, char * argv[]) {
 
 	bool response_to_sender_port = false;
 	bool no_response_to_sender_port = false;
+	bool response_to_sender_address = false;
+	bool no_response_to_sender_address = false;
 	int n = 3;
 	unsigned short port = discovery_port;
 	bool exit_1rst = false;
@@ -145,6 +149,18 @@ int main(int argc, char * argv[]) {
 			// use CIT-DISCOVER-REQUEST option RESPONSE-TO-SENDER-PORT
 			response_to_sender_port = true;
 			no_response_to_sender_port = false;
+		}
+		else if( opt=="-R" )
+		{
+			// don't use CIT-DISCOVER-REQUEST option RESPONSE-TO-SENDER-ADDRESS
+			response_to_sender_address = false;
+			no_response_to_sender_address = true;
+		}
+		else if( opt=="+R" )
+		{
+			// use CIT-DISCOVER-REQUEST option RESPONSE-TO-SENDER-ADDRESS
+			response_to_sender_address = true;
+			no_response_to_sender_address = false;
 		}
 		else if( opt.compare(0, 3, "-n=" ) == 0 )
 		{
@@ -258,6 +274,8 @@ int main(int argc, char * argv[]) {
 		msg << "CIT-DISCOVER-REQUEST" << endl << "Version:\t1";
 		if( response_to_sender_port )
 			msg << endl << "RESPONSE-TO-SENDER-PORT";
+		if( response_to_sender_address )
+			msg << endl << "RESPONSE-TO-SENDER-ADDRESS";
 
 		// destination address spec:
 		struct sockaddr_in sa_dest;

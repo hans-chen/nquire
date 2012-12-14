@@ -61,7 +61,7 @@ local function expand_message_tag()
 
 		-- replace variables:
 		tag = tag:gsub("%${serial}", config:get("/dev/serial") )
-		tag = tag:gsub("%${mac}", config:get("/network/macaddress") )
+		tag = tag:gsub("%${mac}", config:get("/network/macaddress_eth0") )
 
 		return tag
 	else
@@ -109,23 +109,23 @@ local function show_configuration()
 	display:draw_text("%s: %s\n", config:get("/network/interface"), config:get("/network/current_ip") )
 	
 	-- HWaddr:
-	local mac_eth0 = sys.get_macaddr("eth0")
-	local mac_wlan0 = sys.get_macaddr("wlan0")
+	local mac_eth0 = config:get("/network/macaddress_eth0")
 	display:draw_text("eth %s", mac_eth0)
-	if mac_wlan0 and mac_wlan0 ~= "??:??:??:??:??:??" then
+	local mac_wlan0 = config:get("/network/macaddress_wlan0")
+	if #mac_wlan0 > 0 then
 		display:draw_text(", wifi %s", mac_wlan0)
 	end
 	display:draw_text("\n")
 	
 	-- scanner:
 	local scanner_fw = config:get("/dev/scanner/version")
-	if scanner_fw and #scanner_fw>0 then
+	if #scanner_fw > 0 then
 		display:draw_text("%s\n", scanner_fw)
 	end
 
 	-- touch screen
 	local touch16_name = config:get("/dev/touch16/name")
-	if name ~= "" then
+	if #touch16_name > 0 then
 		display:draw_text(touch16_name .. "\n")
 	end
 
@@ -133,17 +133,15 @@ local function show_configuration()
 	
 	-- mifare:
 	local mifare_model = config:get("/dev/mifare/modeltype")
-	if mifare_model and #mifare_model>0 then
+	if #mifare_model > 0 then
 		display:draw_text(sep .. "mifare " .. mifare_model)
 		sep = ", "
 	end
 
 	-- sd card:
-	local fd = io.popen("mount | grep mmcblk0p1")
-	local data = fd:read("*a")
-	fd:close()
-	if #data > 0 then
-		display:draw_text(sep .. "sd card")
+	local mmc = config:get("/dev/mmcblk")
+	if #mmc > 0 then
+		display:draw_text(sep .. "sd card:" .. mmc)
 		sep = ", "
 	end
 		
@@ -712,6 +710,10 @@ local function write_mifare_card( cit, msg )
 				end
 			elseif command == "W" then
 				local sector_chr, block_chr, format, rest = cmds:match("^W(.)(.)([BH])(.*)")
+				if sector_chr == nil then
+					logf(LG_WRN,lgid,"Format error '%s'", cmds)
+					return result .. "W4"
+				end
 				local sector = sector_chr:byte() - 0x30
 				local block = block_chr:byte() - 0x30
 				if sector_chr == nil or sector<0 or sector>=16 or block<0 or block>=32 then
@@ -1125,19 +1127,19 @@ local command_list = {
 		nparam = 64,
 		fn = function( cit, ... )
 			if keyboard ~= nil then
-
-				local released_img, pressed_img, pos, spec = string.match( string.char(...), "^([%w-_]+.gif)\r([%w-_.]*)\r(%x)(%x+)$" )
+				local dta = string.char(...)
+				local released_img, pressed_img, pos, spec = string.match( dta, "^([%w-_]+.gif)\r([%w-_.]*)\r(%x)(%x+)$" )
 				logf(LG_DBG,lgid,"release_img='%s', pressed_img='%s', pos=%s, spec=%s", (released_img or "nil"), (pressed_img or "nil"), (pos or "nil"), (spec or "nil"))
 
 				if released_img == nil then
-					logf(LG_WRN,lgid,"Incorrect data for display touch image. Command: '%s'", event.data.spec )
+					logf(LG_WRN,lgid,"Incorrect data for display touch image. Command: '%s'", dta )
 					return
 				end
 			
 				-- watch out: the event is handled direct without queueing (delay==-1)!
 				-- TODO: refactor to a normal function call
 				evq:push("display_touch_image", {
-						search_path="/home/ftp/img",
+						search_path="/home/ftp/img:/home/ftp/img/default",
 						gif_released=released_img,
 						gif_pressed=pressed_img,
 						key_pos=pos,
@@ -2048,12 +2050,14 @@ local function on_get_resolved_remote_ip(node,cit)
 	end
 
 	-- just use it when it is formatted as a valid ip
-	local n1,n2,n3,n4 = hostname:match("^(%d%d?%d?%).(%d%d?%d?%).(%d%d?%d?%).(%d%d?%d?)%s*$")
-	if n1 and n2 and n3 and n4 and n1<=255 and n2<=255 and n3<=255 and n4<=255 then
+	local n1,n2,n3,n4 = hostname:match("^(%d%d?%d?).(%d%d?%d?).(%d%d?%d?).(%d%d?%d?)%s*$")
+	if n1 and n2 and n3 and n4 and 
+			tonumber(n1)<=255 and tonumber(n2)<=255 and 
+			tonumber(n3)<=255 and tonumber(n4)<=255 then
 		resolved_ip_hostname = hostname
 		resolved_ip = hostname
 		resolved_ip_time = sys.hirestime()
-		logf(LG_DBG,lgid,"Caching ip literal %s", resolved_ip or "nil" )
+		logf(LG_DBG,lgid,"Using ip literal %s", resolved_ip )
 		return resolved_ip
 	end
 	
@@ -2068,7 +2072,7 @@ local function on_get_resolved_remote_ip(node,cit)
 		function(rv,cit)
 			if rv == 0 then
 				-- ok
-				logf(LG_INF,lgid,"Successfully resolved ip %s for hostname %s",
+				logf(LG_INF,lgid,"Using server ip %s (=%s)",
 						resolved_ip or "nil", resolved_ip_hostname or "nil");
 				resolved_ip_time = sys.hirestime()
 			else
@@ -2078,7 +2082,7 @@ local function on_get_resolved_remote_ip(node,cit)
 		end,
 		function(data,cit)
 			local ip = data:match("^(%d+%.%d+%.%d+%.%d+)")
-			logf(LG_DBG,lgid,"found ip %s for %s (first of %s)", ip, hostname, data)
+			logf(LG_DBG,lgid,"found ip %s for %s (first of %s)", ip or "nil", hostname, data or "nil")
 			resolved_ip = ip
 		end,
 		cit)

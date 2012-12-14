@@ -17,7 +17,7 @@ NAME    := cit-app
 BUILD   := $(shell svnversion -c . | cut -d : -f 2)
 # only use a major and a minor verion number
 # patch level numbering is not SG15 compatible!
-VERSION	:= 1.6
+VERSION	:= 1.7
 LABEL := $(VERSION).$(BUILD)
 
 all:

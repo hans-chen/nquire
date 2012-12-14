@@ -67,6 +67,14 @@ return group {
 		default = "-",
 	},
 
+	object { 
+		mode = "r",
+		id = "mmcblk",
+		label = "Micro sd card",
+		type = "string",
+		default = "",
+	},
+
 	group {
 		id = "auth",
 		label = "Authentication",
@@ -619,7 +627,7 @@ return group {
 			-- returning the contents of "/sys/class/input/event0/device/name"
 			mode = "r", 
 			id = "name",
-			label = "Device",
+			label = "Touch-pad",
 			type = "string",
 			default = ""
 		},

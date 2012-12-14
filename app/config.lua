@@ -355,6 +355,16 @@ local function on_config_timer(event, config)
 end
 
 
+local function get_mmcblk(node)
+	local fd = io.open("/sys/block/mmcblk0/device/name", "r")
+	if fd then
+		local data = fd:read()
+		fd:close()
+		node:setraw(data)
+	else
+		node:setraw("")
+	end
+end
 
 -- 
 -- Constructor
@@ -397,6 +407,9 @@ function new(fname_schema, fname_db, fname_db_extern)
 		end,
 		config
 	)
+
+	-- TODO: move this to a more appropriate place
+	config:add_watch("/dev/mmcblk", "get", get_mmcblk, nil)
 
 	return config
 end

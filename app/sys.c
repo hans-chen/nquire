@@ -228,7 +228,9 @@ static int l_sleep(lua_State *L)
 	return 0;
 }
 
-
+// IN: [1] - the id of the interface for which the macaddres is requested
+// return: the macaddress of the indicated interface (format: nn:nn:nn:nn:nn:nn)
+// return: nil if macaddress could not be determined (wrong interface id or interface has no macaddress)
 static int l_macaddr(lua_State *L)
 {
 	int fd;
@@ -243,7 +245,7 @@ static int l_macaddr(lua_State *L)
 
 	fd = socket(PF_INET, SOCK_DGRAM, 0);
 
-        memset(&ifr, 0, sizeof(ifr));
+    memset(&ifr, 0, sizeof(ifr));
 	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 
 	sa = (struct sockaddr_in *)&(ifr.ifr_addr);
@@ -261,13 +263,13 @@ static int l_macaddr(lua_State *L)
 			(unsigned char)ifr.ifr_hwaddr.sa_data[3],
 			(unsigned char)ifr.ifr_hwaddr.sa_data[4],
 			(unsigned char)ifr.ifr_hwaddr.sa_data[5]);
+		lua_pushstring(L, buf);
 	} else {
-		snprintf(buf, sizeof(buf), "??:??:??:??:??:??");
+		lua_pushnil(L);
 	}
 
 	close(fd);
 
-	lua_pushstring(L, buf);
 	return 1;
 
 }

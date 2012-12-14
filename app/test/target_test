@@ -6,7 +6,7 @@
 
 ADDRESS="192.168.1.200"
 if test -f .cit.ip; then
-	ADDRESS="`cat .cip.ip`"
+	ADDRESS="`cat .cit.ip`"
 fi
 TCPPORT=9101
 UDPPORT=9000
@@ -23,7 +23,7 @@ NAK=$'\025'
 reconfigure()
 {
 	echo -n "$1" > cit.conf
-	curl ftp://$ADDRESS/ -T cit.conf
+	curl ftp://${ADDRESS}/ -T cit.conf
 	if test -z "$2"; then
 		sleep 3
 	else
@@ -201,8 +201,8 @@ test_mifare_read()
 /dev/mifare/prevent_duplicate_scan_timeout = 1
 /dev/mifare/cardnum_format = "hexadecimal"
 /dev/mifare/sector_data_format = "hex"
-/dev/mifare/sector_data_seperator = "comma"'
-
+/dev/mifare/sector_data_seperator = "comma"
+/dev/mifare/send_cardnum_only = "false"'
 	testserver -dd -s
 	escape_cmd "\e\xfb\x31" # enable card detection
 
@@ -255,7 +255,8 @@ EOF
 /dev/mifare/sector_data_seperator = "comma"
 /cit/loglevel = 4
 /cit/message_separator = "LF"
-/cit/enable_message_tag = false'
+/cit/enable_message_tag = false
+/dev/mifare/send_cardnum_only = "false"'
 	testserver -dd -s
 
 	escape_cmd "\e\xfb\x31" # enable card detection
@@ -355,7 +356,8 @@ EOF
 /dev/mifare/sector_data_seperator = "comma"
 /cit/loglevel = 4
 /cit/message_separator = "LF"
-/cit/enable_message_tag = false'
+/cit/enable_message_tag = false
+/dev/mifare/send_cardnum_only = false'
 	testserver -dd -s
 
 	escape_cmd "\e\xfb\x31" # enable card detection
@@ -444,7 +446,8 @@ EOF
 /dev/mifare/sector_data_seperator = "comma"
 /cit/loglevel = 4
 /cit/message_separator = "LF"
-/cit/enable_message_tag = false'
+/cit/enable_message_tag = false
+/dev/mifare/send_cardnum_only = false'
 	testserver -dd -s
 
 	escape_cmd "\e\xfb\x31" # enable card detection
@@ -508,7 +511,8 @@ EOF
 /dev/mifare/sector_data_seperator = "comma"
 /cit/loglevel = 4
 /cit/message_separator = "LF"
-/cit/enable_message_tag = false'
+/cit/enable_message_tag = false
+/dev/mifare/send_cardnum_only = false'
 	testserver -dd -s
 
 	escape_cmd "\e\xfb\x31" # enable card detection
@@ -546,7 +550,8 @@ EOF
 /dev/mifare/sector_data_seperator = "comma"
 /cit/loglevel = 4
 /cit/message_separator = "LF"
-/cit/enable_message_tag = false'
+/cit/enable_message_tag = false
+/dev/mifare/send_cardnum_only = false'
 	testserver -dd -s
 
 	escape_cmd "\e\xfb\x31" # enable card detection
@@ -608,7 +613,8 @@ EOF
 /dev/mifare/sector_data_seperator = "comma"
 /cit/loglevel = 4
 /cit/message_separator = "LF"
-/cit/enable_message_tag = false'
+/cit/enable_message_tag = false
+/dev/mifare/send_cardnum_only = false'
 	testserver -dd -s
 
 	escape_cmd "\e\xfb\x31" # enable card detection

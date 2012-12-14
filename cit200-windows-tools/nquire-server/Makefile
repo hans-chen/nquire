@@ -11,14 +11,15 @@
 ALL_EXE = nquire-server.exe nquire-cmd.exe
 ALL_TESTS = misc-tester database-tester
 
-nquire-server.exe_SRC = common/misc.cpp database.cpp server.cpp
-nquire-cmd.exe_SRC = common/misc.cpp nquire-cmd.cpp
-misc-tester_SRC = common/misc.cpp common/misc-tester.cpp
-database-tester_SRC = database.cpp database-tester.cpp common/misc.cpp
+nquire-server.exe_SRC = ../nquire-common/misc.cpp database.cpp server.cpp
+nquire-cmd.exe_SRC = ../nquire-common/misc.cpp nquire-cmd.cpp
+misc-tester_SRC = ../nquire-common/misc.cpp ../nquire-common/misc-tester.cpp
+database-tester_SRC = database.cpp database-tester.cpp ../nquire-common/misc.cpp
 
 # compile flags:
-CFLAGS = -g -Wall -Werror
-CPPFLAGS = -Icommon
+CFLAGS = -g -Wall -Werror -O0
+CXXFLAGS =  -g -Wall -Werror -O0
+CPPFLAGS = -I../nquire-common
 
 # auto vars:
 ALL_TESTRESULTS = $(ALL_TESTS:%=testresults/%.res)
@@ -39,7 +40,7 @@ test: $(ALL_TESTS:%=testresults/%.res) compare
 clean:
 	rm -f $(ALL_TARGETS) *.o testresults/*.res
 	
-clobber: clean
+distclean: clean
 	rm -f *~
 	rm -rf testresults
 	rm -f nquire-server.log database-tester.log .dependencies.mk

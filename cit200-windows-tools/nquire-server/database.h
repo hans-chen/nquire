@@ -51,7 +51,7 @@ private:
 	// find first occurrence of key in my_format_name considering escapes
 	// So, finding "$" from 0 in "bla\$bla$bla" would return 8 (not 4)
 	// When key is not found, npos is returned
-	unsigned find_first( std::string key, unsigned from_pos ) const;
+	size_t find_first( std::string key, size_t from_pos ) const;
 
 private:
 	std::string my_format_name;

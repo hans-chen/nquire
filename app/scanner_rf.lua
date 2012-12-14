@@ -408,6 +408,7 @@ local function open(scanner_rf)
 	local fd = get_rfid_drv():open( device )
 
 	if fd <= 0 then
+		has_rfid_hw = false
 		logf(LG_DBG,lgid,"Could not open mifare fd on %s.", device)
 		return false
 	end

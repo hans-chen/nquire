@@ -841,6 +841,7 @@ test_image_anim ()
 {
 	curl -v ftp://${ADDRESS}/img/ -T img/kitty.gif
     cat 1>&2 << !EOF!
+Test for displaying default images and a custom (animated gif) image:
 Image test. 1 image in each corner and 'winking kitty' in the middle
 !EOF!
 
@@ -860,6 +861,23 @@ Image test. 1 image in each corner and 'winking kitty' in the middle
 	echo -en "\e\xf0kitty.gif\x03"
 	
 }
+
+all="$all image_bad"
+image_anim_sleep=3
+test_image_bad ()
+{
+	curl -v ftp://${ADDRESS}/img/ -T img/kitty.gif
+    cat 1>&2 << !EOF!
+Negative test: check if displaying a nonexisting image is handled well.
+Verify logging if this went well.
+!EOF!
+
+	echo -en "\e\x25" 				# clear screen
+	echo -en "\e\x2c\x90\x60"
+	echo -en "\e\xf0notexist.gif\x03"
+	
+}
+
 
 all="$all backlight_off"
 test_backlight_off ()
@@ -942,7 +960,7 @@ test_delay_msg_idle_1 ()
 {
     cat 1>&2 << !EOF!
 Show something and delay the timeout shorter than the origial timeout
-Returned should be: "Ttakkie"
+Returned should be: "TTtakkie"
 !EOF!
 	echo -en "\e\x25"					# Clear display
 	echo -en "\e\x42\x30"				# Set font
@@ -956,7 +974,7 @@ test_delay_msg_error_1 ()
 {
     cat 1>&2 << !EOF!
 Show something and delay the timeout shorter than the origial timeout
-Returned should be: "Ttakkie"
+Returned should be: "TTtakkie"
 Than after the error-message-timeout, the error message should be shown
 !EOF!
 	echo -en "\e\x25"					# Clear display

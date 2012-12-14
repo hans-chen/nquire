@@ -331,18 +331,33 @@ local function page_home(client, request)
 	draw_head(client)
 	body_begin(client)
 	box_start(client, "home", "Welcome")
-	draw_node(client, config:lookup("/dev/name"), true)
-	draw_node(client, config:lookup("/dev/serial"), true)
-	draw_node(client, config:lookup("/dev/version"))
-	draw_node(client, config:lookup("/dev/rfs_version"))
-	draw_node(client, config:lookup("/dev/build"))
-	draw_node(client, config:lookup("/dev/date"))
-	draw_node(client, config:lookup("/dev/scanner/version"))
-	draw_node(client, config:lookup("/network/macaddress"))
-	draw_node(client, config:lookup("/dev/hardware"))
-	if Scanner_rf.is_available() then
-		draw_node(client, config:lookup("/dev/mifare/modeltype"))
+
+	local keys = 
+		{ 
+			"/dev/name",
+			"/dev/serial",
+			"/dev/hardware",
+			"/dev/firmware",
+			"/dev/version",
+			"/dev/build",
+			"/dev/date",
+			"/dev/rfs_version",
+			"/network/macaddress_eth0",
+			"/network/macaddress_wlan0",
+			"/dev/scanner/version",
+			"/dev/mifare/modeltype",
+			"/dev/touch16/name",
+			"/dev/mmcblk",
+			"/network/current_ip"
+		}
+
+	for _, key in ipairs(keys) do
+		local cfg = config:lookup(key)
+		if #cfg:get() > 0 then
+			draw_node(client, cfg, true)
+		end
 	end
+
 	box_end(client)
 	body_end(client)
 end

@@ -113,7 +113,7 @@ return group {
 		type = "string",
 		default = "${serial}:",
 		range = "1:60",
-		comment = "The characters you use will be inserted in between the barcode identifier and the barcode information itself.<br/>You can use the following variables (case sensitive):<br/> &#36;&#123;serial&#125;  device serial number<br/> &#36;&#123;mac&#125;     ethernet mac-address"
+		comment = "The characters you use will be used as a prefix for each message.<br/>You can use the following variables (case sensitive):<br/> &#36;&#123;serial&#125;  device serial number<br/> &#36;&#123;mac&#125;     ethernet mac-address"
 	},
 
 	group {

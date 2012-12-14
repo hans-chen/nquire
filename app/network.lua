@@ -347,16 +347,31 @@ local function get_carrier_status()
 end
 
 
-local function get_macaddress(node)
-	local serial = sys.get_macaddr("eth0")
-	node:setraw(serial)
+local function get_current_itf()
+	local convert_to_itf = { ["ethernet"] = "eth0", ["wifi"]="wlan0", ["gprs"]="gprs" }
+	return convert_to_itf[config:get("/network/interface")]
+end
+
+local function get_used_macaddress(node)
+	-- TODO: what to do when itf is gprs?
+	local mac = sys.get_macaddr( get_current_itf() )
+	node:setraw(mac or "")
+end
+
+local function get_macaddress_eth0(node)
+	local mac = sys.get_macaddr("eth0")
+	node:setraw(mac or "")
+end
+
+local function get_macaddress_wlan0(node)
+	local mac = sys.get_macaddr("wlan0")
+	node:setraw(mac or "")
 end
 
 
 local function get_current_ip_addr()
 
-	local convert_to_itf = { ["ethernet"] = "eth0", ["wifi"]="wlan0", ["gprs"]="gprs" }
-	local itf = convert_to_itf[config:get("/network/interface")]
+	local itf = get_current_itf()
 
 	local ip, err = net.get_interface_ip( itf )
 	
@@ -666,7 +681,9 @@ function new()
 	
 	evq:signal_add("SIGCHLD")
 
-	config:add_watch("/network/macaddress", "get", get_macaddress, netwrk)
+	config:add_watch("/network/macaddress", "get", get_used_macaddress, netwrk)
+	config:add_watch("/network/macaddress_eth0", "get", get_macaddress_eth0, netwrk)
+	config:add_watch("/network/macaddress_wlan0", "get", get_macaddress_wlan0, netwrk)
 	config:add_watch("/network/current_ip", "get", get_current_ip, netwrk)
 
 	carrier_status = get_carrier_status()
