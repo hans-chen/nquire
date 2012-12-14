@@ -11,9 +11,9 @@ module("Config_node", package.seeall)
 -- label                  optional, this is the label in the webui
 -- default                optional, e.g. "123bf"
 -- match                  optional, e.g. "^%x*$"
--- range                  optional, e.g. "1,5", or a function in case of type=="custom"
+-- range                  optional, e.g. "5", "1,5" or "1:5"
+-- match                  optional, a function for custom validation
 -- size                   optional, this is the alternative size of the editbox in the webui
--- option                 optional, 'b' for binary strings
 -- mode                   optional, 'r', 'w', 'p' (default mode is "wp" when mode==nil)
 
 
@@ -31,7 +31,7 @@ local function get(node)
 			for _, watch in ipairs(node.get_watch_list) do
 				local value = watch.fn(watch.node, watch.fndata)
 				if value then
-					node:set(value)
+					node:setraw(value)
 				end
 			end
 			if node.cache then
@@ -46,18 +46,24 @@ end
 
 --
 -- Set value on node and trigger set-watches if value changed
+-- when now==true, the watch functions will be called immediately, otherwise
+-- that will be queued and handled during the next node_set_watch event
 --
-
 local function set(node, value, now)
 
-	if Upgrade.busy() then
-		logf(LG_WRN,lgid,"Setting config item rejected because an upgrade is in progress")
+	logf(LG_DBG,lgid,"Setting node %s", node:full_id())
+
+	if node:is_readonly() then
+		logf(LG_DBG,lgid,"Setting config item rejected because it is a read-only node")
 		return false
 	end
 
 	value = tostring(value)
-	if type_check(node.type, node.range, value) and 
-	   ( node.match == nil or value:match(node.match) ) then
+	logf(LG_DMP,lgid,"node(id=%s, type=%s, range=%s):='%s'", node:full_id(), node.type, node.range or "nil", value )
+	if		node.type == "custom" and type_check("string", node.range, value) 
+				and type_check("custom", node.match, value)
+			or node.type ~= "custom" and type_check(node.type, node.range, value) 
+				and ( node.match == nil or value:match(node.match) ) then
 		if node.value ~= value then
 			node.value = value
 			if node.cache then
@@ -257,9 +263,9 @@ end
 --
 
 local function is_readable(node)   if node.mode then return node.mode:find("r") else return true end end
+local function is_readonly(node)   if node.mode then return node.mode:find("r") and not node.mode:find("w") else return false end end
 local function is_writable(node)   if node.mode then return node.mode:find("w") else return true end end
 local function is_persistent(node) if node.mode then return node.mode:find("p") else return true end end
-local function is_binary(node)     if node.options then return node.options:find("b") else return false end end
 local function has_data(node)      return node.value and true or false end
 local function has_children(node)  return node.child_list and true or false end
 
@@ -282,9 +288,9 @@ local node_meta = {
 		lookup = lookup,
 		is_visible = is_visible,
 		is_readable = is_readable,
+		is_readonly = is_readonly,
 		is_writable = is_writable,
 		is_persistent = is_persistent,
-		is_binary = is_binary,
 		has_data = has_data,
 		has_children = has_children,
 	}

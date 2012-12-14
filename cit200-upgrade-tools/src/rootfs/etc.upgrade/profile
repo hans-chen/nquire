@@ -1,0 +1,19 @@
+# /etc/profile
+
+# System wide environment and startup programs, for login setup
+# Functions and aliases go in /etc/bashrc
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+LD_LIBRARY_PATH=/lib:/usr/lib
+PS1="\[\033[1m\][\u@\h \w]\[\033[0m\]"
+
+#HOSTNAME="NewLand-EP9307"
+
+HOSTNAME="NewLand-EDDY"
+export PATH HOSTNAME PS1 LD_LIBRARY_PATH
+alias l.='ls -d .[a-zA-Z]* --color=tty'
+
+alias rm='rm -i'
+
+alias cp='cp -i'
+
+alias mv='mv -i' 

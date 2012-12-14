@@ -172,7 +172,7 @@ local function set_font(display, family, size, attr)
 	display.font_attr = attr or display.font_attr
 
 	local ok, err = display.drv:set_font(display.font_family, display.font_size, display.font_attr)
-	if not ok then
+	if err then
 		logf(LG_WRN, lgid, "set_font: %s", err)
 	end
 end

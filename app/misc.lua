@@ -324,8 +324,8 @@ end
 -- meaning when translating back: '\n'=new line and '\xnn' represents the 
 -- charracter with asci-value nn hexadecimal.
 -- @param txt - the text to be translated
--- @param low - the upper bound under which charracters are translated to \xnn (default 32)
--- @param high - the lower bound from which charracters are translated to \xnn (default 128)
+-- @param low - charracter 0..string.char(low) are translated to \xnn (default 32)
+-- @param high - charracter string.char(high)..256 are translated to \xnn (default 128)
 -- @param extra - extra charracters that are to be escaped as \<c> (eg for escaping a '"')
 function binstr_to_escapes( txt, low, high, extra )
 	if low==nil then low = 32 end

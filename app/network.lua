@@ -671,7 +671,8 @@ function new()
 
 	carrier_status = get_carrier_status()
 	
-	local function	reconfigure(node, nw) 
+	local function	reconfigure(node, nw)
+		logf(LG_DBG,lgid,"Reconfigure because of node %s", node:full_id() )
 		-- print("Reconfiguring network")
 		-- reconfigure signal with delay -1 (don't queue: handle direct) so 
 		-- connections can be closed before the network goes down
@@ -683,7 +684,7 @@ function new()
 	config:add_watch("/network", "set", reconfigure, netwrk)
 	config:add_watch("/dev/modem", "set", reconfigure, netwrk)
 	-- config:add_watch("/network/interface", "set", on_interface_changed, netwrk)
-	--	on_interface_changed(nil,netwrk)
+	-- on_interface_changed(nil,netwrk)
 
 	evq:register("check_network_status_timer", on_check_network_status_timer, netwrk)
 	evq:push("check_network_status_timer", nil, 4.0)

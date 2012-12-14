@@ -162,7 +162,7 @@ return group {
 			type = "enum",
 			default = "1D only",
 			range="1D only,1D and 2D",
-			comment = "Specify if 2d barcodes are available.<br/>Note that it is still possible to disable them separately"
+			comment = "Specify if 2d barcodes are available.<br/>Note that it is still possible to disable them separately."
 		},
 
 		object {
@@ -179,7 +179,7 @@ return group {
 			config_type = "number",
 			default = "NOP",
 			range = "NOP,0.3,1,2,3,5,10,15",
-			comment = "The nquire will  not send a server event when a barcode is scanned again within this timeout value (sconds)."
+			comment = "The nquire will  not send a server event when a barcode is scanned again within this timeout value (seconds)."
 		},
 
 		object {
@@ -473,7 +473,7 @@ return group {
 		object {
 			mode = "r",
 			id = "modeltype",
-			label = "modeltype",
+			label = "Rfid device modeltype",
 			type = "string",
 			default = "",
 		},
@@ -483,9 +483,9 @@ return group {
 			label = "Access key A",
 			type = "string",
 			default = "FFFFFFFFFFFF",
+			range = "0,8,12",
 			match = "^%x*$",
-			range = "12",
-			comment = "Twelve hexadecimal nibbles representing key A for accessing a presented mifare card"
+			comment = "0 (ICODE_2/iso15693 or mifare ultralight), 8 (AT88RF020/ISO14443B) or 12 (mifare_classic) hexadecimal nibbles representing key A for accessing a presented rfid card."
 		},
 
 		object {
@@ -495,7 +495,8 @@ return group {
 			default = "0:0,15:2",
 			size = 25,
 			-- "custom" function for validation (see config.lua : load_schema for available functions)
-			range = function (s)
+			range = "0:240",
+			match = function (s)
 					--print("DEBUG: s = \"" .. (s or "nil") .. "\"")
 					if not s or #s==0 then return true end
 					local e=0
@@ -504,15 +505,12 @@ return group {
 						e=string.find(s,",",b)
 						--print("DEBUG: e = " .. (e or "nil"))
 						local g=string.sub(s,b,e and e-1 or b+4)
-						local sect,colon,block = string.match(g,"^(%d%d?)(:-)([012]-)$")
-						if sect==nil then return false end
-						local nsect = tonumber(sect)
-						if nsect>15 then return false end
-						if #colon == 0 and #block>0 then return false end
+						local sect,block = string.match(g,"^(%d?%d):(%d?%d)$")
+						if sect==nil or block==nil then return false end
 					end
 					return true
 				end,
-			comment = "Specify a comma seperated list of blocks (or whole sectors) that should be read when a mifare card is presented to the reader.<br/>The supported mifare classic has 16 sectors [0..15] and 3 accessible blocks per sector [0,1,2]. <br/>The used format is: sector[:block],... E.g.: 1,5:2,15:0.<br/>Specifying an empty string would generate card-detection events without actually reading the mifare card"
+			comment = "Specify a comma seperated list of blocks that should be read when a mifare card is presented to the reader.<br/>e.g. the mifare classic has 16 sectors [0..15] and 3 accessible blocks per sector [0,1,2]. <br/>The used format is: sector:block,... E.g.: 1:0,5:2,15:0.<br/>Specifying an empty string would generate card-detection events without actually reading the mifare card.<br/>Note that the max. sector and block count depends on the presented rf-card."
 		},
 		
 		object {
@@ -522,7 +520,7 @@ return group {
 			config_type = "number",
 			default = "3",
 			range = "0.3,1,2,3,5,10,15",
-			comment = "The same card will not generate a server event within the specified delay time (seconds)"
+			comment = "The same card will not generate a server event within the specified delay time (seconds)."
 		},
 		
 		object {
@@ -681,6 +679,7 @@ return group {
 			label = "Minimum time between click",
 			type = "enum",
 			range = "0.5,1,1.5,2,3",
+			config_type = "number",
 			default = "1"
 		},
 		
@@ -726,7 +725,8 @@ return group {
 			label = "Poll speed (seconds)",
 			type = "enum",
 			range = "1,2,3,5,7,10",
-			default = "5"
+			default = "5",
+			config_type = "number",
 		},
 		
 	},

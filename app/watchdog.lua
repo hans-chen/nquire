@@ -27,6 +27,12 @@ local function start(wdt)
 end
 
 
+local function stop(wdt)
+	-- TODO check: would this really stop the watchdog, and is that desired?
+	evq:unregister("wdt_timer", on_wdt_timer, wdt)
+	io.close(wdt.fd)
+end
+
 
 --
 -- Constructor
@@ -41,6 +47,7 @@ function new()
 
 		-- methods
 		start = start,
+		stop = stop,
 	}
 
 	return wdt

@@ -7,8 +7,7 @@
 #
 # Without RELEASE_TAG the tag for a distribution will be "trunk"<buildnr>
 # No tag will be used when RELEASE_TAG=-
-# The major and minor from file version.mk will be used to version the distribution
-# Note that you can only build an official release when nothing is checked out
+# Note that you should only build an official release when nothing is checked out
 #
 # eg:
 # make RELEASE_TAG=beta1 dist
@@ -18,7 +17,7 @@ NAME    := cit-app
 BUILD   := $(shell svnversion -c . | cut -d : -f 2)
 # only use a major and a minor verion number
 # patch level numbering is not SG15 compatible!
-VERSION	:= 1.5
+VERSION	:= 1.6
 LABEL := $(VERSION).$(BUILD)
 
 all:
@@ -64,7 +63,8 @@ MODULES			+= beepthread.so
 
 MODULES			+= mifare.so
 mifare.so : CFLAGS += -I../lib/rfid
-mifare.so : LDFLAGS += -Wl,-Bstatic ../lib/rfid/libnlrf.a -Wl,-Bdynamic
+#mifare.so : LDFLAGS += -Wl,-Bstatic ../lib/rfid/libnlrf.a -Wl,-Bdynamic
+mifare.so : LDFLAGS += -L../lib/rfid/ -lnlrf
 
 EXE += gethostbyname
 gethostbyname: gethostbyname.c
@@ -81,8 +81,15 @@ CFLAGS	+= -DVERSION=\"$(VERSION)\" -DBUILD=\"$(BUILD)\"
 CFLAGS  += -g -Wall -Werror -O3 
 CFLAGS 	+= $(ARCH_CFLAGS)
 CFLAGS	+= -fPIC
+
+# 'install' lua by copy, not compiled with luac
 ifdef DEBUG
 CFLAGS 	+= -DDEBUG
+endif
+
+# turn on tracing in c-files
+ifdef TRACEON
+CFLAGS 	+= -DTRACEON
 endif
 
 LDFLAGS += -g -Wl,--export-dynamic
@@ -138,12 +145,12 @@ $(SUBDIRS):
 gethostbyname: gethostbyname.o
 	$(CC) $(CFLAGS) $< -o $@ -L../toolchain/usr/lib  
 	$(STRIP) $@
-	chmod -x $@
+	chmod 751 $@
 	
 .PHONY: dist install links clean clobber
 
 # Note that this builds a release from app-binary!
-# When current changes should be includes you have to "make install" first
+# When current changes should be included you have to "make install" first
 dist: app.tar
 	@echo "[$@]"
 	tools/make_firmware $(R_TAG)
@@ -170,18 +177,26 @@ clobber_install:
 	-rm -f $(INSTALL)/*lua $(INSTALL)/*.so $(INSTALL)/*.ttf $(INSTALL)/schema/* 
 	-rm -f $(INSTALL)/img/*.gif $(INSTALL)/img/*.jpg $(INSTALL)/img/*.png $(INSTALL)/img/keypad/*
 
-install: $(MODULES) $(EXE) clobber_install
-	@echo "[$@]"
-	cp *so $(INSTALL)/
-	cp arial.ttf $(INSTALL)/
-	chmod 751 gethostbyname
-	cp -a gethostbyname $(INSTALL)/
-	cp schema/*.schema $(INSTALL)/schema/
-	cp img/*.jpg img/*.png $(INSTALL)/img/
-	cp img/ftp/* $(INSTALL)/img/ftp/
-	for f in $(LUA_SRC); do if ! luac -o $(INSTALL)/$$f $$f; then exit -1; fi; done
+ifdef DEBUG
+$(INSTALL)/%.lua:%.lua
+	cp -f $< $@
+else
+$(INSTALL)/%.lua:%.lua
+	luac -o $@ $<
+endif
 
-app.tar: Makefile
+$(INSTALL)/%.so:%.so
+	cp -f $< $@
+
+install: clobber_install \
+		$(EXE) $(LUA_SRC:%=$(INSTALL)/%) $(MODULES:%=$(INSTALL)/%)
+	@echo "[$@]"
+	cp -a cit arial.ttf gethostbyname $(INSTALL)/
+	cp -a http/* $(INSTALL)/http/
+	cp -a schema/*.schema $(INSTALL)/schema/
+	cp -a img/ftp/* $(INSTALL)/img/ftp/
+
+app.tar: Makefile install
 	@echo "[$@]"
 	cd $(INSTALL) && tar cvf ../app/$@ --exclude=.svn *
 

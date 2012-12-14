@@ -7,13 +7,13 @@ ALL	:= $(HTML)
 
 .PHONY: img all clean clobber
 
-all: img html
+all: img html nquire-tests.pdf
 
 html: $(HTML)
 
 clean:
 	make -C img clean
-	-rm -f $(ALL) *.out *.log *.idx *.tex *.aux
+	-rm -f $(ALL) *.out *.log *.idx *.tex *.aux nquire-tests.pdf
 
 clobber: clean
 	make -C img clobber
@@ -22,12 +22,15 @@ clobber: clean
 img: 
 	make -C img
 
+nquire-tests.pdf: nquire-tests.odt
+	unoconv -f pdf $(@:pdf=odt)
+
 $(HTML): Makefile
 %.html: %.txt
 	asciidoc --verbose -a toc -a numbered -a icons -a iconsdir=./img $(@:html=txt)
 
 SHELL = /bin/bash
-deploy: deploy_root_files = $(shell echo $(wildcard *html) | sed "s/ /,/g")
+deploy: deploy_root_files = $(shell echo $(wildcard *html) | sed "s/ /,/g"),nquire-tests.pdf
 deploy: deploy_img_files = $(shell echo $(wildcard img/*png) | sed "s/ /,/g")
 deploy:
 	make clean

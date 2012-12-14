@@ -27,8 +27,9 @@
 local lgid = "scanner"
 
 -- Note that the default prefixed for:
---  gpio: prefix_out = "I"
---  touch16 keypad: prefix_out = "K"
+-- prefix_hid id's are the HR100 factory defaults (hr100 user manual 'Code ID List', 
+-- page 122), extended with some 2d codes. This means that a HR200 should have 
+-- extensive configuration (easy using 1 big barcode).
 prefixes = {
    { name = "Code128",            prefix_2d = "j", prefix_1d = "j", prefix_hid = "j", prefix_out = "#"  },
    { name = "UCC_EAN-128",        prefix_2d = "J", prefix_1d = "u", prefix_hid = "u", prefix_out = "P", cmd_HR200 = "0004030" },
@@ -36,15 +37,15 @@ prefixes = {
    { name = "EAN-13",             prefix_2d = "D", prefix_1d = "d", prefix_hid = "d", prefix_out = "F", cmd_HR200 = "0004050" },
    { name = "UPC-E",              prefix_2d = "c", prefix_1d = "h", prefix_hid = "h", prefix_out = "E"  },
    { name = "UPC-A",              prefix_2d = "C", prefix_1d = "c", prefix_hid = "c", prefix_out = "A", cmd_HR200 = "0004070" },
-   { name = "Interleaved-2_of_5", prefix_2d = "e", prefix_1d = "e", prefix_hid = "i", prefix_out = "i"  },
+   { name = "Interleaved-2_of_5", prefix_2d = "E", prefix_1d = "e", prefix_hid = "e", prefix_out = "i", cmd_HR200 = "0004080" },
    { name = "Code39",             prefix_2d = "b", prefix_1d = "b", prefix_hid = "b", prefix_out = "*"  },
    { name = "Codabar",            prefix_2d = "a", prefix_1d = "a", prefix_hid = "a", prefix_out = "%"  },
    { name = "Code93",             prefix_2d = "i", prefix_1d = "y", prefix_hid = "y", prefix_out = "c"  },
    { name = "PDF417",             prefix_2d = "r", prefix_1d = "?", prefix_hid = "r", prefix_out = "r", layout="2D" },
-   { name = "QR_Code",            prefix_2d = "s", prefix_1d = "?", prefix_hid = "s", prefix_out = "s", layout="2D" },
-   { name = "Aztec",              prefix_2d = "z", prefix_1d = "?", prefix_hid = "z", prefix_out = "z", layout="2D" },
-   { name = "DataMatrix",         prefix_2d = "u", prefix_1d = "?", prefix_hid = "u", prefix_out = "u", layout="2D" },
-   { name = "Chinese-Sensible",   prefix_2d = "h", prefix_1d = "?", prefix_hid = "h", prefix_out = "h", layout="2D" },
+   { name = "QR_Code",            prefix_2d = "s", prefix_1d = "?", prefix_hid = "S", prefix_out = "s", layout="2D" },
+   { name = "Aztec",              prefix_2d = "z", prefix_1d = "?", prefix_hid = "Z", prefix_out = "z", layout="2D" },
+   { name = "DataMatrix",         prefix_2d = "u", prefix_1d = "?", prefix_hid = "U", prefix_out = "u", layout="2D" },
+   { name = "Chinese-Sensible",   prefix_2d = "h", prefix_1d = "?", prefix_hid = "H", prefix_out = "h", layout="2D" },
    { name = "GS1_Databar",        prefix_2d = "R", prefix_1d = "R", prefix_hid = "R", prefix_out = "R"  },
    { name = "ISBN",               prefix_2d = "B", prefix_1d = "B", prefix_hid = "B", prefix_out = "B"  },
    { name = "Code-11",            prefix_2d = "H", prefix_1d = "z", prefix_hid = "z", prefix_out = "Z"  },
@@ -53,9 +54,10 @@ prefixes = {
    { name = "MSI-Plessey",        prefix_2d = "m", prefix_1d = "m", prefix_hid = "m", prefix_out = "m"  },
    { name = "Plessey",            prefix_2d = "n", prefix_1d = "p", prefix_hid = "p", prefix_out = "n"  },
    { name = "2_5-Standard",       prefix_2d = "f", prefix_1d = "s", prefix_hid = "s", prefix_out = "o"  },
-   { name = "2_5-Industrial",     prefix_2d = "I", prefix_1d = "i", prefix_hid = "s", prefix_out = "o"  },
+   { name = "2_5-Industrial",     prefix_2d = "I", prefix_1d = "i", prefix_hid = "i", prefix_out = "o"  },
 
-   -- event prefixes that are also reserved
+   -- event prefixes (prefix_out) that are also reserved
+   --{ name = "USB",                when "/dev/extscanner/raw = true", usb event are send prefixed with this charracter
    --{ name = "mifare",             prefix_out = "MF" },
    --{ name = "timeout",            prefix_out = "T" }, -- in response to \e\fb.....\x03
    --{ name = "touch16",            prefix_out = config:get("/dev/touch16/prefix") }, -- default = "K"
@@ -64,7 +66,7 @@ prefixes = {
 }
 
 -- codes to turn on and off scanner codes
--- turning of a code improves performance.
+-- turning off a code improves performance.
 -- only the supported codes are in the list
 
 -- HR100 scanner codes

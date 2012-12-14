@@ -29,6 +29,7 @@ MODULE_TESTS   += \
 	module/config_tester.lua\
 	module/display_tester.lua\
 	module/sys_tester.lua\
+	module/scanner_tester.lua\
 
 TARGET_BASE_TESTS = \
 	target/one-time-timeout-tester\
@@ -91,7 +92,7 @@ MAKE	= $(MAKE)
 
 all: prepare
 
-prepare: links discover $(MODULES)
+prepare: links $(MODULES)
 	make -C img all
 	make -C testserver all install
 

@@ -20,22 +20,22 @@ trap ":" INT QUIT TSTP
 /bin/mkdir -p /var/run/wpa_supplicant
 /bin/mkdir -p /var/lib/hwclock
 /bin/mkdir -p /var/lock
-ln -s /tmp /var/run
+#udisk mdev
+echo "/sbin/cit_mdev" > /proc/sys/kernel/hotplug
+/sbin/cit_mdev
+
+#ln -s /tmp /var/run
 hostname NEWLAND_CIT
 
 insmod /driver/qt2160.ko
 insmod /driver/scsi_mod.ko
 insmod /driver/sd_mod.ko
-insmod /driver/scsi_wait_scan.ko 
-insmod /driver/usbcore.ko
-insmod /driver/ohci-hcd.ko
 insmod /driver/usb-storage.ko
 insmod /driver/usbhid.ko
 insmod /driver/rt2x00lib.ko
 insmod /driver/rt2x00usb.ko
 insmod /driver/rt73usb.ko
-insmod /driver/rt2800lib.ko
-insmod /driver/rt2800usb.ko
+insmod /driver/rt3070sta.ko
 insmod /driver/usb-datapipe.ko
 
 # load wifi bin
@@ -45,35 +45,20 @@ insmod /driver/usb-datapipe.ko
 #cat  /lib/firmware/rt73.bin > /sys/class/firmware/1-1.2\:1.0/data           
 #echo 0 > /sys/class/firmware/1-1.2\:1.0/loading  
 #/sbin/ifconfig wlan0 down  
-# mount sd
-#mount /dev/mmcblk0p1 /mnt/
-mount -o rw,umask=000,shortname=mixed /dev/mmcblk0p1 /mnt
-if [[ "$?" == "0" ]] ; then
-  mkdir -p /mnt/img /mnt/fonts
-  mkdir -p /home/ftp/img /home/ftp/fonts            
-  mount --bind /mnt/img /home/ftp/img                            
-  mount --bind /mnt/fonts /home/ftp/fonts      
-else                     
-  echo "Not found SD card,mount local partition:/dev/mtdblock/6"
-  mount -t jffs2 /dev/mtdblock/6 /mnt/
-  if [[ "$?" != "0" ]] ; then
-	 echo "mount /dev/mtdblock/6 fail"
-	 echo "flash_eraseall /dev/mtd/6"
-    /sbin/flash_eraseall -j /dev/mtd/6	
-	 echo "retry mount /dev/mtdblock/6"
-    mount -t jffs2 /dev/mtdblock/6 /mnt/
-  fi
-  if [[ "$?" == "0" ]] ; then
-	 echo "mount succ!"
-	 mkdir -p /home/ftp/img
- 	 mkdir -p /mnt/img 
-	 mount --bind /mnt/img /home/ftp/img                            
-	 chown ftp:ftp /home/ftp/img
-	 chmod 777 /home/ftp/img
-  else
-	  echo "can't mount /dev/mtdlbock/6"
-  fi
+
+echo "Mount /dev/mtdblock/6 to /mnt"
+mount -t jffs2 /dev/mtdblock/6 /mnt/
+if [[ "$?" != "0" ]] ; then
+	echo "mount /dev/mtdblock/6 fail"
+	echo "flash_eraseall /dev/mtd/6"
+	/sbin/flash_eraseall -j /dev/mtd/6
+	echo "retry mount /dev/mtdblock/6"
+	mount -t jffs2 /dev/mtdblock/6 /mnt/
 fi
+mkdir -p /mnt/mmc
+# mount sd
+mount -o rw,umask=000,shortname=mixed /dev/mmcblk0p1 /mnt/mmc
+
 # server
 /sbin/klogd &
 /sbin/syslogd -C64 &
@@ -83,12 +68,12 @@ cd /etc/ && ln -sf vsftpd.conf.anonymous vsftpd.conf
 # touch version file: /etc/cit.ini
 cat > /etc/cit.ini << EOF
 [version]
-rootfs      = 1.4.5
+rootfs      = 1.5.2
 app         = 1.0
 usb_scan    = 1.0
 kernel      = 2.6.35.7
 hardware    = UNKNOW
-firmware	= 1.5.0
+firmware	   = 1.6.0
 [serial number]
 sn          = UNKNOW
 EOF
@@ -97,7 +82,8 @@ if [[ "$?" == "0" ]] ; then
     ./cit_sn -r
 	 lua /usr/bin/cit_appversion 
     cd /cit200
-    lua main.lua &
+	/cit200/cit start
+	cit_upgrade -D
 else
     exit 1
 fi

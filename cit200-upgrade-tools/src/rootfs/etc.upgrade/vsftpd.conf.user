@@ -1,0 +1,41 @@
+#
+# Nquire vsftpd config file for user authentication
+# 
+#
+# Standalone mode
+listen=YES
+max_clients=200
+max_per_ip=4
+# Access rights
+anonymous_enable=NO
+local_enable=YES
+write_enable=YES
+anon_upload_enable=NO
+anon_mkdir_write_enable=NO
+anon_other_write_enable=NO
+userlist_enable=YES
+userlist_deny=NO
+# Security
+anon_world_readable_only=NO
+connect_from_port_20=YES
+hide_ids=YES
+pasv_min_port=50000
+pasv_max_port=60000
+pasv_enable=YES
+nopriv_user=ftp
+local_umask=022
+chroot_local_user=YES
+# Features
+xferlog_enable=NO
+ls_recurse_enable=NO
+ascii_download_enable=NO
+async_abor_enable=YES
+delete_failed_uploads=YES
+use_localtime=YES
+#cmds_allowed=ABOR,APPE,CWD,DELE,HELP,LIST,MDTM,MKD,NLST,PASV,PWD,QUIT,RETR,RMD,RNFR,RNTO,SIZE,STAT,STOR,SYST,USER
+# Performance
+#one_process_model=YES
+idle_session_timeout=120
+data_connection_timeout=300
+accept_timeout=60
+connect_timeout=60

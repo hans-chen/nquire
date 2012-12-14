@@ -1,0 +1,11 @@
+#!/bin/sh
+mount -t jffs2 /dev/mtdblock/5 /appfs 
+#mount --bind /appfs/etc /etc 
+#mount --bind /appfs/cit200 /cit200 
+#mount --bind /appfs/self-test /self-test 
+#mount --bind /appfs/usr/bin /usr/bin 
+#mount --bind /appfs/driver /driver 
+#mount --bind /appfs/dev /dev
+mount -t ramfs ramfs /dev/
+cp -a /appfs/dev/* /dev/
+exec /bin/busybox linuxrc 

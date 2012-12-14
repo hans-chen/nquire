@@ -121,7 +121,7 @@ end
 
 --
 -- set a config item from a configfile formatted line
--- CHECK: Note that, because this line can also be read from a barcode, it can
+-- Note that, because this line can also be read from a barcode, it can
 -- actually contain multiple definitions like:
 -- /nodename = "value x" /group/name2 = y
 -- or:
@@ -141,7 +141,7 @@ local function set_config_item( config, l )
 		else
 			local node = config:lookup(fid)
 			if node then
-				local is_string = node:is_binary() or 
+				local is_string = 
 						node.type == "enum" and (not node.config_type or node.config_type ~= "number") or 
 						node.type == "string" or 
 						node.type == "password" or 
@@ -149,15 +149,16 @@ local function set_config_item( config, l )
 						node.type == "custom"
 				local value
 				value, next_tv = fetch_value( rest, is_string )
-				--logf(LG_DMP,lgid,"read: l='%s', fid='%s', value='%s', rest='%s'" , l, fid or "nil", value or "nil", (next_tv or "nil"))
+				-- logf(LG_DMP,lgid,"read: l='%s', fid='%s', value='%s', rest='%s'" , l, fid or "nil", value or "nil", (next_tv or "nil"))
 				if value then
 					local vvalue = value
-					if node:is_binary() or node.type == "string" then
+					if node.type == "string" then
 						vvalue = escapes_to_binstr( value, "\"" )
+					elseif value:sub(1,1) == "\"" and value:sub(-1,-1) == "\"" and #value >= 2 then
+						-- backward compatible reading of number-values surrounded with quotes
+						vvalue = value:sub(2,-2)
 					end
-					if type_check(node.type, node.range, vvalue) then
-						node:set(vvalue)
-					else
+					if not node:set( vvalue ) then
 						logf(LG_WRN,lgid,"Incorrect node-value: %s = \"%s\"", fid, vvalue )
 					end
 				else
@@ -176,14 +177,9 @@ end
 -- Save config database to file
 --
 
-local function save_db(config, fname_db)
+local function save_db(config)
 
-	logf(LG_DBG, lgid, "Saving configuration to %s", fname_db)
-
-	if Upgrade.busy() then
-		logf(LG_WRN,lgid,"Saving configfile prohibited because an upgrade is in progress")
-		return
-	end
+	logf(LG_DBG, lgid, "Saving configuration to %s", config.fname_db)
 
 	local function s(fd, node, prefix)
 		
@@ -191,9 +187,7 @@ local function save_db(config, fname_db)
 
 			if node:has_data() then
 				local prefix2 = prefix:gsub("^%.", "")
-				if node:is_binary() then
-					fd:write(prefix2 .. "/" .. node.id .. " = \"" .. binstr_to_escapes(node.value,nil,nil,"\"") .. "\"\n")
-				elseif node.type == "string" or (node.type == "enum" and node.config_type ~= "number") or 
+				if node.type == "string" or (node.type == "enum" and node.config_type ~= "number") or 
 							node.type == "password" or node.type == "pattern" or node.type == "custom" then
 					-- CHECK: whether this also works with high utf8 charracters
 					fd:write(prefix2 .. "/" .. node.id .. " = \"" .. binstr_to_escapes(node.value, 32, 256, "\"" ) .. "\"\n")
@@ -215,7 +209,7 @@ local function save_db(config, fname_db)
 		end
 	end
 
-	local fname_tmp = fname_db .. ".tmp"
+	local fname_tmp = "/tmp/cit.conf.tmp" -- config.fname_db .. ".tmp"
 	local fd, err = io.open(fname_tmp, "w")
 	if not fd then
 		logf(LG_WRN,lgid, "Could not write to config db %s: %s", fname_tmp or "nil", err or "nil")
@@ -229,19 +223,25 @@ local function save_db(config, fname_db)
 	fd:write("\n")
 	fd:close()
 
-	-- Rename temporary file to new file name (atomic)
-	
-	local ok, err = os.rename(fname_tmp, fname_db)
-	if not ok then
-		logf(LG_WRN, lgid, "Could not rename %s to %s: %s", fname_tmp, fname_db, err)
+	-- copy temporary file to new file name (atomic)
+	local res = os.execute("cp -a " .. fname_tmp .. " " .. config.fname_db)
+	if res ~= 0 then
+		logf(LG_WRN, lgid, "File system full: removing images from ftp:/img/*")
+		os.execute("rm -f /home/ftp/img/*")
+		res = os.execute("cp -a " .. fname_tmp .. " " .. config.fname_db)
+		if res ~= 0 then
+			logf(LG_WRN, lgid, "File system full: configuration might not be saved!")
+			logf(LG_INF, lgid, "Please remove files using ftp from the 'log' directory")
+		end
 	end
+	local res = os.execute("rm -f " .. fname_tmp)
 	
 	-- Create a copy of the configuration in /home/ftp to allow backup/restore
 	
-	os.execute("rm -f /home/ftp/%s" % fname_db)
-	os.execute("cp -a %s /home/ftp/" % fname_db)
-	os.execute("chown ftp.ftp /home/ftp/%s" % fname_db)
-	os.execute("chmod 664 /home/ftp/%s" % fname_db)
+	os.execute("rm -f " .. config.fname_db_ext)
+	os.execute("cp -a " .. config.fname_db .. " " .. config.fname_db_ext)
+	os.execute("chown ftp.ftp " .. config.fname_db_ext)
+	os.execute("chmod 664 " .. config.fname_db_ext)
 
 	-- Remember the mtime of the config file for automatic reloading
 	
@@ -329,7 +329,7 @@ local function restore_defaults(config)
 
 	logf(LG_INF, lgid, "Restoring factory defaults")
 	setdef(config.db)
-	config:save_db(config.fname_db)
+	config:save_db()
 end
 
 
@@ -339,30 +339,14 @@ end
 
 local function on_config_timer(event, config)
 
-	-- do not check when an upgrade is busy
-	if Upgrade.busy() then
-		return true
-	end
-
-	-- Check mtime of main config file
+	-- Check mtime of external config file
 	
-	local s = sys.lstat(config.fname_db)
-
-	if not s or s.mtime > config.mtime then
-		logf(LG_DBG, lgid, "Config file was modified, rereading")
-		if config:load_db(config.fname_db) then
-			config:save_db(config.fname_db)
-		end
-	end
-
-	-- Check mtime of config file in /home/ftp
-	
-	local s = sys.lstat("/home/ftp/" .. config.fname_db)
+	local s = sys.lstat(config.fname_db_ext)
 
 	if s and s.mtime > config.mtime then
 		logf(LG_DBG, lgid, "FTP Config file was modified, rereading")
-		if config:load_db("/home/ftp/" .. config.fname_db) then
-			config:save_db(config.fname_db)
+		if config:load_db(config.fname_db_ext) then
+			config:save_db()
 		end
 	end
 
@@ -376,7 +360,7 @@ end
 -- Constructor
 --
 
-function new(fname_schema, fname_db)
+function new(fname_schema, fname_db, fname_db_extern)
 
 	local config = {
 
@@ -385,6 +369,7 @@ function new(fname_schema, fname_db)
 		db = {},
 		fname_schema = fname_schema,
 		fname_db = fname_db,
+		fname_db_ext = fname_db_extern,
 
 		-- methods
 
@@ -403,27 +388,12 @@ function new(fname_schema, fname_db)
 	-- load defaults:
 	config.db = config:load_schema(fname_schema)
 
-	-- than load config from file:
-	-- first try to load the 'reset configfile'
-	if not config:load_db("/mnt/" .. config.fname_db) then
-		-- than try to load the configfile made just before an upgrade:
-		if config:load_db("/mnt/" .. config.fname_db .. ".bkup") then
-			os.remove("/mnt/" .. config.fname_db .. ".bkup")
-		else
-			-- than try to load the work-configfile:
-			if not config:load_db(config.fname_db) then
-				logf(LG_WRN, lgid, "No config file found. Using defaults.")
-			end
-		end
-	end
-	config:save_db(config.fname_db)
-
 	evq:register("config_timer", on_config_timer, config)
 	evq:push("config_timer", nil, 1.0)
 
 	config:add_watch("//", "set", 
 		function(node, config)
-			config:save_db(config.fname_db)
+			config:save_db()
 		end,
 		config
 	)

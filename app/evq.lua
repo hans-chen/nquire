@@ -241,6 +241,7 @@ local function pop(evq)
 			for what, fds in pairs(fds_out) do
 				if fds then
 					for fd, has_data in pairs(fds) do
+						logf(LG_DMP,lgid,"fd %d, event %s", fd, what)
 						evq:push("fd", { fd = fd, what = what }, 0)
 					end
 				end

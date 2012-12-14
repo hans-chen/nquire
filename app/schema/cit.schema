@@ -96,7 +96,24 @@ return group {
 		type = "enum",
 		default = "none",
 		range = "none,base64",
-		coomment = "Escape commands and response messages can be transformend into a non-human readable format: base 64."
+		comment = "Escape commands and response messages can be transformend into a non-human readable format: base 64."
+	},
+
+	object { 
+		id = "enable_message_tag",
+		label = "Use Custom NQuire identifier",
+		type = "boolean",
+		default = "false",
+		comment = "Use this option to identify which NQuire a server message is coming from (next to its&#39; IP-address)."
+	},
+
+	object { 
+		id = "message_tag",
+		label = "Custom NQuire identifier",
+		type = "string",
+		default = "${serial}:",
+		range = "1:60",
+		comment = "The characters you use will be inserted in between the barcode identifier and the barcode information itself.<br/>You can use the following variables (case sensitive):<br/> &#36;&#123;serial&#125;  device serial number<br/> &#36;&#123;mac&#125;     ethernet mac-address"
 	},
 
 	group {
@@ -136,6 +153,7 @@ return group {
 				type = "number",
 				default = "3",
 				range = "1:15",
+				comment = "The time a displayed text&#47;image is shown<br/>after which it is replaced by the idle message."
 			},
 			
 			group {
@@ -339,6 +357,7 @@ return group {
 				type = "number",
 				default = "1",
 				range = "1:15",
+				comment = "Delay after which the error-message is shown.<br/>This is overruled by a server-command."
 			},
 			
 			group {

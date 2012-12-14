@@ -11,10 +11,9 @@ EURO_UTF8='€' # same as \xe2\x82\xac
 EURO_IBM852='\x80'
 EURO=${EURO_IBM852}
 
+ADDRESS=""
 if test -f .cit.ip; then 
 	ADDRESS="`cat .cit.ip`"
-else
-	ADDRESS="cit"
 fi
 
 all=""
@@ -135,6 +134,7 @@ lb      xb cb         rb
 	echo -en "\e\x2e\x3Acy\x03" 		# Centre keep y
 	echo -en "\e\x2e\x3Bry\x03" 		# right keep y
 }
+
 
 all="$all text_3"
 test_text_3()
@@ -425,7 +425,7 @@ line 1 part 2
 }
 
 all="$all text_18"
-test_text_text_18 ()
+test_text_18 ()
 {
     cat 1>&2 << !EOF!
 Test use of NL (unix style) in text with alignments
@@ -770,11 +770,6 @@ test_touch_keypad ()
 Touch keyboard image test. Use touch_click to test touch click events.
 !EOF!
 
-	curl -v ftp://cit/img/ -T img/kitty.gif
-    cat 1>&2 << !EOF!
-Image test. 1 image in each corner and 'winking kitty' in the middle
-!EOF!
-
 	echo -en "\e\x25" 				# clear screen
 	echo -en "\e\xf2kitty.gif\r\r33\x03"
 
@@ -844,10 +839,11 @@ all="$all image_anim"
 image_anim_sleep=3
 test_image_anim ()
 {
-	curl -v ftp://cit/img/ -T img/kitty.gif
+	curl -v ftp://${ADDRESS}/img/ -T img/kitty.gif
     cat 1>&2 << !EOF!
 Image test. 1 image in each corner and 'winking kitty' in the middle
 !EOF!
+
 	echo -en "\e\x25" 				# clear screen
 	echo -en "\e\xf01.gif\x03"
 
@@ -900,7 +896,6 @@ test_mifare_read_1 ()
 {
     cat 1>&2 << !EOF!
 Read from mifare card.
-Note: This test only works correct when output encryption is not turned on!
 First make some settings...
 !EOF!
 
@@ -910,9 +905,10 @@ cat > cit.conf << !EOF!
 /dev/mifare/cardnum_format = "hexadecimal"
 /dev/mifare/sector_data_format = "hex"
 /dev/mifare/sector_data_seperator = "comma"
-/dev/mifare/suppress_beep = true
+/cit/message_encryption = "none"
 !EOF!
-curl -s -S ftp://${ADDRESS}/ -T cit.conf 
+set -x
+curl ftp://${ADDRESS}/ -T cit.conf 
 sleep 3
 echo "Now present card..." 1>&2
 
@@ -923,7 +919,9 @@ echo "Now present card..." 1>&2
 	echo -en "\e\x25"					# Clear display
 	echo -en "\e\x2e\x34Reading card 76262fa5\nsector 3, block 0\n\x03"
 	echo "Reading now 1:0 in binary and and 15:2 in hex" 1>&2
-	echo -en "\e\xf876262fa5,FFFFFFFFFFFF:10Bf2H\x03"
+	echo -en "\e\xf876262fa5,FFFFFFFFFFFF:\x3f2H\x03"
+
+sleep 3
 }
 
 all="$all mifare_shift_transaction_log"
@@ -952,7 +950,7 @@ Returned should be: "Ttakkie"
 	echo -en "\e\xf4I25takkie\x03"
 }
 
-all="$all delay_msg_idle_1"
+all="$all delay_msg_error_1"
 delay_msg_error_1_sleep=4
 test_delay_msg_error_1 ()
 {
@@ -986,9 +984,8 @@ then
 cat << EOF
 cit-test -h|{[-udp][-tcp][-imb852][-utf8] [-a <ip address>] <test id>}+
 Send a certain string to the cit
-Output is done to port 9000 for TCP
- -udp        use udp messages
- -tcp        use tcp messages (default)
+ -udp        use udp messages using port 9000
+ -tcp        use tcp messages using port 9101 (default)
  -ibm852     use ibm852 euro sign charracter (default)
  -utf8       use utf8 euro sign charracter
  -a address  the address or name of the nquire (when ommitted, the

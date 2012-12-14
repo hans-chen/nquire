@@ -14,10 +14,6 @@ local dpy_w = 240
 local dpy_h = 128
 
 local font = "arial.ttf"
--- local font = "arialuni.ttf"
--- local font = "wqy-zenhei.ttf"
--- local font = "wt011.ttf"
--- local font = "wt028.ttf"
 
 local ETX = '\3'
 local ACK = '\6'
@@ -43,10 +39,9 @@ local message_received = false
 
 local one_time_timeout_id = nil -- identify the timeout (with hirestime of the moment it wat set)
 local one_time_timeout_msg = nil -- "cit_idle_msg" or "cit_error_msg"
-local one_time_timeout_tag = nil -- the tag givven for this timeout
+local one_time_timeout_tag = nil -- the tag given for this timeout
 
 
---local t_lastcmd = 0
 local t_idle_msg = 0 -- the moment (hirestime) after which an idle message is allowed to be shown
 
 local sector_data_seperators = { ["none"]="", ["space"]="", ["tab"] = "\t", ["comma"] = ",", ["colon"]=":", ["semicolon"] = ";" }
@@ -60,6 +55,21 @@ local barcode_mode = "normal"
 
 local translate_NL = { ["LF"] = "\n", ["CR"] = "\r", ["CRLF"] = "\r\n" }
 
+local function expand_message_tag()
+	if config:get("/cit/enable_message_tag")=="true" then
+		local tag = config:get("/cit/message_tag")
+
+		-- replace variables:
+		tag = tag:gsub("%${serial}", config:get("/dev/serial") )
+		tag = tag:gsub("%${mac}", config:get("/network/macaddress") )
+
+		return tag
+	else
+		return ""
+	end
+end
+
+
 -- Show idle message after a delay
 -- This will have no effect when a longer delay was already set
 local function push_cit_idle_msg( delay_sec )
@@ -68,6 +78,13 @@ local function push_cit_idle_msg( delay_sec )
 	if t > t_idle_msg then
 		t_idle_msg = t
 		evq:push("cit_idle_msg", nil, delay)
+	end
+end
+
+local function set_keepalive( sock )
+	local result, errstr = net.setsockopt(sock, "SO_KEEPALIVE", 1);
+	if not result then
+		logf(LG_WRN, lgid, "setsockopt SO_KEEPALIVE: %s", errstr);
 	end
 end
 
@@ -142,7 +159,7 @@ end
 -- public function for sending data to all clients
 local function send_to_clients(self, data)
 	local nl = translate_NL[config:get("/cit/message_separator")]
-	local s = data .. nl
+	local s = expand_message_tag() .. data .. nl
 	if config:get("/cit/message_encryption") == "base64" then
 		s = base64.encode( s ) .. nl
 	end
@@ -235,6 +252,15 @@ local function authorized_exec( fnc, next_bc_type )
 	end
 end
 
+local function reboot()
+	os.execute("sync")
+	sys.sleep(2) -- give mmc time to write the data
+	os.execute("umount /home/ftp/img/default /home/ftp/img /home/ftp/log")
+	os.execute("umount /home/ftp/fonts")
+	os.execute("umount /mnt/mmc")
+	os.execute("umount /mnt")
+	os.execute("reboot")
+end
 
 local function restore_ftp_defaults()
 	os.execute("cp /etc/passwd.org /etc/passwd");
@@ -246,16 +272,17 @@ end
 
 
 local function restore_defaults()
-	if Upgrade.busy() then
-		logf(LG_WRN,lgid,"Ignored 'factory defaults' because an upgrade is busy")
-	else
-		logf(LG_INF, lgid, "Scanned 'factory defaults' barcode, restoring and rebooting system")
-		os.execute("umount /home/ftp/img/default /home/ftp/img /home/ftp/fonts /home/ftp/log")
-		os.execute("rm -rf /mnt/img /mnt/fonts /mnt/log")
-		os.execute("rm -f /cit200/cit.conf /etc/nowatchdog /mnt/*.conf /mnt/*conf.bkup")
-		restore_ftp_defaults()
-		os.execute("reboot")
-	end
+	logf(LG_INF, lgid, "Scanned 'factory defaults' barcode, restoring and rebooting system")
+
+	os.execute("rm -f /mnt/img/* /mnt/log/* /mnt/fonts/*")
+	os.execute("rm -f /mnt/mmc/img/* /mnt/mmc/log/* /mnt/mmc/fonts/*")
+	os.execute("rm -f /cit200/*.conf /etc/nowatchdog /mnt/*.conf")
+	-- remove possible files from versions prior to 1.6
+	os.execute("rm -f /mnt/*conf.bkup /mnt/mmc/*conf.bkup")
+	restore_ftp_defaults()
+
+	reboot()
+
 end
 
 
@@ -397,12 +424,7 @@ local function handle_barcode_programming(cit, barcode, prefix)
 	logf(LG_DBG,lgid," handle_barcode_programming()")
 	local success = true
 
-	if Upgrade.busy() then
-	
-		logf(LG_WRN, lgid, "Not handling special barcode because an upgrade is in progress")
-		success = false
-		
-	elseif not barcode then
+	if not barcode then
 
 		success = false
 
@@ -449,7 +471,7 @@ local function handle_barcode_programming(cit, barcode, prefix)
 		end
 		next_barcode_type = ""
 
-		if scanner.reinit_2d and not Upgrade.busy() then
+		if scanner.reinit_2d then
 			scanner:reinit_2d()
 		end
 
@@ -487,7 +509,7 @@ local function handle_barcode_programming(cit, barcode, prefix)
 			-- Extra codes for reboot and factory defaults, barcode config settings
 			if par == "00" then
 				logf(LG_INF, lgid, "Scanned 'reboot' barcode, rebooting system");
-				os.execute("reboot")
+				reboot()
 			elseif par == "01" then
 				authorized_exec( restore_defaults, "defaults" )
 			elseif par == "02" then
@@ -534,13 +556,11 @@ local function on_programming_mode_timeout(event, cit)
 	if diff >= tonumber(config:get("/cit/programming_mode_timeout")) and barcode_mode ~= "normal" then
 		logf(LG_INF,lgid,"Exit programming mode because of timeout")
 		end_barcode_programming()
-		if not Upgrade.busy() then
-			if scanner.reinit_2d then
-				scanner:reinit_2d()
-			end
-
-			beeper:beep_error()
+		if scanner.reinit_2d then
+			scanner:reinit_2d()
 		end
+
+		beeper:beep_error()
 	end
 end
 
@@ -554,10 +574,10 @@ end
 
 
 
--- display an image that can be found in one of the image directories
--- image directories are resp.: /mnt/img/ and /cit200/img/ftp/
--- Note that /mnt/img/ is mounted to /dev/mtdblock/6 OR the sd card (/dev/mmcblk0p1)
--- such images can be uploaded.
+-- Display an image that can be found in one of the image directories
+-- Image directories are resp.: /home/ftp/img and /home/ftp/img/default
+-- Note that /home/ftp/img/ is mounted to /mnt/img or /mnt/mmc/img, so uploaded
+-- images are persistent
 -- @param: image   the name of the image. A path is allowed but no ..
 local function display_image( cit, image, x, y )
 	-- prevent use of paths that go 'up' in the tree
@@ -565,10 +585,10 @@ local function display_image( cit, image, x, y )
 		logf(LG_WRN,lgid,"No '..' allowed in path for file '%s'.", image)
 		return false
 	end
-	local fname = "/mnt/img/" .. image
+	local fname = "/home/ftp/img/" .. image
 	local fstat = sys.lstat( fname )
 	if not fstat then
-		fname = "/cit200/img/ftp/" .. image
+		fname = "/home/ftp/img/default/" .. image
 		fstat = sys.lstat( fname )
 	end
 	if not fstat then
@@ -588,14 +608,21 @@ local function display_image( cit, image, x, y )
 end
 
 local function read_mifare_card( cit, msg )
-	local cardnum, keyA, specs = msg:match("^(%x%x%x%x%x%x%x%x),(%x%x%x%x%x%x%x%x%x%x%x%x):(.*)")
+	local cardnum, keyA, specs = msg:match("^(%x+),(%x*):(.*)")
 				
-	if cardnum == nil or specs == nil or #specs==0 then
+	if cardnum == nil or specs == nil or #specs==0 or
+			(#cardnum~=8 and #cardnum~=16) or 
+			(#keyA~=0 and #keyA~=8 and #keyA~=12) then
 		logf(LG_WRN,lgid,"Message format error")
 		return NAK .. "7"
 	else
 		-- first verify that we are reading the right card
-		local info_result, real_cardnum = scanner_rf:query_cardinfo()
+		local info_result, real_cardnum, cardtype, nsect, nblock, blocksize, keysize = scanner_rf:query_cardinfo()
+		if info_result == 0 and cardnum ~= real_cardnum then
+				-- try again (could be a read-error)
+				logf(LG_DBG,lgid,"Incorrect card detected. Re-reading to exclude read-errors")
+				info_result, real_cardnum, cardtype, nsect, nblock, blocksize, keysize = scanner_rf:query_cardinfo()
+		end
 		logf(LG_DBG,lgid,"Real cardnum = %s", cardnum or "nil")
 		if info_result ~= 0 then
 			logf(LG_WRN,lgid,"Could not verify cardnum (error=%d)", info_result)
@@ -606,27 +633,33 @@ local function read_mifare_card( cit, msg )
 		else
 		
 			-- set key:
-			local chkkey_result = scanner_rf:chkkey( keyA )
+			local chkkey_result = scanner_rf:chkkey( string.sub(keyA,0,keysize) )
 			if chkkey_result ~= 0 then
 				return NAK .. "3"
 			end
 			
 			local stopped = scanner_rf:stop_card_detection()
 
+			if cardtype == "MIFARE_ULTRALIGHT" then
+				-- MIFARE ULTRALIGHT requires read ops before read
+				scanner_rf:readblock(0,0,blocksize)
+			end
+
 			-- read data:
 			local data = ""
 			local sep = ""
 			local sepact = sector_data_seperators[config:get("/dev/mifare/sector_data_seperator")]
 			while #specs~=0 do
-				local sector_chr,block,format,rest = specs:match("^(.)([012%-])([BH])(.*)")
-				if sector_chr == nil or sector_chr:byte() < 0x30 or sector_chr:byte() > 0x3f then
-					logf(LG_WRN,lgid,"Message format error")
+				local sector_chr,block_chr,format,rest = specs:match("^(.)(.)([BH])(.*)")
+				local sector = sector_chr:byte()-0x30
+				local block = block_chr:byte()-0x30
+				if sector_chr == nil or sector<0 or sector>=16 or block<0 or block>=32 then
+					logf(LG_WRN,lgid,"Message format error: %s, sector=%d, block=%d", specs, sector, block)
 					if stopped then scanner_rf:start_card_detection() end
 					return NAK .. "4"
 				else
-					local sector = sector_chr:byte() - 0x30
 					specs = rest or ""
-					local pdata, result = scanner_rf:read_block( sector, tonumber(block) )
+					local pdata, result = scanner_rf:readblock( sector, block, blocksize )
 					if pdata == nil then
 						if stopped then scanner_rf:start_card_detection() end
 						return NAK .. "1"
@@ -652,12 +685,12 @@ end
 -- @param msg: <carnum>,<transaction id>:K<keyA>{{{W<sector><block><format><data>}|{K<keyA>}}}+
 local function write_mifare_card( cit, msg )
 
-	local cardnum, transaction_id, cmds = msg:match("^(%x%x%x%x%x%x%x%x),(%x+):(K.+)")
-	if cardnum == nil then
+	local cardnum, transaction_id, cmds = msg:match("^(%x+),(%x+):(.+)")
+	if cardnum == nil or (#cardnum~=8 and #cardnum~=16) then
 		logf(LG_WRN,lgid,"Incorrect message format: \"%s\"", msg)
 		return NAK .. "7"
 	elseif #transaction_id > 8 then
-		logf(LG_WRN,lgid,"Mifare transaction id too big %s", transaction_id)
+		logf(LG_WRN,lgid,"Rfid transaction id too big %s", transaction_id)
 		return NAK .. "7"
 	else
 		-- first validate the format and construct a 'command' list
@@ -666,9 +699,9 @@ local function write_mifare_card( cit, msg )
 		while #cmds ~= 0 do
 			logf(LG_DBG,lgid,"cmds='%s'", cmds)
 			local command = cmds:sub(1,1)
-			if command == "K" then
-				local keyA, rest = cmds:match("(%x%x%x%x%x%x%x%x%x%x%x%x)(.*)")
-				if keyA == nil then
+			if command == "K" then -- keyA, reserve 'k' for keyB
+				local keyA, rest = cmds:match("^K(%x*),?([KW].*)")
+				if keyA == nil or (#keyA~=0 and #keyA~=8 and #keyA~=12) then
 					logf(LG_WRN,lgid,"Format error in '%s'", cmds)
 					return result .. "K4"
 				else
@@ -678,25 +711,31 @@ local function write_mifare_card( cit, msg )
 					key_defined = true
 				end
 			elseif command == "W" then
-				local sector_chr, block, format, rest = cmds:match("^W(.)([012])([BH])(.*)")
-				if sector_chr == nil or sector_chr:byte() < 0x30 or sector_chr:byte() > 0x3f then
+				local sector_chr, block_chr, format, rest = cmds:match("^W(.)(.)([BH])(.*)")
+				local sector = sector_chr:byte() - 0x30
+				local block = block_chr:byte() - 0x30
+				if sector_chr == nil or sector<0 or sector>=16 or block<0 or block>=32 then
 					logf(LG_WRN,lgid,"Format error in '%s'", cmds)
 					return result .. "W4"
 				else
-					local sector = sector_chr:byte() - 0x30
 					local data = ""
 					if format == "B" and #rest >= 16 then
 						data = rest:sub(1,16)
 						cmds = rest:sub(17)
-					elseif format == "H" 
-							and rest:match("^%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x") then
-						data = rest:sub(1,32):gsub("(%x%x)", function (cc) return string.char(tonumber(cc,16)) end )
-						cmds = rest:sub(33)
+					elseif format == "H" then
+						local data_hex, rest = rest:match("^(%x+),?(.*)")
+						if data_hex then
+							data = data_hex:gsub("(%x%x)", function (cc) return string.char(tonumber(cc,16)) end )
+							cmds = rest
+						else
+							logf(LG_WRN,lgid,"format error (no data) in '%s'", cmds)
+							return result .. "W4"
+						end
 					else
 						logf(LG_WRN,lgid,"format error (data) in '%s'", cmds)
 						return result .. "W4"
 					end
-					table.insert(commands,{cmd="W", sector=sector, block=tonumber(block), data=data})
+					table.insert(commands,{cmd="W", sector=sector, block=block, data=data})
 					result = result .. "W0"
 				end
 			elseif command == "I" then
@@ -724,18 +763,19 @@ local function write_mifare_card( cit, msg )
 
 		local stopped = scanner_rf:stop_card_detection()
 		result = ""
+		local retval = ""
 		-- than write the card and write to log.
 		local flog = io.open( "/home/ftp/log/mifare.log", "a" )
 		if flog==nil then
 			logf(LG_WRN, lgid, "Could not open log-file: mifare transaction refused")
-			result = "6"
+			result = NAK .. "6"
 		else
 			-- first verify that the card is not exchanged for another
-			local info_result, real_cardnum = scanner_rf:query_cardinfo()
+			local info_result, real_cardnum, cardtype, nsect, nblock, blocksize, keysize = scanner_rf:query_cardinfo()
 			if info_result == 0 and cardnum ~= real_cardnum then
 				-- try again (could be a read-error)
 				logf(LG_DBG,lgid,"Incorrect card detected. Re-reading to exclude read-errors")
-				info_result, real_cardnum = scanner_rf:query_cardinfo()
+				info_result, real_cardnum, cardtype, nsect, nblock, blocksize, keysize = scanner_rf:query_cardinfo()
 			end
 			logf(LG_DBG,lgid,"Real cardnum = %s", cardnum)
 
@@ -746,10 +786,14 @@ local function write_mifare_card( cit, msg )
 				logf(LG_WRN,lgid,"Cardnum mismatch req=%s, real=%s", cardnum, real_cardnum or "nil")
 				result = "5"
 			else
+				if cardtype == "MIFARE_ULTRALIGHT" then
+					-- MIFARE ULTRALIGHT requires read ops before write
+					scanner_rf:readblock(0,0,blocksize)
+				end
 				for _,cmd in ipairs(commands) do
 					if cmd.cmd == "K" then
 						logf(LG_DBG,lgid,"Executing mifare sub-comand: %s", cmd.cmd)
-						local r = scanner_rf:chkkey( cmd.keyA )
+						local r = scanner_rf:chkkey( string.sub(cmd.keyA, 0, keysize) )
 						if r ~= 0 then
 							logf(LG_WRN,lgid,"Check key error")
 							result = result .. "K2"
@@ -758,8 +802,9 @@ local function write_mifare_card( cit, msg )
 							result = result .. "K0"
 						end
 					elseif cmd.cmd == "W" then
-						logf(LG_DBG,lgid,"Executing mifare sub-comand: %s on sector %d block %d, with data '%s'", cmd.cmd, cmd.sector, cmd.block, cmd.data)
-						local r = scanner_rf:write_block( cmd.sector, cmd.block, cmd.data )
+						local wdata = string.sub(cmd.data, 0, blocksize)
+						logf(LG_DBG,lgid,"Executing mifare sub-comand: %s on sector %d block %d, with data '%s'", cmd.cmd, cmd.sector, cmd.block, wdata)
+						local r = scanner_rf:writeblock( cmd.sector, cmd.block, wdata )
 						if r ~= 0 then
 							result = result .. "W3"
 							break
@@ -769,40 +814,39 @@ local function write_mifare_card( cit, msg )
 					end
 				end
 			end
-		end
 
-		local retval
-		local logstring
-		if result:match("0$") then
-			logstring = transaction_id .. ":0\n"
-			retval = ACK
-		else
-			logstring = transaction_id .. ":" .. result .. "\n"
-			retval = NAK .. result
-		end
-		flog:write( logstring )
-		flog:close()
-			
-		-- verify whether the transaction was really written to the log-file:
-		local f = io.open( "/home/ftp/log/mifare.log", "r" )
-		if f then
-			local t = f:read("*all")
-			f:close()
-			if #t > 2000 then
-				-- send a log-rotate request
-				logf(LG_INF,lgid,"Big log-file detected")
-				evq:push("cit_send_to_clients", "W8", 1 )
-			end
-			local last = t:sub( -#logstring )
-			if last ~= logstring then
-				logf(LG_WRN,lgid,"Transaction not logged: '%s'", logstring)
-				retval = NAK .. result .. "6"
+			local logstring
+			if result:match("0$") then
+				logstring = transaction_id .. ":0\n"
+				retval = ACK
 			else
-				logf(LG_DBG,lgid,"Transaction logging '%s':  verified", logstring)
+				logstring = transaction_id .. ":" .. result .. "\n"
+				retval = NAK .. result
 			end
-		else
-			logf(LG_WRN,lgid,"Could not verify transaction logging of: '%s'", logstring)
-			retval = NAK .. result .. "6"
+			flog:write( logstring )
+			flog:close()
+			
+			-- verify whether the transaction was really written to the log-file:
+			local f = io.open( "/home/ftp/log/mifare.log", "r" )
+			if f then
+				local t = f:read("*all")
+				f:close()
+				if #t > 2000 then
+					-- send a log-rotate request
+					logf(LG_INF,lgid,"Big log-file detected")
+					evq:push("cit_send_to_clients", "W8", 1 )
+				end
+				local last = t:sub( -#logstring )
+				if last ~= logstring then
+					logf(LG_WRN,lgid,"Transaction not logged: '%s'", logstring)
+					retval = NAK .. result .. "6"
+				else
+					logf(LG_DBG,lgid,"Transaction logging '%s':  verified", logstring)
+				end
+			else
+				logf(LG_WRN,lgid,"Could not verify transaction logging of: '%s'", logstring)
+				retval = NAK .. result .. "6"
+			end
 		end
 
 		if stopped then
@@ -939,11 +983,7 @@ local command_list = {
 		nparam = 0,
 		fn = function(cit)
 			logf(LG_WRN, lgid, "Reset not implemented")
-			if Upgrade.busy() then
-				logf(LG_INF,lgid,"reboot not executed because an upgrade is in progress")
-			else
-				os.execute("reboot")
-			end
+			reboot()
 		end
 	},
 
@@ -972,10 +1012,6 @@ local command_list = {
 		name = "sleep/wakeup barcode scanner",
 		nparam = 1,
 		fn = function(cit, onoff)
-			if Upgrade.busy() then
-				logf(LG_WRN,lgid,"Ignored sleep/wakup because an opgrade is in progress")
-				return
-			end
 			logf(LG_INF, lgid, "Putting scanner to %s", (onoff==0x30 and "sleep" or "wakeup") )
 			if onoff == 0x30 and not cit.power_saving_on then
 				local itf = config:get("/network/interface")
@@ -1389,48 +1425,44 @@ local function handle_bytes(cit, bytes)
 
 	local answer=""
 
-	if Upgrade.busy() then
-		logf(LG_INF,lgid, "Command ignored because and upgrade is in progress")
+	message_received = true
+	local encryption = config:get("/cit/message_encryption")
+	local nl = translate_NL[config:get("/cit/message_separator")]
+			
+	if encryption == "base64" then
+		bytes_remaining = bytes_remaining .. bytes
+		logf(LG_DBG,lgid, "Decoding (base64): \"%s\"", bytes_remaining)
+		command = ""
+		local n=0
+		local e=0
+		while n ~= nil do
+			n,e = bytes_remaining:find(nl)
+			logf(LG_DBG,lgid, "Found n=%d, e=%d", n or "-1", e or -1)
+			if n then
+				command = command .. base64.decode( bytes_remaining:sub(1,n-1) )
+				logf(LG_DBG,lgid, "command = \"%s\"", command)
+				bytes_remaining = bytes_remaining:sub(e+1)
+				logf(LG_DBG,lgid, "bytes_remaining = \"%s\"", bytes_remaining)
+			end
+		end
 	else
-		message_received = true
-		local encryption = config:get("/cit/message_encryption")
-		local nl = translate_NL[config:get("/cit/message_separator")]
-				
-		if encryption == "base64" then
-			bytes_remaining = bytes_remaining .. bytes
-			logf(LG_DBG,lgid, "Decoding (base64): \"%s\"", bytes_remaining)
-			command = ""
-			local n=0
-			local e=0
-			while n ~= nil do
-				n,e = bytes_remaining:find(nl)
-				logf(LG_DBG,lgid, "Found n=%d, e=%d", n or "-1", e or -1)
-				if n then
-					command = command .. base64.decode( bytes_remaining:sub(1,n-1) )
-					logf(LG_DBG,lgid, "command = \"%s\"", command)
-					bytes_remaining = bytes_remaining:sub(e+1)
-					logf(LG_DBG,lgid, "bytes_remaining = \"%s\"", bytes_remaining)
-				end
-			end
-		else
-			command = bytes
-			bytes_remaining = ""
-		end
-		
-		logf(LG_DBG,lgid,"Received: %s", command)
-		for i, c in ipairs( { command:byte(1, #command) } ) do
-			local current_answer = handle_byte(cit, c)
-			if current_answer and #current_answer>0 then
-				logf( LG_DBG, lgid, "Current answer '%s'", current_answer )
-				if encryption == "base64" then
-					current_answer = base64.encode(current_answer .. nl)
-				end
-				answer = answer .. current_answer .. nl
-			end
-		end
-	
-		push_cit_idle_msg( )
+		command = bytes
+		bytes_remaining = ""
 	end
+	
+	logf(LG_DBG,lgid,"Received: %s", command)
+	for i, c in ipairs( { command:byte(1, #command) } ) do
+		local current_answer = handle_byte(cit, c)
+		if current_answer and #current_answer>0 then
+			logf( LG_DBG, lgid, "Current answer '%s'", current_answer )
+			if encryption == "base64" then
+				current_answer = base64.encode(current_answer .. nl)
+			end
+			answer = answer .. current_answer .. nl
+		end
+	end
+
+	push_cit_idle_msg( )
 	
 	return answer
 end
@@ -1454,8 +1486,9 @@ local function on_udp(event, cit)
 	if command and #command > 0 then
 		local answer = handle_bytes(cit, command)
 		if answer and #answer>0 then
-			logf( LG_DBG, lgid, "Sending back (UDP) '%s'", answer )
-			if net.sendto( cit.sock_udp, answer, destaddr, destport ) ~= #answer then
+			local s = expand_message_tag() .. answer
+			logf( LG_DBG, lgid, "Sending back (UDP) '%s'", s )
+			if net.sendto( cit.sock_udp, s, destaddr, destport ) ~= #s then
 				logf( LG_WRN, lgid, "Error sending back data in response to an ESC code" )
 			end
 		end
@@ -1479,8 +1512,9 @@ local function on_tcp_client(event, client)
 	if command and #command > 0 then
 		local answer = handle_bytes(cit, command)
 		if answer and #answer > 0 then
-			logf( LG_DBG, lgid, "Sending back (TCP) '%s'", answer )
-			if net.send(fd, answer) ~= #answer then
+			local s = expand_message_tag() .. answer
+			logf( LG_DBG, lgid, "Sending back (TCP) '%s'", s )
+			if net.send(fd, s) ~= #s then
 				logf( LG_WRN, lgid, "Error sending back data in response to an ESC code" )
 			end
 		end
@@ -1545,6 +1579,8 @@ local function on_tcp_server(event, cit)
 		logf(LG_WRN, lgid, "Error accepting client: %s", err)
 		return
 	end
+
+	set_keepalive( sock )
 
 	local client = client_new(cit, sock, addr, port)
 
@@ -1615,7 +1651,7 @@ end
 
 
 -- Enable TCP keep-alive option.
--- All accepted sockets will inherit this option.
+-- Watch out: linux sockets won't inherit this option!!!
 -- this is required for two reasons:
 --   1. prevent routers of closing inactive connection
 --   2. ability to check the health of the connection without the
@@ -1624,15 +1660,20 @@ end
 local function enable_keepalive_config( net, sock )
 	if config:get("/network/tcp_keepalive/use_keepalive") == "true" then
 
+--TODO: use setsockopt instead of systemwide proc settings
+--TCP_KEEPCNT
+--    The maximum number of keepalive probes TCP should send before dropping the connection. This option should not be used in code intended to be portable. 
+--TCP_KEEPIDLE
+--    The time (in seconds) the connection needs to remain idle before TCP starts sending keepalive probes, if the socket option SO_KEEPALIVE has been set on this socket. This option should not be used in code intended to be portable. 
+--TCP_KEEPINTVL
+--    The time (in seconds) between individual keepalive probes. This option should not be used in code intended to be portable. 
+
 		-- workaround for missing SOL_TCP defintions:
 		os.execute( "echo " .. config:get("/network/tcp_keepalive/time") .. " > /proc/sys/net/ipv4/tcp_keepalive_time" )
 		os.execute( "echo " .. config:get("/network/tcp_keepalive/intvl") .. "  > /proc/sys/net/ipv4/tcp_keepalive_intvl" )
 		os.execute( "echo " .. config:get("/network/tcp_keepalive/probes") .. "  > /proc/sys/net/ipv4/tcp_keepalive_probes" )
 
-		local result, errstr = net.setsockopt(sock, "SO_KEEPALIVE", 1);
-		if not result then
-			logf(LG_WRN, lgid, "setsockopt SO_KEEPALIVE: %s", errstr);
-		end
+		set_keepalive( sock )
 	end
 end
 
@@ -1741,7 +1782,7 @@ local function init_cit_mode()
 			-- Open tcp listen port mode is "server" or "TCP server"
 			local sock = net.socket("tcp")
 			
-			enable_keepalive_config( net, sock )
+			--enable_keepalive_config( net, sock )
 			
 			--net.setsockopt( sock , "TCP_NODELAY", 1 )
 			
@@ -1799,7 +1840,7 @@ local function on_draw_idle_msg(event, cit)
 		if one_time_timeout_msg ==  nil or 
 				event.data and  event.data.one_time_timeout_id == one_time_timeout_id then
 				
-			if t_idle_msg - 1 < sys.hirestime() and not Upgrade.busy() then
+			if t_idle_msg - 1 < sys.hirestime() then
 				cit:draw_idle_msg() 
 			end
 		else
@@ -2226,7 +2267,7 @@ local function on_change_ftp_auth()
 			on_change_ftp_username()
 		end
 	end
-	os_execute( "killall vsftpd; vsftpd &" )
+	os_execute( "while killall vsftpd; do sleep 0.1; done; vsftpd &" )
 end
 
 
@@ -2292,26 +2333,26 @@ function new()
 
 	-- Check if there are any fonts on the sd card we can use
 	-- there are two directories on the sd card: 
-	-- /mnt          legacy, the fontfile is burned on the sd-card before it was inserted into the nquire
-	-- /mnt/fonts    this is mounted to /home/ftp, font upload by ftp is possible (overrules /mnt)
+	-- /mnt/mmc/          legacy, the fontfile is burned on the sd-card before it was inserted into the nquire
+	-- /mnt/mmc/fonts    this is mounted to /home/ftp, font upload by ftp is possible (overrules font file in /mnt/mmc)
 
-	local files = sys.readdir("/mnt")
+	local files = sys.readdir("/mnt/mmc")
 	if files then
 		for _, file in ipairs(files) do
 			local tmp = file:match(".+\.ttf$")
 			if tmp then
-				font = "/mnt/" .. tmp
+				font = "/mnt/mmc/" .. tmp
 				break
 			end
 		end
 	end
 	
-	local files = sys.readdir("/mnt/fonts")
+	local files = sys.readdir("/home/ftp/fonts")
 	if files then
 		for _, file in ipairs(files) do
 			local tmp = file:match(".+\.ttf$")
 			if tmp then
-				font = "/mnt/fonts/" .. tmp
+				font = "/home/ftp/fonts/" .. tmp
 				break
 			end
 		end
@@ -2337,48 +2378,10 @@ function new()
 
 	evq:register("programming_mode_timeout", on_programming_mode_timeout, cit)
 	
-	-- configure ftp in case the cit.conf is overwritten during startup (/mnt/cit.conf)
+	-- configure ftp in case the cit.conf is overwritten during startup (/udisk/cit.conf)
 	on_change_ftp_auth()
 	
 	config:add_watch("/dev/auth", "set", on_change_ftp_auth)
-
-
-	evq:register( "upgrade", 	
-		function( event, cit )
-			if event.data.msg == "start" then
-				if scanner then scanner:close() end
-				if gpio then gpio:disable() end
-				if scanner_hid then scanner_hid:close() end
-				if scanner_rf then scanner_rf:disable() end
-				os.execute("cp -f /cit200/cit.conf /mnt/cit.conf.bkup")
-
-				display:set_font( nil, 18, nil )
-				display:show_message("Upgrading", "firmware", "", "DON'T", "DISCONNECT", "THE POWER")
-				display:update()
-
-			elseif event.data.msg == "progress" then
-				
-				display:set_font( nil, 18, nil )
-				display:show_message("Upgrading", "firmware", "", "DON'T", "DISCONNECT", "THE POWER")
-				display:set_font( nil, 12, nil )
-				display:gotoxy(75, 48)
-				display:draw_text(event.data.comment)
-
-			elseif event.data.msg == "ready" then
-			
-				-- Watch out: do not do anything that can change a filesystem
-				display:set_font( nil, 18, nil )
-				display:show_message("", "Upgrade ok", "", "rebooting")
-
-			elseif event.data.msg == "error" then
-
-				display:show_message("Upgrade failed","","try downloading","log/upgrade_fail.log","log/upgrade_fail.dmesg", "", "then reboot or try again")
-				os.execute( "/mnt/cit.conf.bkup" )
-			end
-		end, scanner )
-
-
-
 
 	logf(LG_INF, lgid, "Using font file %q", font)
 	

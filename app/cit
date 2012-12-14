@@ -1,0 +1,74 @@
+#!/bin/sh
+
+if test -z "$1" -o "$1" = "-h"; then
+	echo "usage: cit start|stop"
+	echo
+	echo "This starts or stops the cit-application."
+	echo "Stop will only exit when then application is completely stopped"
+	exit
+fi
+
+case $1 in
+	"start")
+		# if everything else fails:
+		ifconfig eth0 192.168.1.200
+
+		# nquire app specific mounting:
+
+		# mount points
+		mkdir -p /home/ftp/img /home/ftp/log
+
+		# skip if something is still/already mounted:
+		if test -z "`df /home/ftp/img | grep tmpfs`"; then
+			echo "WARNING: /home/ftp/img already mounted: are you debugging?"
+		else
+
+			# mount depends on availablity of an mmc card:
+			if test -z "`df /mnt/mmc | grep mmcblk`"; then
+				# no mmc card, use /dev/mtdblock/6
+
+				mkdir -p /mnt/img /mnt/log
+				chown ftp:ftp /mnt/img /mnt/log
+				chmod 777 /mnt/img /mnt/log
+
+				mount --bind /mnt/img /home/ftp/img
+				mount --bind /mnt/log /home/ftp/log
+			else
+				# mmc card detected
+
+				# remove possibly superflous directories:
+				rm -rf /mnt/img /mnt/log 
+
+				mkdir -p /mnt/mmc/img /mnt/mmc/log /mnt/mmc/fonts /home/ftp/fonts
+
+				mount --bind /mnt/mmc/img /home/ftp/img
+				mount --bind /mnt/mmc/log /home/ftp/log
+				mount --bind /mnt/mmc/fonts /home/ftp/fonts
+			fi
+
+			# make default pictures available (read-only):
+			chmod 644 /cit200/img/ftp/*
+			chmod 755 /cit200/img/ftp
+			mkdir -p /home/ftp/img/default
+			mount --bind /cit200/img/ftp /home/ftp/img/default
+		fi
+			
+		cd /cit200
+		lua main.lua &
+	;;
+
+	"stop")
+		while killall lua 2> /dev/null; do sleep .5; done
+		# sync data (eg the config or log file) to disk/mmc
+		sync
+		# give mmc time to write the data (for cheap memory cards)
+		sleep 2
+		# unmount nquire app specific mounts
+		umount /home/ftp/img/default /home/ftp/img /home/ftp/log /home/ftp/fonts
+	;;
+
+	"restart")
+		/cit200/cit stop
+		/cit200/cit stop
+	;;	
+esac

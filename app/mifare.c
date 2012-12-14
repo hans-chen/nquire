@@ -14,7 +14,6 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
-//#define DEBUG
 #include "misc.h"
 
 typedef struct {
@@ -32,16 +31,16 @@ static int mifare_error( int nlrf_error )
 	switch( nlrf_error )
 	{
 		case NLRF_OK: return 0;
-		case -NLRF_ERR_NODEV: return -1;
-    	case -NLRF_ERR_NOCARD: return -2;
-    	case -NLRF_ERR_WRONGKEY: return -3;
-    	case -NLRF_ERR_CARDORKEY: return -4;
-    	case -NLRF_ERR_IGNORE_ME: return -5;
-    	case -NLRF_ERR_INVALID: return -6;
-    	case -NLRF_ERR_SETTTY: return -7;
-    	case -NLRF_ERR_BACKUPTTY: return -8;
-    	case -NLRF_ERR_RESTORETTY: return -9;
-    	case -NLRF_ERR_UNKNOWN: return -10;
+		case NLRF_ERR_NODEV: return -1;
+    	case NLRF_ERR_NOCARD: return -2;
+    	case NLRF_ERR_WRONGKEY: return -3;
+    	case NLRF_ERR_CARDORKEY: return -4;
+    	case NLRF_ERR_IGNORE_ME: return -5;
+    	case NLRF_ERR_INVALID: return -6;
+    	case NLRF_ERR_SETTTY: return -7;
+    	case NLRF_ERR_BACKUPTTY: return -8;
+    	case NLRF_ERR_RESTORETTY: return -9;
+    	case NLRF_ERR_UNKNOWN: return -10;
     	default: return -100; // eg memory alloc error
     }
 }
@@ -51,21 +50,31 @@ static const char* mifare_error_str( int nlrf_error )
 	switch( nlrf_error )
 	{
 		case NLRF_OK: return "No error";
-		case -NLRF_ERR_NODEV: return "Mifare HW not found";
-    	case -NLRF_ERR_NOCARD: return "Mifare card not available";
-    	case -NLRF_ERR_WRONGKEY: return "Incorrect key accessing mifare card";
-    	case -NLRF_ERR_CARDORKEY: return "Card or key error";
-    	case -NLRF_ERR_IGNORE_ME: return "Ignore";
-    	case -NLRF_ERR_INVALID: return "Invalid parameter using mifare";
-    	case -NLRF_ERR_SETTTY: return "Incorrect tty during opening mifare";
-    	case -NLRF_ERR_BACKUPTTY: return "Backup tty failed during opening mifare";
-    	case -NLRF_ERR_RESTORETTY: return "Restore tty failed during close mifare";
-    	case -NLRF_ERR_UNKNOWN: return "Mifare error (not specific)";
+		case NLRF_ERR_NODEV: return "Mifare HW not found";
+    	case NLRF_ERR_NOCARD: return "Mifare card not available";
+    	case NLRF_ERR_WRONGKEY: return "Incorrect key accessing mifare card";
+    	case NLRF_ERR_CARDORKEY: return "Card or key error";
+    	case NLRF_ERR_IGNORE_ME: return "Ignore";
+    	case NLRF_ERR_INVALID: return "Invalid parameter using mifare";
+    	case NLRF_ERR_SETTTY: return "Incorrect tty during opening mifare";
+    	case NLRF_ERR_BACKUPTTY: return "Backup tty failed during opening mifare";
+    	case NLRF_ERR_RESTORETTY: return "Restore tty failed during close mifare";
+    	case NLRF_ERR_UNKNOWN: return "Mifare error (not specific)";
     	default: return "Unknown error from mifare"; // eg memory alloc error
     }
 }
 
-
+static const char* cardtype_str( int cardtype )
+{
+	switch( cardtype )
+	{
+		case MIFARE_S50: return "MIFARE_S50";
+		case MIFARE_ULTRALIGHT: return "MIFARE_ULTRALIGHT";
+		case AT88RF020: return "AT88RF020";
+		case ICODE_2: return "ICODE_2";
+		default: return "UNDEFINED";
+	}
+}
 
 static int l_new(lua_State *L)
 {
@@ -140,7 +149,30 @@ static int l_free(lua_State *L)
 	return(0); 
 }
 
-// @return result, nsector, nblock, blocksize, cardnum
+static int lua_pushcardinfo( lua_State *L, const struct nlrf_cardinfo* info )
+{
+#ifdef TRACEON
+	TRACE_NB("#cardnum=%d, cardnum=%02x%02x%02x%02x",info->idlen, info->cardnum[0], info->cardnum[1], info->cardnum[2], info->cardnum[3]);
+	if( info->cardtype == ICODE_2 )
+	{
+		TRACE_PRINTF("%02x%02x%02x%02x",info->cardnum[4], info->cardnum[5], info->cardnum[6], info->cardnum[7]);
+	}
+	TRACE_PRINTF(", cardtype=%d, nsector=%d, nblock=%d, blocksize=%d, keysize=%d\n",
+			info->cardtype, info->nsector, info->nblock, info->blocksize, info->keysize);
+#endif
+
+	lua_pushlstring(L, (char*)(info->cardnum), info->idlen);
+	lua_pushstring(L, cardtype_str(info->cardtype) );
+	lua_pushnumber(L, info->nsector);
+	lua_pushnumber(L, info->nblock);
+	lua_pushnumber(L, info->blocksize);
+	lua_pushnumber(L, info->keysize);
+
+	return 6;
+}
+
+
+// @return result[, cardnum, cardtype, nsector, nblock, blocksize, keysize]
 static int l_querycardinfo(lua_State *L)
 {
 	Mifare *dd = lua_touserdata(L, 1);
@@ -156,11 +188,7 @@ static int l_querycardinfo(lua_State *L)
 	switch( result )
 	{
 	case 0:
-		lua_pushnumber(L, info.nsector);
-		lua_pushnumber(L, info.nblock);
-		lua_pushnumber(L, info.blocksize);
-		lua_pushlstring(L, info.cardnum, 4);
-		return 5;
+		return 1+lua_pushcardinfo(L, &info);
 	default:
 		return 1;
 	}
@@ -173,11 +201,9 @@ static int l_querycardinfo(lua_State *L)
 int l_send_querycardinfo(lua_State *L)
 {
 	Mifare *dd = lua_touserdata(L, 1);
-	TRACE(" fd = %d", dd->fd);
-
 	if( dd->fd == 0 ) BARF(L,"Interface not opened");
 
-	TRACE("before: nlrf_send_querycardinfo");
+	TRACE("before: nlrf_send_querycardinfo(fd=%d)", dd->fd);
 	int result = nlrf_send_querycardinfo(dd->fd);
 	TRACE("after: nlrf_sendquerycardinfo, result=%d", result);
 
@@ -185,9 +211,10 @@ int l_send_querycardinfo(lua_State *L)
 	return 1;
 }
 
+
 // async querycardinfo, use send_querycardinfo to innitiate the request
 // A file event wil happen when there is data, or when 3 seconds have passed
-// @return result[, nsector, nblock, blocksize, cardnum]
+// @return result[, cardnum, cardtype, nsector, nblock, blocksize, keysize]
 int l_fetch_querycardinfo(lua_State *L)
 {
 	Mifare *dd = lua_touserdata(L, 1);
@@ -204,16 +231,7 @@ int l_fetch_querycardinfo(lua_State *L)
 	switch( result )
 	{
 	case 0:
-		TRACE("nsector=%d, nblock=%d, blocksize=%d, cardnum=%02x%02x%02x%02x",
-				info.nsector, info.nblock, info.blocksize, 
-				info.cardnum[0], info.cardnum[1], info.cardnum[2], info.cardnum[3]);
-
-		lua_pushnumber(L, info.nsector);
-		lua_pushnumber(L, info.nblock);
-		lua_pushnumber(L, info.blocksize);
-		lua_pushlstring(L, info.cardnum, 4);
-
-		return 5;
+		return 1+lua_pushcardinfo(L, &info);
 	default:
 		return 1;
 	}
@@ -223,21 +241,22 @@ int l_fetch_querycardinfo(lua_State *L)
 // @param L[2] the access key to the mifare card
 static int l_chkkey(lua_State *L)
 {
-	//TRACE_ON();
-
 	Mifare *dd = lua_touserdata(L, 1);
 	unsigned int length=0U;
-	const char *key = lua_tolstring(L, 2, &length);
+	unsigned char key[16];
+	const char *pkey = lua_tolstring(L, 2, &length);
+	memset(key,0x3c, sizeof(key));
+	if( pkey )
+		memcpy( key, pkey, length );
+	
 	TRACE("before: nlrf_chkkey( key='%02x%02x %02x%02x %02x%02x %02x%02x %02x%02x %02x%02x', length=%d )", 
 			key[0],key[1],key[2],key[3], key[4],key[5],
 			key[6],key[7], key[8],key[9],key[10],key[11], 
 			length);
-	int result = nlrf_chkkey(dd->fd, (const unsigned char*)key, length);
+	int result = nlrf_chkkey(dd->fd, key, length);
 	TRACE("after: nlrf_chkkey, result = %d", result);
 
 	lua_pushinteger(L, mifare_error(result));
-
-	//TRACE_OFF();
 
 	return 1;
 }
@@ -268,10 +287,19 @@ static int l_readblock(lua_State *L)
 	else
 	{
 		memset(data,0,size);
+		int i=3;
+		int result;
+		// sometimes a NLRF_ERR_NOCARD error happens without a valid reason
+		// therefore we retry 3 times in case of NLRF_ERR_NOCARD
 		TRACE("before: nlrf_readblock( fd=%d, sector=%d, block=%d, size=%d )", dd->fd, sector, block, size);
-		int result = nlrf_readblock(dd->fd, sector, block, data, size);
+		do
+		{
+			result = nlrf_readblock(dd->fd, sector, block, data, size);
+			if( result == NLRF_ERR_NOCARD || result == NLRF_ERR_CARDORKEY )
+				TRACE("NLRF_ERR_NOCARD: Retry");
+		}
+		while (--i > 0 && (result==NLRF_ERR_NOCARD || result == NLRF_ERR_CARDORKEY));
 		TRACE("after: nlrf_readblock, result=%d", result);
-
 		if (result == 0)
 			lua_pushlstring( L, (const char*)data, size );
 		else
@@ -286,13 +314,14 @@ static int l_readblock(lua_State *L)
 	}
 }
 
+// Write a block to an rfid card
+// Note: handling mifare-ultrlight requires reading sector 0 block 0 first!
 // @param L[2] - sectornr
 // @param L[3] - blocknr
 // @param L[4] - data
 // return result, result_str
 static int l_writeblock(lua_State *L)
 {
-	TRACE_ON();
 	Mifare *dd = lua_touserdata(L, 1);
 
 	if( dd->fd == 0 )
@@ -307,14 +336,25 @@ static int l_writeblock(lua_State *L)
 	unsigned int size=0U;
 	const char *data = lua_tolstring(L, 4, &size);
 
+	int result;
+
+
 	TRACE("before: nlrf_writeblock( fd=%d, sector=%d, block=%d, size=%d )", dd->fd, sector, block, size);
-	int result = nlrf_writeblock(dd->fd, sector, block, (unsigned char*) data, size);
+	int i=3;
+	// sometimes a NLRF_ERR_NOCARD error happens without a valid reason
+	// therefore we retry 3 times in case of NLRF_ERR_NOCARD
+	do
+	{
+		result = nlrf_writeblock(dd->fd, sector, block, (unsigned char*) data, size);
+		if( result == NLRF_ERR_NOCARD )
+			TRACE("NLRF_ERR_NOCARD: Retry");
+	}
+	while (--i > 0 && result==NLRF_ERR_NOCARD);
 	TRACE("after: nlrf_writeblock, result=%d", result);
 
 	lua_pushinteger(L, mifare_error(result));
 	lua_pushstring(L, mifare_error_str(result));
 	
-	TRACE_OFF();
 	return 2;
 }
 
@@ -323,13 +363,17 @@ static int l_get_modeltype(lua_State *L)
 	Mifare *dd = lua_touserdata(L, 1);
 
 	if( dd->fd == 0 ) BARF(L,"Interface not opened");
-
+	
+	TRACE("before: nlrf_get_modeltype(fd=%d)",dd->fd);
 	switch(nlrf_get_modeltype(dd->fd))
 	{
 	case NLRF_MODEL_V1: lua_pushinteger( L, 1 ); break;
 	case NLRF_MODEL_V2: lua_pushinteger( L, 2 ); break;
+	case NLRF_MODEL_V3: lua_pushinteger( L, 3 ); break;
+	case NLRF_ERR_NODEV: lua_pushinteger( L, -2 ); break;
 	default: lua_pushinteger( L, -1 ); break;
 	}
+	TRACE("after: nlrf_get_modeltype()");
 	return 1;
 }
 

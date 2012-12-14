@@ -31,7 +31,6 @@
 
 #define BARF(L, msg...) do { lua_pushnil(L); lua_pushfstring(L, msg); return 2; } while(0)
 
-//#define DEBUG
 #include "misc.h"
 
 typedef struct {
@@ -439,6 +438,8 @@ static int l_draw_text(lua_State *L)
 /* l_set_font( L )
  * @param L[2]	font_name, this is the filename of the fontfile. eg "arial.ttf"
  * @param l[3]	font_size in points
+ * return true          := success
+ *        nil, errstr   := error
  */
 static int l_set_font(lua_State *L)
 {
@@ -469,6 +470,7 @@ static int l_set_font(lua_State *L)
 	dd->font_size = font_size;
 	dd->font_loaded = 1;
 
+	lua_pushboolean(L, 1);
 	return 1;
 }
 
@@ -494,7 +496,7 @@ static int l_set_font_size(lua_State *L)
 
 	dd->font_size = font_size;
 
-	return 1;
+	return 0;
 }
 
 static int l_draw_video(lua_State *L)      { BARF(L, "Not implemented"); }
@@ -612,7 +614,7 @@ static int l_update(lua_State *L)
 	
 	
 	lua_pushboolean(L, 1);
-	return 0;
+	return 1;
 }
 
 // Draw an image.
@@ -626,8 +628,6 @@ static int l_update(lua_State *L)
 // return image_index, error
 static int l_draw_image(lua_State *L)
 {
-	//TRACE_ON();
-
 	struct dpydrv *dd = lua_touserdata(L, 1);
 	const char *fname = luaL_optstring(L, 2, "");
 	lua_Number img_x = luaL_optnumber(L, 3, 0);
@@ -733,7 +733,7 @@ static int l_draw_image(lua_State *L)
 			{   int j;
 				for(j=0; j<cmap->ColorCount; j++) 
 				{
-					#ifdef DEBUG
+					#ifdef TRACEON
 						if( gif_colormap[j].Red != 0 || gif_colormap[j].Green != 0 || gif_colormap[j].Blue != 0 )
 							TRACE("color[%d]=%d,%d,%d", j, gif_colormap[j].Red, gif_colormap[j].Green, gif_colormap[j].Blue );
 					#endif
@@ -774,7 +774,7 @@ TRACE();
 				Uint8 *pfrom = savedimage->RasterBits + (desc->Width * j);
 				Uint8 *pto = surf->pixels + (surf->pitch * (j + desc->Top)) + desc->Left;
 				memcpy(pto, pfrom, cw);
-				#ifdef NODEF //DEBUG
+				#ifdef NODEF //TRACE_ON
 				printf("pixels: ");
 				int k;
 				for(k=0; k < gif->SWidth; k++)
@@ -829,8 +829,6 @@ TRACE();
 	TRACE("DGifCloseFile");
 	DGifCloseFile(gif);
 
-	//TRACE_OFF();
-
 	dd->t_dirty = hirestime();
 
 	// and return the image index:
@@ -844,7 +842,6 @@ TRACE();
  */
 static int l_invert(lua_State *L)
 {
-	//TRACE_ON();
 	struct dpydrv *dd = lua_touserdata(L, 1);
 
 	int layer_nr = (int)luaL_optnumber(L, 2, 0);
@@ -882,7 +879,6 @@ static int l_invert(lua_State *L)
 			dd->t_dirty = hirestime();
 		}
 	}
-	//TRACE_OFF();
 	return 0;
 }
 

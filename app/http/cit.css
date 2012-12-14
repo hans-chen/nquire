@@ -1,0 +1,147 @@
+* { font-family: Arial, sans-serif; }
+a img { border: 0; }
+a { text-decoration: none; color: #004366; }
+body { margin: 0px; padding: 0px; }
+form { display: inline; }
+input { border: solid 1px #aaaaaa; }
+select { border: solid 1px #aaaaaa; }
+
+ul { 
+	list-style: none; 
+	padding-left: 0px;
+	margin-left: 0px;
+	margin-top: 50px;
+}
+
+li {
+	font-weight: bold;
+	margin-top: 10px;
+	font-size: 1.1em;
+	margin-left: 10px;
+}
+
+fieldset {
+	width: 70%;
+	padding: 15px;
+	margin-top: 40px;
+	margin-left: auto;
+	margin-right: auto;
+	margin-bottom: 20px;
+	border: solid 2px #004366;
+	-moz-border-radius: 8px;
+}
+
+.log {
+	border-collapse: collapse;
+	margin: 20px;
+}
+
+.log-dmp {
+	vertical-align: top;
+	font-family: mono;
+	font-size: 0.8em;
+	color: grey;
+	border: solid 1px #dddddd;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+.log-dbg {
+	vertical-align: top;
+	font-family: mono;
+	font-size: 0.8em;
+	color: grey;
+	border: solid 1px #dddddd;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+.log-inf {
+	vertical-align: top;
+	font-family: mono;
+	font-size: 0.8em;
+	color: black;
+	border: solid 1px #dddddd;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+.log-wrn {
+	vertical-align: top;
+	font-family: mono;
+	font-size: 0.8em;
+	color: red;
+	border: solid 1px #dddddd;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+
+legend {
+	background-color: #004336;
+	color: white;
+	font-weight: bold;
+	-moz-border-radius: 3px;
+}
+
+.error { background: #ff8888; border: solid 1px #aaaaaa; padding: 5px; }
+.label { 
+	white-space: nowrap; 
+	color: #004366; 
+	margin-right: 30px; 
+	font-weight: bold;
+}
+.node { }
+.node-error { border: solid 2px red; }
+.submit { margin: 10px; border: solid 1px outset; }
+.title { background: #eeeeff; padding: 15px; font-size: 1.5em; font-weight: bold; }
+
+.top { 
+	width: 100%;
+	height: 70px;
+	margin: 0px;
+	padding: 0px;
+	background-image: url(top-gradient.jpg); 
+	border-collapse: collapse;
+}
+
+.top-left {
+	background-image: url(top-left.jpg); 
+	background-repeat: no-repeat;
+	width: 608px;
+}
+
+.top-right {
+	background-image: url(top-right.jpg); 
+	background-repeat: no-repeat;
+	background-position: top right;
+}
+
+.bottom { 
+	width: 100%;
+	height: 70px;
+	margin: 0px;
+	padding: 0px;
+	background-image: url(bottom-gradient.jpg); 
+	border-collapse: collapse;
+}
+
+.bottom-left {
+	background-image: url(bottom-left.jpg); 
+	background-repeat: no-repeat;
+	background-position: top left;
+}
+
+.progressbar-bg {
+	border: solid 2px #004366;
+	padding: 2px;
+}
+
+.progressbar-fg {
+	color: orange;
+	background-color: orange;
+}
+
+<!--
+#dek {POSITION:absolute;VISIBILITY:hidden;Z-INDEX:200;}
+//-->
+

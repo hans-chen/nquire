@@ -24,7 +24,7 @@ logf_init(LG_INF, true, true)
 evq = Evq.new()
 
 local function test1()
-	local config = Config.new("module/config_tester.schema", "config_tester.conf" )
+	local config = Config.new("module/config_tester.schema", "config_tester.conf", "config_tester_ext.conf" )
 
 	local function tst( s, ... )
 		th:start("config:set_config_item('" .. s .. "')")
@@ -52,11 +52,11 @@ local function test1()
 
 	th:start("save_db")
 
-	config:save_db( "config_tester.conf1" )
+	config:save_db()
 
 	-- and print the new configfile contents for verification
 	print("Configfile:")
-	local fd = io.open("config_tester.conf1", "r")
+	local fd = io.open("config_tester_ext.conf", "r")
 	local txt = fd:read("*all")
 	fd:close()
 	print(txt)
@@ -89,16 +89,16 @@ local function test2()
 	os.execute("rm -f cit.conf")
 
 	-- first time should create a new file with default settings
-	local config1 = Config.new("schema/root.schema", "cit.conf" )
+	local config1 = Config.new("schema/root.schema", "cit.conf", "cit-ext.conf" )
 	-- and again should load from cit.conf
-	local config1 = Config.new("schema/root.schema", "cit.conf" )
+	local config1 = Config.new("schema/root.schema", "cit.conf", "cit-ext.conf" )
 
 	print("/dev/mifare/key_A = " .. config1:get("/dev/mifare/key_A"))
 	print("/dev/mifare/relevant_sectors = " .. config1:get("/dev/mifare/relevant_sectors"))
 
 	local node = config1:lookup("/dev/mifare/relevant_sectors")
 	local function tst( r )
-		print("range(\"" .. r .. "\") = " .. (node.range( r ) and "true" or "false"))
+		print("match(\"" .. r .. "\") = " .. (node.match( r ) and "true" or "false"))
 	end
 	tst("1")
 	tst("0")
@@ -117,6 +117,7 @@ local function test2()
 	
 end
 
-test1()
-test2()
+th:run( test1, "test1" )
+th:run( test2, "test2" )
+
 

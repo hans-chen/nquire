@@ -25,12 +25,25 @@
 
 #include "misc.h"
 
+#ifdef TRACEON
+static int test_nonblock( int fd )
+{
+	return fcntl(fd, F_GETFL) & O_NONBLOCK;
+}
+#endif
+
+static void set_nonblocking( int fd )
+{
+	int r = fcntl(fd, F_GETFL);
+	if (r!=-1) 
+		fcntl(fd, F_SETFL, r | O_NONBLOCK);
+}
+
 static int l_socket(lua_State *L)
 {
 	int fd;
 	int type = -1;
 	const char *typestr;
-	int r;
 
 	typestr = luaL_checkstring(L, 1);
 	if(strcmp(typestr, "tcp")==0) type = SOCK_STREAM;
@@ -48,9 +61,9 @@ static int l_socket(lua_State *L)
 		return 2;
 	} else {
 
-		r = fcntl(fd, F_GETFL);
-		r |= O_NONBLOCK;
-		fcntl(fd, F_SETFL, r);
+		TRACE( "socket = %d", fd );
+
+		set_nonblocking( fd );
 
 		lua_pushnumber(L, fd);
 		return 1;
@@ -138,6 +151,9 @@ static int l_connect(lua_State *L)
 		lua_pushstring(L, "Address not parsable as IPV4");
 		return 2;
 	}
+	
+	//TRACE("name = %s, addr = %u.%u.%u.%u", he->h_name, (unsigned char)he->h_addr[0], (unsigned char)(he->h_addr[1]), (unsigned char)he->h_addr[2], (unsigned char)he->h_addr[3] );
+	//sa.sin_addr.s_addr = *((in_addr_t *)(he->h_addr));//inet_addr(he->h_addr);
 	sa.sin_port = htons(port);
 	
 	r = connect(fd, (struct sockaddr *)&sa, sizeof(sa));
@@ -217,24 +233,42 @@ static int l_listen(lua_State *L)
 	return 0;
 }
 
-
+// accept a tcp connection
+// @param L[1]    the socket file descriptor
+// @param L[2]    optional sendbuffersize (to enlarge the default size)
 static int l_accept(lua_State *L)
 {
-	int fd;
-	int fd_client;
-	struct sockaddr_in sa;
-	unsigned int salen;
-	
-	fd = luaL_checknumber(L, 1);
+	int fd = luaL_checknumber(L, 1);
+	int sock_buf_size = luaL_optnumber( L, 2, -1 );
 
-	salen = sizeof(sa);
-	fd_client = accept(fd, (struct sockaddr *)&sa, &salen);
+	struct sockaddr_in sa;
+	unsigned int salen = sizeof(sa);
+TRACE("Before accept( fd=%d, nonblock=0x%x )", fd, test_nonblock(fd));
+	int fd_client = accept(fd, (struct sockaddr *)&sa, &salen);
+TRACE("After accept: r=%d", fd_client);
+
 
 	if (fd_client == -1) {
 		lua_pushnil(L);
 		lua_pushstring(L, strerror(errno));
 		return 2;
 	} else {
+
+		TRACE( "accept socket = %d", fd_client );
+
+		// and explicit set the socket to nonblocking
+		// (linux sockets won't inherit socket attributes)
+		set_nonblocking( fd_client );
+
+		if( sock_buf_size > 0 )
+		{
+			// try with a larger sendbuf
+			int r = setsockopt( fd_client, SOL_SOCKET, SO_SNDBUF,
+		               (char *)&sock_buf_size, sizeof(sock_buf_size) );
+			TRACE("setsockopt( SO_SNDBUF = %d ) = %d", sock_buf_size, r );
+			if(r) {}
+		}
+
 		lua_pushnumber(L, fd_client);
 		lua_pushstring(L, inet_ntoa(sa.sin_addr));
 		lua_pushnumber(L, ntohs(sa.sin_port));
@@ -249,7 +283,10 @@ static int l_send(lua_State *L)
 	size_t buflen=0;
 	const char *buf = luaL_checklstring(L, 2, &buflen);
 
+TRACE("Before send( fd=%d, nonblock=0x%x )", fd, test_nonblock(fd));
 	int r = send(fd, buf, buflen, 0);
+TRACE("After send: r=%d (%s), buflen=%d", r, r==EAGAIN ? "EAGAIN" : "", buflen);
+
 	if(r < 0) {
 		lua_pushnil(L);
 		lua_pushstring(L, strerror(errno));
@@ -281,7 +318,10 @@ static int l_sendto(lua_State *L)
 	sa.sin_addr.s_addr = inet_addr(addr);
 	sa.sin_port = htons(port);
 
+TRACE("Before sendto( fd=%d, nonblock=0x%x )", fd, test_nonblock(fd));
 	r = sendto(fd, buf, buflen, 0, (struct sockaddr *)&sa, sizeof(sa));
+TRACE("After sendto: r=%d (%s), buflen=%d", r, r==EAGAIN ? "EAGAIN" : "", buflen);
+
 	if(r < 0) {
 		lua_pushnil(L);
 		lua_pushstring(L, strerror(errno));
@@ -313,7 +353,10 @@ static int l_recv(lua_State *L)
 	}
 
 	memset( buf, 0, maxlen );
+TRACE("Before recv( fd=%d, nonblock=0x%x )", fd, test_nonblock(fd));
 	int r = recv(fd, buf, maxlen, flags);
+TRACE("After recv: r=%d (%s)", r, r==EAGAIN ? "EAGAIN" : "");
+
 	if( r == -1 && errno == EAGAIN )
 		r = 0;
 	else if( r <= 0 )
@@ -354,7 +397,9 @@ static int l_recvfrom(lua_State *L)
 	}
 
 	salen = sizeof(sa);
+TRACE("Before recvfrom( fd=%d, nonblock=0x%x )", fd, test_nonblock(fd));
 	r = recvfrom(fd, buf, maxlen, 0, (struct sockaddr *)&sa, &salen);
+TRACE("After recvfrom: r=%d (%s)", r, r==EAGAIN ? "EAGAIN" : "");
 	if(r < 0) {
 		free(buf);
 		lua_pushnil(L);
@@ -369,6 +414,33 @@ static int l_recvfrom(lua_State *L)
 	return 3;
 }
 
+// shut down a socket
+// See man -s 2 shutdown
+// @par : "RD", "WR", "RDWR"
+// @return 
+//		true             == OK
+//		false,"error"    == error
+static int l_shutdown(lua_State *L)
+{
+	int s = luaL_checkint(L, 1);
+	const char *how = luaL_checkstring(L, 2);
+
+	if( strcmp( how, "RD" ) == 0 )
+		shutdown(s,SHUT_RD);
+	else if( strcmp( how, "WR" ) == 0 )
+		shutdown(s,SHUT_WR);
+	else if ( strcmp( how, "RDWR" ) == 0 )
+		shutdown(s,SHUT_RDWR);
+	else
+	{
+		lua_pushnil( L );
+		lua_pushstring( L, "Incorrect parameter 'how' for shutdown socket");
+		return 2;
+	}
+	
+	lua_pushboolean(L, 1);
+	return 1;
+}
 
 static int l_close(lua_State *L)
 {
@@ -398,7 +470,7 @@ static int l_getsockopt(lua_State *L)
 	int fd;
 	int opt;
 	int ret;
-	size_t retsize;
+	socklen_t retsize;
 
 	fd = luaL_checknumber(L, 1);
 	opt = luaL_checkoption(L, 2, NULL, optname);
@@ -449,7 +521,7 @@ static int l_setsockopt(lua_State *L)
 			break;
 		case 3:
 			valstr = luaL_checkstring(L, 3);
-			TRACE("IP_ADD_MEMBERSHIP %s", varstr);
+			TRACE("IP_ADD_MEMBERSHIP %s", valstr);
 			bzero(&mreq, sizeof mreq);
 			mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 			mreq.imr_multiaddr.s_addr = inet_addr(valstr);
@@ -502,7 +574,8 @@ static int l_get_interface_ip(lua_State *L)
 	{
 		close(fd);
         lua_pushnil(L);
-        lua_pushstring(L, "Error requesting interface flags" );
+        lua_pushstring(L, strerror(errno));
+        //lua_pushstring(L, "Error requesting interface flags" );
         return 2;
     }
     
@@ -517,7 +590,8 @@ static int l_get_interface_ip(lua_State *L)
 	{
 		close(fd);
         lua_pushnil(L);
-        lua_pushstring(L, "Error requesting ip address of interface" );
+		lua_pushstring(L, strerror(errno));
+        //lua_pushstring(L, "Error requesting ip address of interface" );
         return 2;
     }
 
@@ -588,6 +662,7 @@ static struct luaL_Reg net_table[] = {
 	{ "sendto",	l_sendto },
 	{ "recv",	l_recv },
 	{ "recvfrom",	l_recvfrom },
+	{ "shutdown", l_shutdown },
 	{ "close",	l_close },
 	{ "setsockopt", l_setsockopt },
 	{ "getsockopt", l_getsockopt },

@@ -138,6 +138,11 @@ packd()
             modify_name
 			exit 0
             ;;
+        "firmwareex")
+				BuildVersion=build.r`svnversion -c $Now_path | cut -d : -f 2`
+            modify_name
+			exit 0
+            ;;
         "logo")
             modify_name
 			exit 0
@@ -149,7 +154,7 @@ packd()
             fi
             # step 1: create tar package
             cd $Pack_path
-            tar cf $Install_path/app.tar ./*
+            tar cf $Install_path/app.tar ./* --exclude=.svn
 
             if [ ! $? -eq 0 ] ; then
                 echo "can't creat application tar package"
@@ -187,7 +192,7 @@ if [ $# -lt 2 ] ; then
     exit 1
 fi
 # TODO Add long command line options
-while getopts "k:s:hv:n:r:f:l:e:m:d:" opt ; do
+while getopts "k:s:hv:n:r:f:l:e:m:d:g:" opt ; do
     case "$opt" in
         k)
             # kernel image
@@ -216,6 +221,11 @@ while getopts "k:s:hv:n:r:f:l:e:m:d:" opt ; do
             # firmware
             Pack_path=$OPTARG
             Component="firmware"
+            ;;
+        g)
+            # firmware
+            Pack_path=$OPTARG
+            Component="firmwareex"
             ;;
         l)
             # logo

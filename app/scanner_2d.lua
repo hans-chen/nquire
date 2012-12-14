@@ -381,6 +381,7 @@ local function open(scanner)
 	end
 
 	local function l_cmd_commit( scanner, txt )
+		logf(LG_DBG,lgid,"committing: %s",txt)
 		err, answer = _cmd_commit(scanner)
 		if err then
 			logf( LG_WRN, lgid, "Error setting em2027 %s", txt )
@@ -391,6 +392,10 @@ local function open(scanner)
 	logf( LG_INF, lgid, "Restoring defaults")
 	_cmd(scanner, SCANNER_CMD_SET_DEFAULTS )
 	l_cmd_commit(scanner, "defaults")
+
+	-- patching em2027 bug: default is 'auto' but should be 'manual'
+	_write(scanner, "\0270")
+	_wait_ack(scanner)
 
 	logf( LG_INF, lgid, "Making basic settings")
 	_cmd(scanner, 
@@ -628,12 +633,8 @@ function new()
 	config:add_watch("/dev/scanner", "set", function (e) evq:push( "reinit_scanner" ) end)
 	evq:register("reinit_scanner", 
 		function (e,s) 
-			if Upgrade.busy() then
-				logf(LG_WRN,lgid,"Scanner not reinitialized because an upgrade is in progress")
-			else
-				s:close() 
-				s:open() 
-			end
+			s:close() 
+			s:open() 
 		end, scanner)
 	
 	return scanner

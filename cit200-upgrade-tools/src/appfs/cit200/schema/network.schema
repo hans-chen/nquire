@@ -1,0 +1,204 @@
+return group { 
+	label = "Network settings", 
+	id = "network", 
+	prio = 1,
+
+	object { 
+		id = "interface",
+		label = "Network interface",
+		type = "enum",
+		default = "ethernet", 
+		range = "ethernet,wifi,gprs",
+	},
+		
+	object { 
+		mode = "r",
+		id = "macaddress",
+		label = "MAC address",
+		type = "string",
+		default = "??:??:??:??:??:??"
+	},
+	
+	object { 
+		mode = "r",
+		id = "current_ip",
+		label = "Current IP address",
+		type = "string",
+		default = "?"
+	},
+
+	object { 
+		id = "dhcp",
+		label = "Use DHCP",
+		type = "boolean",
+		default = "false", 
+		depends = "../interface == 'ethernet' or ../interface == 'wifi'"
+	},
+
+	group {
+		id = "discovery",
+		
+		object {
+			mode = "r",
+			id = "sg15_broadcast_addr",
+			type = "ip_address",
+			default = "255.255.255.255",
+		},
+	},
+	
+	group {
+		id = "tcp_keepalive",
+		
+		object {
+			id = "use_keepalive",
+			type = "boolean",
+			default = "true", 
+		},
+		
+		object {
+			id = "time",
+			type = "number",
+			default = "60", 
+			range = "20:600",
+		},
+		
+		object {
+			id = "intvl",
+			type = "number",
+			default = "20", 
+			range = "5:120",
+		},
+
+		object {
+			id = "probes",
+			type = "number",
+			default = "6", 
+			range = "2:32",
+		},
+	},
+	
+	group {
+		id = "ip",
+		label = "IP settings",
+		depends = "(../interface == 'ethernet' or ../interface == 'wifi') and ../dhcp == 'false'",
+		
+		object { 
+			id = "address",
+			label = "IP address",
+			type = "ip_address",
+			default = "192.168.1.200",
+		},
+
+		object { 
+			id = "netmask",
+			label = "Netmask",
+			type = "ip_address",
+			default = "255.255.255.0",
+		},
+
+		object { 
+			id = "gateway",
+			label = "Gateway",
+			type = "ip_address",
+			default = "192.168.1.1",
+		},
+
+		object { 
+			id = "ns1",
+			label = "Nameserver 1",
+			type = "ip_address",
+			default = "192.168.1.1",
+		},
+
+		object { 
+			id = "ns2",
+			label = "Nameserver 2",
+			type = "ip_address",
+			default = "192.168.1.1",
+		},
+
+	},
+
+	group {
+
+		id = "wifi", 
+		label = "Wlan settings",
+		depends = "../interface == 'wifi'",
+
+		object { 
+			id = "essid",
+			label = "ESSID",
+			type = "string",
+			default = "default", 
+			range = "0:32" 
+		},
+		
+		object { 
+			id = "keytype",
+			label = "Wireless key type",
+			type = "enum",
+			default = "off", 
+			range = "off,WEP,WPA / WPA2",
+		},
+
+		object { 
+			id = "key",
+			label = "Wireless key",
+			type = "string",
+			default = "1122334455", 
+			range = "0:32",
+			depends = "../keytype ~= 'off'",
+		}
+	},
+	
+	group {
+
+		id = "gprs", 
+		label = "GPRS/UMTS settings",
+		depends = "../interface == 'gprs'",
+
+		object { 
+			id = "pin",
+			label = "PIN code",
+			type = "number",
+			default = "0000", 
+			range = "0:9999" 
+		},
+
+		object { 
+			id = "username",
+			label = "Username",
+			type = "string",
+			default = "", 
+			range = "0:16"
+		},
+
+		object { 
+			id = "password",
+			label = "Password",
+			type = "string",
+			default = "", 
+			range = "0:16" 
+		},
+
+		object { 
+			id = "apn",
+			label = "Access point name",
+			type = "string",
+			default = "internet",
+			range = "0:64" 
+		},
+
+		object { 
+			id = "number",
+			label = "Phone number",
+			type = "string",
+			default = "*99***1#", 
+			range = "1:32" 
+		}
+
+	},
+
+}
+
+-- vi: ft=lua ts=3 sw=3

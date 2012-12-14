@@ -70,8 +70,8 @@ local type_checker = {
 		return val:match(range) 
 	end,
 	
-	custom = function( range, val )
-		return range( val )
+	custom = function( match, val )
+		return match( val )
 	end,
 }
 

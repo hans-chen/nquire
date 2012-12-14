@@ -45,7 +45,7 @@ Building the application
 ========================
 
 The application can be compiled in windows and in linux.
-Eclipse c++ is used form windows development. 
+Eclipse c++ is used for windows development.
 Makefiles are used for linux development.
 Only in linux one can execute the tests.
 

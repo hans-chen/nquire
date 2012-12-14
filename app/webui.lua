@@ -5,167 +5,17 @@ local lgid = "webui"
 
 local hidden_password = "\001\001\001\001"
 
-local function draw_css(client)
+local function draw_head(client)
 
 	-- Draw one node
 
 	client:add_data([[
-	<head>
-	<style>
-	* { font-family: Arial, sans-serif; }
-	a img { border: 0; }
-	a { text-decoration: none; color: #004366; }
-	body { margin: 0px; padding: 0px; }
-	form { display: inline; }
-	input { border: solid 1px #aaaaaa; }
-	select { border: solid 1px #aaaaaa; }
-
-	ul { 
-		list-style: none; 
-		padding-left: 0px;
-		margin-left: 0px;
-		margin-top: 50px;
-	}
-
-	li {
-		font-weight: bold;
-		margin-top: 10px;
-		font-size: 1.1em;
-		margin-left: 10px;
-	}
-
-	fieldset {
-		width: 70%;
-		padding: 15px;
-		margin-top: 40px;
-		margin-left: auto;
-		margin-right: auto;
-		margin-bottom: 20px;
-		border: solid 2px #004366;
-		-moz-border-radius: 8px;
-	}
-
-	.log {
-		border-collapse: collapse;
-		margin: 20px;
-	}
-	
-	.log-dmp {
-		vertical-align: top;
-		font-family: mono;
-		font-size: 0.8em;
-		color: grey;
-		border: solid 1px #dddddd;
-		padding-left: 10px;
-		padding-right: 10px;
-	}
-
-	.log-dbg {
-		vertical-align: top;
-		font-family: mono;
-		font-size: 0.8em;
-		color: grey;
-		border: solid 1px #dddddd;
-		padding-left: 10px;
-		padding-right: 10px;
-	}
-
-	.log-inf {
-		vertical-align: top;
-		font-family: mono;
-		font-size: 0.8em;
-		color: black;
-		border: solid 1px #dddddd;
-		padding-left: 10px;
-		padding-right: 10px;
-	}
-
-	.log-wrn {
-		vertical-align: top;
-		font-family: mono;
-		font-size: 0.8em;
-		color: red;
-		border: solid 1px #dddddd;
-		padding-left: 10px;
-		padding-right: 10px;
-	}
-
-	legend {
-		background-color: #004336;
-		color: white;
-		font-weight: bold;
-		-moz-border-radius: 3px;
-	}
-
-	.error { background: #ff8888; border: solid 1px #aaaaaa; padding: 5px; }
-	.label { 
-		white-space: nowrap; 
-		color: #004366; 
-		margin-right: 30px; 
-		font-weight: bold;
-	}
-	.node { }
-	.node-error { border: solid 2px red; }
-	.submit { margin: 10px; border: solid 1px outset; }
-	.title { background: #eeeeff; padding: 15px; font-size: 1.5em; font-weight: bold; }
-
-	.top { 
-		width: 100%;
-		height: 70px;
-		margin: 0px;
-		padding: 0px;
-		background-image: url(top-gradient.jpg); 
-		border-collapse: collapse;
-	}
-
-	.top-left {
-		background-image: url(top-left.jpg); 
-		background-repeat: no-repeat;
-		width: 608px;
-	}
-	
-	.top-right {
-		background-image: url(top-right.jpg); 
-		background-repeat: no-repeat;
-		background-position: top right;
-	}
-	
-	.bottom { 
-		width: 100%;
-		height: 70px;
-		margin: 0px;
-		padding: 0px;
-		background-image: url(bottom-gradient.jpg); 
-		border-collapse: collapse;
-	}
-	
-	.bottom-left {
-		background-image: url(bottom-left.jpg); 
-		background-repeat: no-repeat;
-		background-position: top left;
-	}
-
-	.progressbar-bg {
-		border: solid 2px #004366;
-		padding: 2px;
-	}
-
-	.progressbar-fg {
-		color: orange;
-		background-color: orange;
-	}
-
-
-	</style>
-	
-	<STYLE TYPE="text/css">
-		<!--
-		#dek {POSITION:absolute;VISIBILITY:hidden;Z-INDEX:200;}
-		//-->
-	</STYLE>
-
-	</head>
-	]])
+<head>
+<link rel="icon" href="favicon.ico" type="image/x-icon"> 
+<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+<link rel="stylesheet" type="text/css" href="cit.css" />
+</head>
+]])
 end
 
 
@@ -249,8 +99,8 @@ client:add_data([[
 ]])
 end
 
-local function to_html_escapes( value, esc )
-	return value:gsub("[" .. esc .. "]",
+local function to_html_escapes( value )
+	return value:gsub("[;&#\"'%<>]",
 		function (c) 
 			return "&#" .. string.byte(c) .. ";"
 		end )
@@ -288,7 +138,9 @@ local function draw_node_value_data( client, node, ro, optarg )
 
 			popup = ""
 			if node.comment then
-				local html_comment = to_html_escapes(node.comment, "\"\'")
+				-- the comment should be written in html (with escape codes),
+				-- so the actual string we pass through to the popup function should be escaped:
+				local html_comment = to_html_escapes(node.comment)
 				popup = "onMouseOver=\"popup('" .. html_comment .. "','lightgreen')\"; onMouseOut=\"kill()\""
 			end
 
@@ -315,32 +167,35 @@ local function draw_node_value_data( client, node, ro, optarg )
 				--client:add_data("<input type='password' name='set-%s' size='15' value=%q %s/>\n" % {id, value, optarg })
 				client:add_data("<input type='password' name='set-%s' size='15' value=%q %s %s/>\n" % {id, hidden_password, optarg, popup })
 			else
-				if node.type == "ip_address" then
-					size = 15
-				elseif node.type ~= "custom" and node.range then
-					size = 0
+				local maxlength = 10
+				if node.range then
+					local rmax = 0
 					for c in node.range:gmatch("(%d+)") do
 						local n = tonumber(c)
-						if size<n then size=n end
+						if rmax<n then rmax=n end
 					end
 					if node.type == "number" then
-						size = 1+math.floor(math.log(size) / math.log(10))
+						maxlength = 1+math.floor(math.log(rmax) / math.log(10))
+					else
+						maxlength = rmax
 					end
-				else
-					size = 10
 				end
-				local maxlength = size
-				if node.options and node.options:find("b") then
-					--print("DEBUG: node[= " .. id .. "]='" ..  value .. "'")
-					
-					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s %s/>\n" % {id, maxlength*4, (node.size or size*4), binstr_to_escapes(value,0,0), optarg, popup })
-				else
-					-- To show string as it is, we have to replace some charracters
-					-- by their html escape code
-					local v = binstr_to_escapes(to_html_escapes( value, "&\\\'\"" ), 31, 256)
 				
-					client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s %s/>\n" % {id, maxlength, (node.size or size), v, optarg, popup })
+				local size = node.size or maxlength>=40 and 40 or maxlength<3 and 3 or maxlength
+				if node.type == "ip_address" then
+					size = 15
+					maxlength = 15
+				elseif node.type == "number" and not node.size then
+					size = maxlength
 				end
+
+				-- To show string as it is, we have to replace some charracters
+				-- first replace everything under string.char(32) by a human-readable escape code
+				local v_esc = binstr_to_escapes(value,31,256)
+				-- than replace all charracters that are ambious in html
+				local v_html = to_html_escapes( v_esc )
+			
+				client:add_data("<input name='set-%s' maxlength='%d' size='%d' value='%s' %s %s/>\n" % {id, maxlength, size+2, v_html, optarg, popup })
 			end
 
 		else
@@ -419,7 +274,7 @@ end
 ---------------------------------------------------------------------------
 
 local function page_top(client, request)
-	draw_css(client)
+	draw_head(client)
 	client:add_data("<table class=top><tr>")
 	client:add_data("<td class=top-left>&nbsp;</td>")
 	client:add_data("<td class=top-right>&nbsp;</td>")
@@ -427,7 +282,7 @@ local function page_top(client, request)
 end
 
 local function page_bottom(client, request)
-	draw_css(client)
+	draw_head(client)
 	client:add_data("<table class=bottom><tr>")
 	client:add_data("<td class=bottom-left>&nbsp;</td>")
 	client:add_data("</tr></table>\n")
@@ -439,7 +294,6 @@ local function page_main(client, request)
 	local name = config:lookup("/dev/name"):get()
 
 	client:add_data([[
-		<html>
 		<title>]] .. name .. [[</title> 
 		<noframes>
 		<body>
@@ -454,7 +308,6 @@ local function page_main(client, request)
 		<frame src="/?p=bottom" noresize scrolling=no>
 		</frameset>
 		</body>
-		</html>
 	]])
 end
 
@@ -463,7 +316,7 @@ local function page_menu(client, request)
 
 	local item_list = { "home", "network", "messages", "scanner", "miscellaneous", "log", "reboot" }
 
-	draw_css(client)
+	draw_head(client)
 
 	client:add_data("<ul class=menu>")
 	for _,item in ipairs(item_list) do
@@ -475,7 +328,8 @@ end
 
 
 local function page_home(client, request)
-	draw_css(client)
+	draw_head(client)
+	body_begin(client)
 	box_start(client, "home", "Welcome")
 	draw_node(client, config:lookup("/dev/name"), true)
 	draw_node(client, config:lookup("/dev/serial"), true)
@@ -486,16 +340,20 @@ local function page_home(client, request)
 	draw_node(client, config:lookup("/dev/scanner/version"))
 	draw_node(client, config:lookup("/network/macaddress"))
 	draw_node(client, config:lookup("/dev/hardware"))
-	body_end(client);
+	if Scanner_rf.is_available() then
+		draw_node(client, config:lookup("/dev/mifare/modeltype"))
+	end
+	box_end(client)
+	body_end(client)
 end
 
 local function display_by_default( yes_do )
 	return (yes_do and "" or "style='display:none'")
 end
 
+
 local function page_network(client, request)
-	
-	draw_css(client)
+	draw_head(client)
 	body_begin(client);
 	form_start(client)
 
@@ -513,7 +371,7 @@ local function page_network(client, request)
 			if not has_wlan and not has_gprs and itf_config~="ethernet" then
 				client:add_data("<span class=label>WATCH OUT: " .. itf_config .. " hardware is not detected!</span>\n")
 			end
-			local extra = "onclick=\"set_visibility(this.value==" ..
+			local extra = "onChange=\"set_visibility(this.value==" ..
 				(has_wlan and "'wifi','wifisettings'" or "'gprs','gprssettings'") .. ");" ..
 											"set_visibility(this.value!='gprs', 'dhcp_settings')\""
 --print("DEBUG: extra=".. extra)
@@ -552,7 +410,7 @@ local function page_network(client, request)
 
 
 	box_start(client, "network", "IP Settings", "id='dhcp_settings'")
-		draw_node(client, config:lookup("/network/dhcp"),false,"onclick='set_visibility(this.value==\"false\",\"static_ip_settings\")'")
+		draw_node(client, config:lookup("/network/dhcp"),false,"onClick='set_visibility(this.value==\"false\",\"static_ip_settings\")'")
 		client:add_data("<table id='static_ip_settings' " .. 
 				display_by_default(config:lookup("/network/dhcp"):get()=="false" and 
 										ift_value~="gprs") .. ">")
@@ -570,7 +428,7 @@ local function page_network(client, request)
 				(mode:find("TCP") and " disabled" or "") )
 		draw_node(client, config:lookup("/cit/tcp_port"), false, "id='tcp_port'" .. 
 				(mode=="UDP" and " disabled" or "") )
-		draw_node(client, config:lookup("/cit/mode"), false, "onchange=\"enable_disable(this.value!='UDP','tcp_port');enable_disable(this.value!='TCP server' && this.value!='TCP client' && this.value!='TCP client on scan','udp_port');enable_disable(this.value!='TCP server','remote_ip') \"" )
+		draw_node(client, config:lookup("/cit/mode"), false, "onChange=\"enable_disable(this.value!='UDP','tcp_port');enable_disable(this.value!='TCP server' && this.value!='TCP client' && this.value!='TCP client on scan','udp_port');enable_disable(this.value!='TCP server','remote_ip') \"" )
 		draw_node(client, config:lookup("/cit/remote_ip"), false, "id='remote_ip'" .. 
 				(mode=="TCP server" and " disabled" or "") )
 	box_end(client)
@@ -580,10 +438,8 @@ local function page_network(client, request)
 end
 
 
-
-
 local function page_messages(client, request)
-	draw_css(client)
+	draw_head(client)
 	body_begin(client);
 
 	local msg_list = { 
@@ -618,10 +474,10 @@ local function page_messages(client, request)
 					end
 				end
 				if item == "valign" then 
-					extra = "onchange='enable_disable(value==\"top\", \"" .. msg.id .. "ypos" .. row .. "\")'"; 
+					extra = "onChange='enable_disable(value==\"top\", \"" .. msg.id .. "ypos" .. row .. "\")'"; 
 				end
 				if item == "halign" then 
-					extra = "onchange='enable_disable(value==\"left\", \"" .. msg.id .. "xpos" .. row .. "\")'";
+					extra = "onChange='enable_disable(value==\"left\", \"" .. msg.id .. "xpos" .. row .. "\")'";
 				end
 				local node = config:lookup("/cit/messages/%s/%s/%s" % { msg.id, row, item } )
 				draw_node_value(client, node, false, extra)
@@ -634,7 +490,7 @@ local function page_messages(client, request)
 			
 			local idle_picture_show = config:lookup("/cit/messages/idle/picture/show")
 			draw_node_label_start(client, idle_picture_show)
-			draw_node_value_data(client, idle_picture_show,false, "onclick=\"enable_disable(this.checked,'xpos');enable_disable(this.checked,'ypos')\" id='show_idle_picture'")
+			draw_node_value_data(client, idle_picture_show,false, "onClick=\"enable_disable(this.checked,'xpos');enable_disable(this.checked,'ypos')\" id='show_idle_picture'")
 			draw_node_label_end( client )
 			--local enabled = config:lookup("/cit/messages/idle/picture/show"):get() == "true"
 			draw_node_value(client, config:lookup("/cit/messages/idle/picture/xpos"), false, "id='xpos'")
@@ -664,15 +520,16 @@ client:add_data([[
 	body_end(client);
 end
 
+
 local function page_scanner( client, request )
 
-	draw_css(client)
+	draw_head(client)
 	body_begin(client);
 	form_start(client)
 
 	box_start(client, "scanner", "Barcodes")
 	if scanner.type == "em2027" then
-		local onof = "onclick='"
+		local onof = "onChange='"
 		local n = 1;
 		for _,code in ipairs(scanner.enable_disable) do
 			if does_firmware_support( code ) and is_2d_code(code.name) then
@@ -755,6 +612,7 @@ local function page_scanner( client, request )
 			draw_node(client, config:lookup("/dev/mifare/send_cardnum_only"))
 			draw_node(client, config:lookup("/dev/mifare/sector_data_format"))
 			draw_node(client, config:lookup("/dev/mifare/sector_data_seperator"))
+			draw_node(client, config:lookup("/dev/mifare/suppress_beep"))
 			draw_node(client, config:lookup("/dev/mifare/prevent_duplicate_scan_timeout"))
 			draw_node(client, config:lookup("/dev/mifare/msg/access_violation/text"))
 			draw_node(client, config:lookup("/dev/mifare/msg/incomplete_scan/text"))
@@ -767,9 +625,10 @@ local function page_scanner( client, request )
 
 end
 
+
 local function page_miscellaneous(client, request)
 	
-	draw_css(client)
+	draw_head(client)
 	body_begin(client);
 	form_start(client)
 
@@ -778,7 +637,7 @@ local function page_miscellaneous(client, request)
 	box_end(client)
 
 	box_start(client, "miscellaneous", "Authentication")
-	draw_node(client, config:lookup("/dev/auth/enable"),false,"onclick=\"enable_disable(value=='true', 'auth_username');enable_disable(value=='true', 'auth_password');enable_disable(value=='true', 'auth_password_shadow')\"")
+	draw_node(client, config:lookup("/dev/auth/enable"),false,"onClick=\"enable_disable(value=='true', 'auth_username');enable_disable(value=='true', 'auth_password');enable_disable(value=='true', 'auth_password_shadow')\"")
 	local extra = config:lookup("/dev/auth/enable").value=="true" and "" or " disabled";
 	draw_node(client, config:lookup("/dev/auth/username"), false, " id='auth_username'" .. extra)
 	draw_node(client, config:lookup("/dev/auth/password"), false, " id='auth_password'" .. extra)
@@ -787,7 +646,7 @@ local function page_miscellaneous(client, request)
 	
 	box_start(client, "miscellaneous", "Programming barcode security")
 	draw_node(client, config:lookup("/cit/programming_mode_timeout"))
-	draw_node(client, config:lookup("/dev/barcode_auth/enable"),false,"onclick=\"enable_disable(value=='true', 'security_code')\"")
+	draw_node(client, config:lookup("/dev/barcode_auth/enable"),false,"onClick=\"enable_disable(value=='true', 'security_code')\"")
 	local extra = config:lookup("/dev/barcode_auth/enable").value=="true" and "" or " disabled";
 	draw_node(client, config:lookup("/dev/barcode_auth/security_code"), false, " id='security_code'" .. extra)
 	box_end(client)
@@ -798,6 +657,9 @@ local function page_miscellaneous(client, request)
 	draw_node(client, config:lookup("/cit/codepage"))
 	draw_node(client, config:lookup("/cit/message_separator"))
 	draw_node(client, config:lookup("/cit/message_encryption"))
+	local emtn = config:lookup("/cit/enable_message_tag")
+	draw_node(client, emtn, false, "onClick=\"enable_disable(value=='true', 'message_tag')\"")
+	draw_node(client, config:lookup("/cit/message_tag"), false, " id='message_tag'" .. (emtn.value=="true" and "" or " disabled"))
 	box_end(client)
 
 	box_start(client, "miscellaneous", "Interaction")
@@ -809,7 +671,7 @@ local function page_miscellaneous(client, request)
 
 	box_start(client, "miscellaneous", "GPIO")
 	draw_node(client, config:lookup("/dev/gpio/prefix"))
-	draw_node(client, config:lookup("/dev/gpio/method"),false,"onclick=\"enable_disable(this.value=='Poll','poll_delay')\"" )
+	draw_node(client, config:lookup("/dev/gpio/method"),false,"onChange=\"enable_disable(this.value=='Poll','poll_delay')\"" )
 	local gpio_poll_delay_disabled = config:get("/dev/gpio/method")=="Poll" and "" or " disabled";
 	draw_node(client, config:lookup("/dev/gpio/poll_delay"),false," id='poll_delay'" .. gpio_poll_delay_disabled)
 	box_end(client)
@@ -830,10 +692,12 @@ local function page_miscellaneous(client, request)
 
 end
 
+
 local function page_log(client, request)
 	
-	draw_css(client)
-
+	draw_head(client)
+	body_begin(client);
+	
 	local line = 1
 	local f = io.popen("logread", "r")
 	if f then
@@ -841,24 +705,28 @@ local function page_log(client, request)
 		client:add_data("<table class=log>")
 		for l in f:lines() do
 			-- Jan  1 01:56:38 NEWLAND_CIT user.notice lua: inf webserver: 10.0.0.56: GET /bottom-left.jpg
-			local level, component, msg = l:match("lua: (%S+) (%S-): (.+)")
+			--local level, component, msg = l:match("lua: (%S+) (%S-): (.+)")
 			-- change above to this when logging should be with time string
 			-- also see log.lua (doing syslog)
-			--local time, level, component, msg = l:match("lua: (%d+:%d+:%d+%.%d+) (%S+) (%S-): (.+)")
+			local datetime, level, component, msg = l:match("^(%a+%s+%d%d? %d%d:%d%d:%d%d) .*lua: (%S+) (%S-): (.+)")
 			if level then
 				client:add_data("<tr>")
 				client:add_data(" <td class=log-%s>%d</td>" % { level, line } )
-				--client:add_data(" <td class=log-%s>%s</td>" % { level, time } )
+				--client:add_data(" <td class=log-%s>%s</td>" % { level, datetime } )
 				client:add_data(" <td class=log-%s>%s</td>" % { level, level } )
 				client:add_data(" <td class=log-%s>%s</td>" % { level, component } )
-				client:add_data(" <td class=log-%s>%s</td>" % { level, msg } )
+				client:add_data(" <td class=log-%s>%s</td>" % { level, to_html_escapes(msg) } )
 				client:add_data("</tr>\n")
+				client:flush()
 				line = line + 1
 			end
 		end
 		client:add_data("</table>")
 		f:close()
 		box_end(client)
+	else
+		logf(LG_WRN,lgid,"Could not read the log")
+		client:add_data("<table>ERROR: could not read the system log</table>")
 	end
 
 	body_end(client);
@@ -867,7 +735,8 @@ end
 
 local function page_reboot(client, request)
 	
-	draw_css(client)
+	draw_head(client)
+	body_begin(client);
 
 	box_start(client, "miscellaneous", "Device")
 
@@ -883,62 +752,54 @@ local function page_reboot(client, request)
 	client:add_data("<input type=submit value='Defaults'>")
 	client:add_data("</form>")
 	box_end(client)
+
 	body_end(client);
 
 end
 
 function show_page_rebooting( client, intro, delay )
-		client:add_data([[
+	client:add_data([[
+<meta http-equiv='refresh' content="30; url=javascript:window.open('/','_top');">
 
-			<meta http-equiv='refresh' content="30; url=javascript:window.open('/','_top');">
+<br><br><br> ]] .. intro .. [[<br><br>
 
-			<br><br><br> ]] .. intro .. [[<br><br>
+If the connection attempt is unsuccessful, or if the IP address of the
+device changes after the restart, the connection must be reopened
+manually. Enter the IP address of the device in the URL field (address
+bar) in your browser.<br><br>
 
-			If the connection attempt is unsuccessful, or if the IP address of the
-			device changes after the restart, the connection must be reopened
-			manually. Enter the IP address of the device in the URL field (address
-			bar) in your browser.<br><br>
+<script language=javascript>
+	function progressbar(ticks, maxticks)
+	{
+		width = 100 * ticks / maxticks + 1;
+		var div = document.getElementById("progressbar")
+		div.innerHTML = "<center><table width=50%% class=progressbar-bg><tr><td class=progressbar-fg width=" + width + "%%>&nbsp;</td><td>&nbsp;</td></tr></table></center>";
+		if(ticks <= maxticks) {
+			setTimeout("progressbar(" + (ticks+1) + "," + maxticks + ")", 1000);
+		}
+	}
+</script>
 
-			<script language=javascript>
-				function progressbar(ticks, maxticks)
-				{
-					width = 100 * ticks / maxticks + 1;
-					var div = document.getElementById("progressbar")
-					div.innerHTML = "<center><table width=50%% class=progressbar-bg><tr><td class=progressbar-fg width=" + width + "%%>&nbsp;</td><td>&nbsp;</td></tr></table></center>";
-					if(ticks <= maxticks) {
-						setTimeout("progressbar(" + (ticks+1) + "," + maxticks + ")", 1000);
-					}
-				}
-			</script>
+<div id=progressbar>
+	teller
+</div>
 
-			<div id=progressbar>
-				teller
-			</div>
-			
-			<script language=javascript>
-				progressbar(0, ]] .. delay .. [[ );
-			</script>
-		]])
+<script language=javascript>
+	progressbar(0, ]] .. delay .. [[ );
+</script>
+]])
 end
 
 local function page_rebooting(client, request)
 	
-	draw_css(client)
+	draw_head(client)
+	body_begin(client)
 
-	if Upgrade.busy() then
-		logf(LG_INF, "upgrade", "Upgrade in progress")
+	show_page_rebooting( client, [[
+		The NQuire is now rebooting. This page will automatically attempt to
+		reconnect after 40 seconds. ]], 40 )
 
-		show_page_rebooting( client, [[
-			The NQuire is currently upgrading its software. A reboot will be
-			performed after the upgrade. This page will automatically attempt to
-			reconnect after 100 seconds. ]], 100 )
-	else
-		show_page_rebooting( client, [[
-			The NQuire is now rebooting. This page will automatically attempt to
-			reconnect after 40 seconds. ]], 40 )
-
-		os.execute("reboot")
-	end
+	os.execute("reboot")
 
 	body_end(client);
 
@@ -961,132 +822,146 @@ local function on_webserver(client, request)
 	local applied_setting;
 	local retval = ""
 
-	if not Upgrade.busy() then
-		-- Watch out: this only works as long as the pages do not post binary data 
-		if request.method=="POST" and request.post_data then
-			string.gsub(request.post_data, "([^&=]+)=([^&;]*)[&;]?", 
-				function(name, attr) 
-					request.param[webserver.url_decode(name)] = webserver.url_decode(attr) 
-				end
-			)
-		end
-
-		errors = {}
-		local skip = {}
-		
-		-- since a checkbox is only received when it is checked, the false value 
-		-- is faked with a hidden value of which the key starts with "default-" instead of "set-"
-		local keyvalues = {}
-		for key, val in pairs(request.param) do
-			local id = key:match("^set%-(.+)$")
-			if id then
-				keyvalues[id] = escapes_to_binstr( val )
-			else
-				local cb_id = key:match("^default%-(.+)$")
-				if cb_id and not request.param["set-" .. cb_id] then
-					keyvalues[cb_id] = "false"
-				end
+	-- Watch out: this only works as long as the pages do not post binary data 
+	if request.method=="POST" and request.post_data then
+		string.gsub(request.post_data, "([^&=]+)=([^&;]*)[&;]?", 
+			function(name, attr) 
+				request.param[webserver.url_decode(name)] = webserver.url_decode(attr) 
 			end
-		end
+		)
+	end
 
-		for key, value in pairs(keyvalues) do
-			logf(LG_DBG,lgid,"keyvalue['%s'] = '%s'", key, value)
-		end
+	errors = {}
+	local skip = {}
 	
-		-- and special validation for the password
-		if keyvalues["/dev/auth/enable"] and keyvalues["/dev/auth/enable"]=="true" then
-
-			-- so this is the misc page with authentication enabled
-			local usr = keyvalues["/dev/auth/username"]
-			local pwd = keyvalues["/dev/auth/password"]
-			local pwd_shadow = keyvalues["/dev/auth/password_shadow"]
-
-			-- reject when just changed from authentication disabled or username is
-			-- changed and passwords did not change or differ
-			if usr == "" or usr:match("^%s") or usr:match("%s$") then
-				skip["/dev/auth/enable"] = true
-				errors["/dev/auth/username"] = true
-				skip["/dev/auth/password"] = true
-				skip["/dev/auth/password_shadow"] = true
-			elseif pwd ~= pwd_shadow or pwd == "" or (pwd ~= hidden_password and pwd:match("\1")) then
-				skip["/dev/auth/enable"] = true
-				errors["/dev/auth/username"] = true
-				errors["/dev/auth/password"] = true
-				errors["/dev/auth/password_shadow"] = true
-			elseif (config:get("/dev/auth/enable") == "false" or usr ~= config:get("/dev/auth/username")) and
-					(pwd == hidden_password)  then
-				logf(LG_DBG,lgid,"password is not entered but authentication or user is changed.")
-				skip["/dev/auth/enable"] = true
-				errors["/dev/auth/username"] = true
-				errors["/dev/auth/password"] = true
-				errors["/dev/auth/password_shadow"] = true
-		
-			-- ignore when user and password are not changed:
-			-- this only happens direct after authorisation because the browser will 
-			-- re-send the page-request
-			elseif usr == config:get("/dev/auth/username") and
-					pwd == config:get("/dev/auth/password") then
-				keyvalues["/dev/auth/enable"] = nil
-				keyvalues["/dev/auth/username"] = nil
-				keyvalues["/dev/auth/password"] = nil
-				keyvalues["/dev/auth/password_shadow"] = nil
-				keyvalues["/dev/auth/encrypted"] = nil
-			
-			-- accept when passwords are entered:
-			elseif pwd ~= hidden_password then
-				local shadow, salt, crypted = encrypt_password( pwd )
-				keyvalues["/dev/auth/encrypted"] = escapes_to_binstr( crypted )
+	-- since a checkbox is only received when it is checked, the false value 
+	-- is faked with a hidden value of which the key starts with "default-" instead of "set-"
+	local keyvalues = {}
+	for key, val in pairs(request.param) do
+		local id = key:match("^set%-(.+)$")
+		if id then
+			keyvalues[id] = escapes_to_binstr( val )
+		else
+			local cb_id = key:match("^default%-(.+)$")
+			if cb_id and not request.param["set-" .. cb_id] then
+				keyvalues[cb_id] = "false"
 			end
-		elseif keyvalues["/dev/auth/enable"] == "false" then
-			--keyvalues["/dev/auth/username"] = ""
-			keyvalues["/dev/auth/encrypted"] = ""
-			keyvalues["/dev/auth/password"] = ""
-			keyvalues["/dev/auth/password_shadow"] = ""
 		end
+	end
 
-		-- now actualy set all values
-		for key, value in pairs(keyvalues) do
-			local node = config:lookup(key)
-			if node then 
-				if node.type=="boolean" and node.appearance=="checkbox" and value~="false" then
-					value="true"
-				end
-				if skip[key] then
-					-- nothing to do, just skip because of some other error
-					logf(LG_DBG,lgid,"Skipped setting of %s because of some other error", key)
-				elseif errors[key] then
-					logf(LG_DBG,lgid,"Webui data entry error on field %s", key)
-				else
-					local prev_value = node:get()
-					if prev_value ~= value then
-						if not node:set( value ) then
-							logf(LG_WRN,lgid,"Error setting node %s from '%s' to '%s'", key, node:get(), value)
-							errors[key] = true
-						else
-							logf(LG_DBG,lgid,"changed node %s from '%s' to '%s'", key, prev_value, value)
-							applied_setting = true
-						end
+	for key, value in pairs(keyvalues) do
+		logf(LG_DBG,lgid,"keyvalue['%s'] = '%s'", key, value)
+	end
+
+	-- and special validation for the password
+	if keyvalues["/dev/auth/enable"] and keyvalues["/dev/auth/enable"]=="true" then
+
+		-- so this is the misc page with authentication enabled
+		local usr = keyvalues["/dev/auth/username"]
+		local pwd = keyvalues["/dev/auth/password"]
+		local pwd_shadow = keyvalues["/dev/auth/password_shadow"]
+
+		logf(LG_DBG,lgid,"/dev/auth/username=%s, usr=%s, pwd=%s, shadow=%s", config:get("/dev/auth/username"), usr, pwd, pwd_shadow)
+
+		-- skip when nothing is changed:
+		if		config:get("/dev/auth/enable") == "true" and 
+				usr == config:get("/dev/auth/username") and
+				pwd == hidden_password and
+				pwd_shadow == pwd then
+			logf(LG_DBG,lgid,"Nothing changed to authentication")
+			skip["/dev/auth/enable"] = true
+			skip["/dev/auth/username"] = true
+			skip["/dev/auth/password"] = true
+			skip["/dev/auth/password_shadow"] = true
+		
+		-- reject on incorrect username
+		elseif usr == "" or usr:match("^%s") or usr:match("%s$") then
+			logf(LG_DBG,lgid,"Incorrect format of username")
+			skip["/dev/auth/enable"] = true
+			errors["/dev/auth/username"] = true
+			skip["/dev/auth/password"] = true
+			skip["/dev/auth/password_shadow"] = true
+
+		-- reject on incorrect password entry
+		elseif pwd ~= hidden_password and ( pwd ~= pwd_shadow or pwd == "" or pwd:match("\1") ) then
+			logf(LG_DBG,lgid,"passwords differs from password shadow, or the password still contains a partial hidden password")
+			skip["/dev/auth/enable"] = true
+			skip["/dev/auth/username"] = true
+			errors["/dev/auth/password"] = true
+			errors["/dev/auth/password_shadow"] = true
+
+		-- ignore when user and password are not changed:
+		-- this only happens direct after authorisation because the browser will 
+		-- re-send the page-request
+		elseif usr == config:get("/dev/auth/username") and
+				pwd == config:get("/dev/auth/password") then
+			logf(LG_DBG,lgid,"usr and password ignore because of page resend")
+			keyvalues["/dev/auth/enable"] = nil
+			keyvalues["/dev/auth/username"] = nil
+			keyvalues["/dev/auth/password"] = nil
+			keyvalues["/dev/auth/password_shadow"] = nil
+			keyvalues["/dev/auth/encrypted"] = nil
+	
+		-- accept when passwords are entered:
+		elseif pwd ~= hidden_password then
+			-- accept entered user and passwords
+			local shadow, salt, crypted = encrypt_password( pwd )
+			keyvalues["/dev/auth/encrypted"] = escapes_to_binstr( crypted )
+		else
+			logf(LG_WRN,lgid,"undefined situation for username password")
+			errors["/dev/auth/enable"] = true
+			errors["/dev/auth/username"] = true
+			errors["/dev/auth/password"] = true
+			errors["/dev/auth/password_shadow"] = true
+		end
+	elseif keyvalues["/dev/auth/enable"] == "false" then
+		--keyvalues["/dev/auth/username"] = ""
+		keyvalues["/dev/auth/encrypted"] = ""
+		keyvalues["/dev/auth/password"] = ""
+		keyvalues["/dev/auth/password_shadow"] = ""
+	end
+
+	-- now actualy set all values
+	for key, value in pairs(keyvalues) do
+		local node = config:lookup(key)
+		if node then 
+			if node.type=="boolean" and node.appearance=="checkbox" and value~="false" then
+				value="true"
+			end
+			if skip[key] then
+				-- nothing to do, just skip because of some other error
+				logf(LG_DBG,lgid,"Skipped setting of %s because of some other error", key)
+			elseif errors[key] then
+				logf(LG_DBG,lgid,"Webui data entry error on field %s", key)
+			else
+				local prev_value = node:get()
+				if prev_value ~= value then
+					if not node:set( value ) then
+						logf(LG_WRN,lgid,"Error setting node %s from '%s' to '%s'", key, node:get(), value)
+						errors[key] = true
+					else
+						logf(LG_DBG,lgid,"changed node %s from '%s' to '%s'", key, prev_value, value)
+						applied_setting = true
 					end
 				end
 			end
 		end
+	end
 
-		if applied_setting then
-			logf(LG_DBG,lgid,"Applied settings")
-			display:set_font( nil, 18, nil )
-			display:show_message("Applying", "settings")
-			evq:push("cit_idle_msg", nil, 4.0)
-		end
-		
-		if keyvalues["/dev/auth/encrypted"] and keyvalues["/dev/auth/encrypted"]~="" then
-			-- so the password is changed, inform the webserver of this so 
-			-- the client has to authenticate:
-			logf(LG_DBG,lgid,"Requesting authorisation")
-			retval = "Authorization"
-		end
-
+	if applied_setting then
+		logf(LG_DBG,lgid,"Applied settings")
+		display:set_font( nil, 18, nil )
+		display:show_message("Applying", "settings")
+		evq:push("cit_idle_msg", nil, 4.0)
 	end
 	
+	if keyvalues["/dev/auth/encrypted"] and keyvalues["/dev/auth/encrypted"]~="" then
+		-- so the password is changed, inform the webserver of this so 
+		-- the client has to authenticate:
+		logf(LG_DBG,lgid,"Requesting authorisation")
+		retval = "Authorization"
+	end
+
 	local pagehandlers = {
 		top = page_top,
 		bottom = page_bottom,
@@ -1105,9 +980,7 @@ local function on_webserver(client, request)
 
 	local p = request.param.p
 	local handler
-	if Upgrade.busy() then
-		handler = page_rebooting
-	elseif p and pagehandlers[p] then
+	if p and pagehandlers[p] then
 		handler = pagehandlers[p]
 	else
 		handler = pagehandlers.main
@@ -1117,7 +990,11 @@ local function on_webserver(client, request)
 	client:set_header("Expires", "")
 	client:set_header("Cache-control", "no-cache, must-revalidate, proxy-revalidate")
 	
+	client:add_data([[<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+]])
+	client:add_data("<html>\n")
 	handler(client, request)
+	client:add_data("</html>")
 
 	return retval
 
@@ -1125,21 +1002,8 @@ end
 
 
 function new()
-	webserver:register("/", on_webserver)
 
-	webserver:register(".+.jpg",
-		function(client, request)
-			local fname = request.path:match("([^/]+.jpg)")
-			if fname then
-				local fd = io.open("img/" .. fname)
-				if fd then
-					client:set_header("Content-Type", "image/jpg")
-					client:add_data(fd:read("*a"))
-					client:set_cache(3600)
-					fd:close()
-				end
-			end
-		end)
+	webserver:register("/", on_webserver)
 	
 end
 

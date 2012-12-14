@@ -16,7 +16,7 @@ The nquire server communication is 3-fold (as seen from the server):
 
  -	link:nquire-discovery-protocol.html[Discovery] of available Nquires on a network
  -	Event messages from Nquire to server (barcode, gpio, touchscreen, mifare)
- -	Control (esacpe) code messages from server to NQuire (display, beep, etc).
+ -	Control (escape) code messages from server to NQuire (display, beep, etc) and there return messages
  
 Note that discovery can also be done using the SG15 compatebility.
 
@@ -48,6 +48,19 @@ However, an event message will never come inbetween a command and it's return me
 
 Event messages are seperated by the configured message separator (+/cit/message_separator+): +LF+,+CR+ or +CRLF+.
 
+Messages are composed as follows (BNF):
+
+-----
+message ::= [ device_id ] { event_message | control_cmd_return_message }
+device_id ::= <depend on /cit/enable_message_tag and /cit/message_tag>
+event_message ::= prefix data
+control_cmd_return_message ::= data
+prefix ::= <see below>
+data ::= <message specific>
+-----
+
+When /cit/enable_message_tag = true , then each message begins with a device identifier specified in /cit/message_tag.
+
 Different event messages can be recognized by their prefix:
 
 [cols="10,2,2,50",options="header"]
@@ -60,15 +73,15 @@ Different event messages can be recognized by their prefix:
 |EAN-13             |d|F|
 |UPC-E              |h|E|
 |UPC-A              |c|A|
-|Interleaved-2_of_5 |i|i|
+|Interleaved-2_of_5 |e|i|
 |Code39             |b|*|
 |Codabar            |a|%|
 |Code93             |y|c|
 |PDF417             |r|r|
-|QR_Code            |s|s|
-|Aztec              |z|z|
-|DataMatrix         |u|u|
-|Chinese-Sensible   |h|h|
+|QR_Code            |S|s|
+|Aztec              |Z|z|
+|DataMatrix         |U|u|
+|Chinese-Sensible   |H|h|
 |GS1_Databar        |R|R|
 |ISBN               |B|B|
 |Code-11            |z|Z|
@@ -77,7 +90,7 @@ Different event messages can be recognized by their prefix:
 |MSI-Plessey        |m|m|
 |Plessey            |p|n|
 |2_5-Standard       |s|o|
-|2_5-Industrial     |s|o|
+|2_5-Industrial     |i|o|
 |USB                ||U|
 When configuration option "/dev/extscanner/raw = true", the data as received from the external scanner is send to the server, prefixed with an 'U': no prefix translation is performed!
 The data received on the USB is chopped in chunks. The chunks received from the USB are to be seperated by CR or LF.
@@ -415,8 +428,7 @@ format ::= 'B' or 'H'
 
 Explanation:
 
-cardnum:: the cardnumer of the card to be written. The transaction is refused when 
-     it does not match the current card.
+cardnum:: the cardnumer of the card to be written. The transaction is refused 	when it does not match the current card.
 keyA:: This is the key that will be used to access the mifare card.
 sector:: One byte specifying the sector to be written: values 0x30 .. 0x3f respectively representing sector 0 to 15
 block:: this is the block to be read. The whole sector will be read when using '-'
@@ -567,7 +579,7 @@ onoff ::= \x30 | \x31
 
 Explanation:
 
-onoff:: 0x30 = disable, 0x30 = enable
+onoff:: 0x30 = disable, 0x31 = enable
 
 
 Card detection can interfere with reading and writing the mifare card when multiple seperate read or write commands are send in a row.

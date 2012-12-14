@@ -1,0 +1,685 @@
+#!/bin/bash
+
+# execute tests on the nquire HW using escape commands, ftp and http
+# curl is used for configuration via ftp and http access
+# testserver is used for comminication with the nquire (
+
+ADDRESS="192.168.1.200"
+if test -f .cit.ip; then
+	ADDRESS="`cat .cip.ip`"
+fi
+TCPPORT=9101
+UDPPORT=9000
+RESULTFILE="target_test.result"
+
+ACK=$'\006'
+NAK=$'\025'
+
+# helper functions ===========================================================
+
+# reconfigure the nquire by sending a cit.conf
+# IN: $1  - the configfile text
+#     $2  - optional: time to wait after reconfig
+reconfigure()
+{
+	echo -n "$1" > cit.conf
+	curl ftp://$ADDRESS/ -T cit.conf
+	if test -z "$2"; then
+		sleep 3
+	else
+		sleep $2
+	fi
+}
+
+# send strings to server
+# IN: $1  - strings to send to the server
+# IN: $2  - optional: number of lines to receive from the nquire (default: no wait)
+# OUT: REPLY
+escape_cmd()
+{
+	REPLY=""
+	#echo "DEBUG: Sending $1"
+
+	exec 3<>/dev/tcp/localhost/9101
+	R=$?
+	if test $R = 0; then
+		echo -en "$1" >&3
+		if test -n "$2"; then
+			read -u 3 REPLY
+		fi
+		exec 3>&-
+	fi
+	export REPLY
+}
+export escape_cmd
+
+# perform some manual check
+# IN: $1  - the yes/no question to be answered 
+#     $2  - optional: the check-id
+#             "y" or "Y" result in success, other in fail
+check_manual()
+{
+	if test -z "$2"; then
+		CHECK_ID="$1"
+	else
+		CHECK_ID="$2"
+	fi
+	echo -n "$1 (y/N)"
+	read yn
+	RESULT="Test '$TEST', check '$CHECK_ID': "
+	if test $yn = "y" -o $yn = "Y"; then
+		RESULT=$RESULT"SUCCESS"
+	else
+		RESULT=$RESULT"FAILED"
+	fi
+	echo "$RESULT" 
+	echo "`date +"%F %T"`: $RESULT" >> $RESULTFILE
+}
+
+# perform an automated check
+# IN: $1  - testresult
+#     $2  - check-id
+check()
+{
+	if test -z "$2"; then
+		echo "No check id" 1>&2 
+		exit -1
+	fi
+	CHECK_ID=$2
+	RESULT="Test '$TEST', check '$CHECK_ID': "
+	if test $1 -eq 0; then
+		RESULT=$RESULT"SUCCESS"
+	else
+		RESULT=$RESULT"FAILED"
+	fi
+	echo "$RESULT" 
+	echo "`date +"%F %T"`: $RESULT" >> $RESULTFILE
+}
+
+# test definitions ===========================================================
+
+ALL=""
+
+ALL="$ALL display_alignment"
+test_display_alignment()
+{
+	#set -x
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/codepage = "ibm852"
+/cit/messages/idle/timeout = 15'
+	testserver -dd
+
+	# Set font, clear display, left top
+	escape_cmd '\e\x42\x30\e\x25'
+	escape_cmd '\e\x2e\x30lt\x03'		# Left top
+	escape_cmd '\e\x2e\x31ct\x03' 		# Center top
+	escape_cmd '\e\x2e\x32rt\x03' 		# Right top
+	escape_cmd '\e\x2e\x33lm\x03' 		# left middle
+	escape_cmd '\e\x2e\x34cm\x03' 		# Centre middle
+	escape_cmd '\e\x2e\x35rm\x03' 		# Right middle
+	escape_cmd '\e\x2e\x36lb\x03' 		# Left bottom
+	escape_cmd '\e\x2e\x37cb\x03' 		# Centre bottom
+	escape_cmd '\e\x2e\x38rb\x03' 		# Right bottom
+	
+	escape_cmd '\e\x2c\x50\x40X\x03'	# Write x at (
+	escape_cmd '\e\x2c\x50\x40'			# Set pixel position (
+	escape_cmd '\e\x2e\x3cxt\x03' 		# Left keep x
+	escape_cmd '\e\x2c\x50\x40'			# Set pixel position (
+	escape_cmd '\e\x2e\x3dxm\x03' 		# Centre keep x
+	escape_cmd '\e\x2c\x50\x40'			# Set pixel position (
+	escape_cmd '\e\x2e\x3exb\x03' 		# right keep x
+
+	escape_cmd '\e\x2c\x40\x40Y\x03'		# Write Y at (20,20)
+	escape_cmd '\e\x2c\x40\x40'			# Set pixel position (20,20)
+	escape_cmd '\e\x2e\x39ly\x03' 		# Left keep y
+	escape_cmd '\e\x2e\x3Acy\x03' 		# Centre keep y
+	escape_cmd '\e\x2e\x3Bry\x03' 		# right keep y
+
+    cat << EOF
+
+------------------------
+lt      xt ct         rt
+
+ly Y    X  cy         ry
+lm      xm cm         rm
+
+                 
+lb      xb cb         rb
+------------------------
+
+EOF
+
+	check_manual "Does the display look as above (you have 15 seconds)?", "lt"
+
+	escape_cmd '\e\xf3' # show idle message
+
+	killall testserver
+}
+
+ALL="$ALL display_euro"
+test_display_euro()
+{
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/codepage = "utf-8"
+/cit/messages/idle/timeout = 10'
+	testserver -dd
+
+	# Set font, clear display, € sign in left top (€=\xe2\x82\xac)
+	escape_cmd '\e\x42\x30\e\x25\e\x2e\x30\xe2\x82\xac\x03'
+
+	check_manual "Is an euro sign displayed left-top?", "€ utf-8"
+
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/codepage = "ibm852"
+/cit/messages/idle/timeout = 10'
+	testserver -dd
+
+
+	# Set font, clear display, € sign in left top (€=\x80)
+	escape_cmd '\e\x42\x30\e\x25\e\x2e\x30\x80\x03'
+
+	check_manual "Is an euro sign displayed left-top?", "€ ibm852"
+
+	escape_cmd '\e\xf3' # show idle message
+
+	killall testserver
+}
+
+
+ALL="$ALL mifare_read"
+test_mifare_read()
+{
+	# reconfigure:
+	killall testserver
+	reconfigure '/cit/mode = "server"
+/cit/messages/idle/timeout = 10
+/cit/message_encryption = "none"
+/dev/mifare/relevant_sectors = ""
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/sector_data_format = "hex"
+/dev/mifare/sector_data_seperator = "comma"'
+
+	testserver -dd -s
+	escape_cmd "\e\xfb\x31" # enable card detection
+
+	echo "Now present card..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Present mifare card\x03' 1
+
+	card="`echo $REPLY | cut -c3-`"
+	echo "Reading card: $card, sector 15, block 0 in hex and bin"
+	escape_cmd '\e\xf8'$card',FFFFFFFFFFFF:\x3f0H\x3f0B\x03' 1
+
+	ANSW=$REPLY
+
+	escape_cmd "\e\xfb\x30" # disable card detection
+	escape_cmd '\e\x25\e\x2e\x34Thank you\x03' 		# Centre middle
+
+	echo "Read data:  '$ANSW'"
+	
+	check_manual "Is the returned data correct (first hex, then binary, comma separated)?" "read hex + binary"
+
+	escape_cmd "\e\xfb\x31" # enable card detection
+	escape_cmd '\e\xf3' # show idle message
+
+	killall testserver
+}
+
+
+
+ALL="$ALL detect_mifare_classic"
+test_detect_mifare_classic()
+{
+# test mifare classic: cardnum=76262fa5, key="FFFFFFFFFFFF", sectors="1:0,1:1,1:2,3:0,3:1,3:2,4:0,4:1,4:2,5:0,5:1,5:2,6:0,6:1,6:2,7:0,7:1,7:2,8:0,8:1,8:2,9:0,9:1,9:2,10:0,10:1,10:2,11:0,11:1,11:2,12:0,12:1,12:2,13:0,13:1,13:2,14:0,14:1,14:2,15:0,15:1,15:2"
+
+	cat << EOF
+This test checks:
+	- rf card detection
+	- mifare-classic read by preset key and sectors
+It requires a mifare classic card with read access 
+in sectors 0 to 15 using key FFFFFFFFFFFF
+EOF
+
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/messages/idle/timeout = 10
+/cit/message_encryption = "none"
+/dev/mifare/key_A = "FFFFFFFFFFFF"
+/dev/mifare/relevant_sectors = "1:0,1:1,1:2,3:0,3:1,3:2,4:0,4:1,4:2,5:0,5:1,5:2,6:0,6:1,6:2,7:0,7:1,7:2,8:0,8:1,8:2,9:0,9:1,9:2,10:0,10:1,10:2,11:0,11:1,11:2,12:0,12:1,12:2,13:0,13:1,13:2,14:0,14:1,14:2,15:0,15:1,15:2"
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/sector_data_format = "hex escapes"
+/dev/mifare/sector_data_seperator = "comma"
+/cit/loglevel = 4
+/cit/message_separator = "LF"
+/cit/enable_message_tag = false'
+	testserver -dd -s
+
+	escape_cmd "\e\xfb\x31" # enable card detection
+
+	echo "Now present card..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Present mifare classic card\x03' 1
+
+	echo "Reply is: $REPLY"
+	check_manual "14 sectors with 3 blocks, sector 3 is skipped. Is this correct?" "mifare-classic"
+
+	escape_cmd '\e\xf3' # show idle message
+
+	killall testserver
+}
+
+
+ALL="$ALL write_read_mifare_classic"
+test_write_read_mifare_classic()
+{
+	cat << EOF
+This test checks:
+	- mifare write writing 1 block
+	- mifare read, reading the written block
+It requires a mifare card with read write access 
+in sector 15 block 0 using key FFFFFFFFFFFF
+EOF
+
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/messages/idle/timeout = 10
+/cit/message_encryption = "none"
+/dev/mifare/relevant_sectors = ""
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/sector_data_format = "hex"
+/dev/mifare/sector_data_seperator = "comma"
+/cit/loglevel = 4
+/cit/message_separator = "LF"
+/cit/enable_message_tag = false'
+	testserver -dd -s
+
+	escape_cmd "\e\xfb\x31" # enable card detection
+
+	echo "Now present card..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Present mifare classic card\x03' 1
+	card="`echo $REPLY | cut -c3-`"
+
+	escape_cmd '\e\xfb\x30' # disable card detection
+
+	echo "Writing card: $card, sector 1 block 0, sector 15 block 3"
+	escape_cmd '\e\xf9'$card',deadbeef:KFFFFFFFFFFFFW\x310Bsector01-block00W\x3f2Bsector15-block03\x03' 1
+	echo -n ${REPLY} | od -t x1
+	test ${ACK} = ${REPLY}
+	test "`echo ${REPLY}`" = "${ACK}"
+	check $? "write ack"
+	
+	echo "Reading card: $card, sector 1, block 0 in hex and bin, sector 15 block 3 in bin"
+	escape_cmd '\e\xf8'$card',FFFFFFFFFFFF:\x310B\x310H\x3f2B\x03' 1
+	#set -x
+	test "${REPLY}" = "${ACK}sector01-block00,736563746f7230312d626c6f636b3030,sector15-block03"
+	check $? "read hex + binary"
+	set +x
+	
+	# enable card detection and show idle message
+	echo "Remove card please..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Remove card now please\x03'
+	sleep 2
+
+	escape_cmd '\e\xfb\x31' # enable mifare
+	escape_cmd '\e\xf3' # show idle message
+
+	killall testserver
+}
+
+
+ALL="$ALL detect_mifare_ultralight"
+test_detect_mifare_ultralight()
+{
+# test ultralight: cardnum=8823dbcc
+
+	cat << EOF
+This test checks:
+	- rf card detection
+	- mifare-ultralight read by preset key and sectors
+It requires a mifare ultralight card
+EOF
+
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/messages/idle/timeout = 10
+/cit/message_encryption = "none"
+/dev/mifare/key_A = "FFFFFFFFFFFF"
+/dev/mifare/relevant_sectors = "3:0,3:1,3:2,3:3,2:0,2:1,2:2,2:3,1:0,1:1,1:2,1:3,0:0,0:1,0:2,0:3"
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/sector_data_format = "hex escapes"
+/dev/mifare/sector_data_seperator = "comma"
+/cit/loglevel = 4
+/cit/message_separator = "LF"
+/cit/enable_message_tag = false'
+	testserver -dd -s
+
+	escape_cmd "\e\xfb\x31" # enable card detection
+
+	echo "Now present card..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Present mifare ultralight card\x03' 1
+	ANSW=$REPLY
+
+	# enable card detection and show idle message
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Thank you\x03'
+
+	echo -E "Reply is: $ANSW"
+	check_manual "4 sectors with 4 blocks, sectors read in reversed order. Is this correct?" "detect-mifare-ultralight"
+
+	escape_cmd '\e\xf3' # show idle message
+	killall testserver
+}
+
+ALL="$ALL read_mifare_ultralight"
+test_read_mifare_ultralight()
+{
+	cat << EOF
+This test checks:
+	- mifare ultralight read
+It requires a mifare_ultralight card with read access
+EOF
+
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/messages/idle/timeout = 10
+/cit/message_encryption = "none"
+/dev/mifare/relevant_sectors = ""
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/sector_data_format = "hex"
+/dev/mifare/sector_data_seperator = "comma"
+/cit/loglevel = 4
+/cit/message_separator = "LF"
+/cit/enable_message_tag = false'
+	testserver -dd -s
+
+	escape_cmd "\e\xfb\x31" # enable card detection
+
+	echo "Now present card..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Present mifare ultralight card\x03' 1
+	card="`echo $REPLY | cut -c3-`"
+
+	escape_cmd '\e\xfb\x30' # disable card detection
+
+	echo "Reading card: $card, sector 3 block 4, sector 0 block 0 (all hex)"
+	escape_cmd '\e\xf8'$card',3c3c3c3c3c3c:\x333H\x300H\x03' 1
+
+	ANSW=$REPLY
+
+	# enable card detection and show idle message
+	echo "Remove card please..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Remove card now please\x03'
+
+	check_manual "Is \"${ANSW}\" correct?" "read hex + binary"
+
+	escape_cmd '\e\xfb\x31' # enable card detection
+	escape_cmd '\e\xf3' # show idle message
+
+	killall testserver
+}
+
+
+ALL="$ALL write_read_mifare_ultralight"
+test_write_read_mifare_ultralight()
+{
+	cat << EOF
+This test checks:
+	- mifare write writing 1 block
+	- mifare read, reading the written block
+It requires a mifare_ultralight card with read write access 
+EOF
+
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/messages/idle/timeout = 10
+/cit/message_encryption = "none"
+/dev/mifare/relevant_sectors = ""
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/sector_data_format = "hex"
+/dev/mifare/sector_data_seperator = "comma"
+/cit/loglevel = 4
+/cit/message_separator = "LF"
+/cit/enable_message_tag = false'
+	testserver -dd -s
+
+	escape_cmd "\e\xfb\x31" # enable card detection
+
+	echo "Now present card..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Present mifare ultralight card\x03' 1
+	card="`echo $REPLY | cut -c3-`"
+
+	escape_cmd '\e\xfb\x30' # disable card detection
+
+	echo "Writing card: $card, sector 1 block 0, sector 3 block 3"
+	escape_cmd '\e\xf9'$card',deadbeef:K000000000000W\x310Bs1b0............W\x333Bs3b3............\x03' 1
+	echo -n ${REPLY} | od -t x1
+	test ${ACK} = ${REPLY}
+	test "`echo ${REPLY}`" = "${ACK}"
+	check $? "write ack"
+	
+	echo "Reading card: $card, sector 1, block 0 in bin and hex, sector 3 block 3 in bin"
+	escape_cmd '\e\xf8'$card',3c3c3c3c3c3c:\x310B\x310H\x333B\x03' 1
+	#set -x
+	test "${REPLY}" = "${ACK}s1b0,73316230,s3b3"
+	check $? "read hex + binary"
+	#set +x
+	
+	# enable card detection and show idle message
+	echo "Remove card please..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Remove card now please\x03'
+	sleep 2
+
+	escape_cmd '\e\xfb\x31' # enable mifare
+	escape_cmd '\e\xf3' # show idle message
+
+	killall testserver
+}
+
+
+
+
+ALL="$ALL detect_iso15693"
+test_detect_iso15693()
+{
+# test iso 15693: cardnum=41c9824b
+
+	cat << EOF
+This test checks:
+	- rf card detection
+	- iso15693 read by preset key and sectors
+It requires a detect_iso15693 card with read access 
+in sectors 0 to 3
+EOF
+
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/messages/idle/timeout = 10
+/cit/message_encryption = "none"
+/dev/mifare/key_A = "FFFFFFFFFFFF"
+/dev/mifare/relevant_sectors = "0:0,0:1,0:2,0:3,0:4,0:5,0:6,0:7,0:8,0:9,0:10,0:11,0:12,0:13,0:14,0:15,0:16,0:17,0:18,0:19,0:20,0:21,0:22,0:23,0:24,0:25,0:26,0:27"
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/sector_data_format = "hex escapes"
+/dev/mifare/sector_data_seperator = "comma"
+/cit/loglevel = 4
+/cit/message_separator = "LF"
+/cit/enable_message_tag = false'
+	testserver -dd -s
+
+	escape_cmd "\e\xfb\x31" # enable card detection
+
+	echo "Now present card..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Present iso15693 card\x03' 1
+
+	echo "Reply is: $REPLY"
+	check_manual "1 sector with 28 blocks. Is this correct?" "iso15693"
+
+	escape_cmd '\e\xf3' # show idle message
+
+	killall testserver
+}
+
+
+ALL="$ALL write_read_iso15639"
+test_write_read_iso15639()
+{
+	cat << EOF
+This test checks:
+	- mifare write writing 1 block
+	- mifare read, reading the written block
+It requires an iso15639 card with read write access 
+EOF
+
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/messages/idle/timeout = 10
+/cit/message_encryption = "none"
+/dev/mifare/relevant_sectors = ""
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/sector_data_format = "hex"
+/dev/mifare/sector_data_seperator = "comma"
+/cit/loglevel = 4
+/cit/message_separator = "LF"
+/cit/enable_message_tag = false'
+	testserver -dd -s
+
+	escape_cmd "\e\xfb\x31" # enable card detection
+
+	echo "Now present card..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Present I-Code2/ISO15693 card\x03' 1
+	card="`echo $REPLY | cut -c3-`"
+
+	escape_cmd '\e\xfb\x30' # disable card detection
+
+	echo "Writing card: $card, sector 0 block 0, sector 0 block 1"
+	escape_cmd '\e\xf9'$card',deadbeef:K,W\x30\x30H73306230,W\x30\x4aH73303237\x03' 1
+	echo -n ${REPLY} | od -t x1
+	test ${ACK} = ${REPLY}
+	test "`echo ${REPLY}`" = "${ACK}"
+	check $? "write ack"
+	
+	echo "Reading card: $card, sector 0, block 0 in bin and hex, sector 0 block 27 in bin"
+	escape_cmd '\e\xf8'$card',:\x30\x30B\x30\x30H\x30\x4aB\x03' 1
+	#set -x
+	test "${REPLY}" = "${ACK}s0b0,73306230,s027"
+	check $? "read hex + binary"
+	#set +x
+	
+	# enable card detection and show idle message
+	echo "Remove card please..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Remove card now please\x03'
+	sleep 2
+
+	escape_cmd '\e\xfb\x31' # enable mifare
+	escape_cmd '\e\xf3' # show idle message
+
+	killall testserver
+}
+
+
+ALL="$ALL detect_iso14443B"
+test_detect_iso14443B()
+{
+# test iso 14443B: cardnum=00374fa3
+
+	cat << EOF
+This test checks:
+	- rf card detection
+	- iso14443B read by preset key and sectors
+It requires a detect_iso14443B card with read access 
+in sectors 0 to 3 using access key "00000000"
+EOF
+
+	# reconfigure:
+	reconfigure '/cit/mode = "server"
+/cit/messages/idle/timeout = 10
+/cit/message_encryption = "none"
+/dev/mifare/key_A = "000000000000"
+/dev/mifare/relevant_sectors = "0:0,0:1,0:2,0:4,0:5,0:6,0:7,0:8,0:9,0:10,0:11,0:12,0:13,0:14,0:15,0:16,0:17,0:18,0:19,0:20,0:21,0:22,0:23,0:24,0:25,0:26,0:27,0:28,0:29,0:30,0:31"
+/dev/mifare/prevent_duplicate_scan_timeout = 1
+/dev/mifare/cardnum_format = "hexadecimal"
+/dev/mifare/sector_data_format = "hex escapes"
+/dev/mifare/sector_data_seperator = "comma"
+/cit/loglevel = 4
+/cit/message_separator = "LF"
+/cit/enable_message_tag = false'
+	testserver -dd -s
+
+	escape_cmd "\e\xfb\x31" # enable card detection
+
+	echo "Now present card..."
+	escape_cmd '\e\x25\e\x42\x30\e\x2e\x34Present iso14443B card\x03' 1
+
+	echo "Reply is: $REPLY"
+	check_manual "1 sectors with 32 blocks. Is this correct?" "iso14443"
+
+	escape_cmd '\e\xf3' # show idle message
+
+	killall testserver
+}
+
+
+
+# test execution =============================================================
+
+show_help()
+{
+cat << EOF
+
+target-test -h|{[-a <ip address>] [--tcpport <port>] [--udpport <port>] --all|<test id>}+}
+
+Available tests:
+$ALL
+
+EOF
+}
+
+while test -n "$1"; do
+	if test -z "$1" -o "$1" = "-h" -o "$1" = "--help"; then
+		show_help
+		exit
+	elif test "$1" = "-a"; then
+		shift
+		ADDRESS=$1
+		echo "$ADDRESS" > .cit.ip
+	elif test "$1" = "--tcpport"; then
+		shift
+		TCPPORT=$1
+	elif test "$1" = "--udpport"; then
+		shift
+		ADDRESS=$1
+		echo "$ADDRESS" > .cit.ip
+	elif test "$1" = "--all"; then
+		echo doing all
+		do_all=$ALL
+	else
+		break;
+	fi
+	shift
+done
+
+
+if test -z $do_all -a -z $*; then
+	echo Error: No tests to execute 1>&2
+	show_help
+	exit
+fi
+
+echo "Start executing tests $do_all"
+
+for TEST in $do_all $*; do
+
+	echo =================================================================
+	echo "test: $TEST"
+	echo -----------------------------------------------------------------
+	test_$TEST
+	echo "finished test: $TEST"
+done
+
+

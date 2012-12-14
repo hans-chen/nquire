@@ -3,12 +3,23 @@
 # usage: install [install options] [main.lua options]
 # install options: -a    all (first remove current installation completely)
 #                  -i    install only (do not start app)
+#                  -r    reboot
 # e.g:
 # ./install -a -n
 # Start main without ethernet network (re)configuration
 
+if test $0 != /home/ftp/install -a -f /home/ftp/install; then
+	chmod +x /home/ftp/install
+	/home/ftp/install
+	exit
+fi
+
 killall lua
-sleep 1
+sleep .5
+if killall lua; then
+	killall -9 lua
+fi
+sleep .1
 
 if ! cd /cit200; then
 	exit
@@ -36,11 +47,11 @@ else
 	{
 		if ! test -f $2; then
 			echo "New file: $2"
-			cp -a $1 $2
+			cp -af $1 $2
 		else
 			if ! diff $1 $2 > /dev/null; then 
 				echo "Changed file: $2"
-				cp -a $1 $2
+				cp -af $1 $2
 			fi
 		fi
 	}
@@ -63,7 +74,10 @@ else
 	rm -rf /home/ftp/app-tmp
 fi
 
-if ! test "$1" == "-i"; then
+if test "$1" = "-r"; then
+	sleep 2
+	reboot
+elif ! test "$1" = "-i"; then
 	sleep 2
 	set -x
 	lua main.lua $1 $2 $3 $4 $5 2>&1 &

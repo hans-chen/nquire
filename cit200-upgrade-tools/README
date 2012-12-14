@@ -1,5 +1,10 @@
       cit200 image tools how to
 ------------------------------------
+2011-03-23:
+1.Change upgrade mode
+  - before upgrade chroot filesystem into tmpfs.So during the upgrade it will not reading from carmfs partition or jffs2 partition.
+  - upgrade tools are built in busybox
+
 2009-08-13:
 1.Modify filesystem.
 	The new filesystem include cramfs partition and jffs2 partition.

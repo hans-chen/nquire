@@ -30,7 +30,7 @@ clobber: clean
 	rm -f *~ *.o
 	
 install: all
-	if test -d ${HOME}/bin; then cp testserver ~/bin; fi
+	if test -d ${HOME}/bin; then cp testserver ${HOME}/bin; fi
 
 $(ALL): SRC=$($@_SRC)
 $(ALL): OBJ=$(SRC:.cpp=.o)

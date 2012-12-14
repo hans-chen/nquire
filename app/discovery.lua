@@ -8,6 +8,11 @@ local discovery_address = "239.255.255.250"
 local discovery_port = 19200
 
 
+local function get_current_itf()
+	local convert_to_itf = { ["ethernet"] = "eth0", ["wifi"]="wlan0" }
+	return convert_to_itf[config:get("/network/interface")]
+end
+
 local function gen_reply_v1(self)
 
 	local reply = { "CIT-DISCOVER-RESPONSE"}
@@ -23,8 +28,7 @@ local function gen_reply_v1(self)
 	end
 
 	-- Get current network address
-	local convert_to_itf = { ["ethernet"] = "eth0", ["wifi"]="wlan0" }
-	local itf = convert_to_itf[config:get("/network/interface")]
+	local itf = get_current_itf()
 	if itf ~= nil then
 		local ip, err = net.get_interface_ip( itf )
 		if err or not ip then

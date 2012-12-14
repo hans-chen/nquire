@@ -16,13 +16,11 @@ local lgid = "webserver"
 --
 -- client:add_data(...)         HTTP payload data to send, typically HTML
 -- client:add_header(hdr, val)  Set HTTP header 'hdr' to 'val'
--- client:set_cache(n)          Mark the returned document as cachable for n seconds.
 --
 -- Example for serving .png images, using the cache
 --
 -- mod.webserver:register(".+.png", function(client, request)
 --    client:set_header("Content-Type", "image/png")
--- 	client:set_cache(3600)
 -- 	local fd = io.open("." .. request.path)
 -- 	if fd then
 -- 		client:add_data(fd:read("*a"))
@@ -31,6 +29,15 @@ local lgid = "webserver"
 -- 	return true
 -- end)
 --
+
+
+local function set_keepalive( sock )
+	local result, errstr = net.setsockopt(sock, "SO_KEEPALIVE", 1);
+	if not result then
+		logf(LG_WRN, lgid, "setsockopt SO_KEEPALIVE: %s", errstr);
+	end
+end
+
 
 -- return: remaining next_buf
 local function handle_request(client, method, uri, headers, next_buf)
@@ -90,8 +97,6 @@ local function handle_request(client, method, uri, headers, next_buf)
 	if method == "POST" then
 		request.post_data = next_buf:sub(1, request.header["Content-Length"])
 		next_buf = next_buf:sub( request.header["Content-Length"]+1 )
-		--print("DEBUG:89 post_data=" .. request.post_data)
-		--print("DEBUG:90 next_buf=" .. next_buf)
 	end
 	
 	-- Find handler for request
@@ -100,11 +105,11 @@ local function handle_request(client, method, uri, headers, next_buf)
 
 		for _, handler in pairs(client.webserver.handler_list) do
 
+			logf(LG_DMP, lgid, "handler.path %s", handler.path)
 			if request.path:find(handler.path) then
 
 				-- Call handler to generate HTTP response data and headers
 
-				client.cache_time = -30758400;  -- 1 year ago 
 				client.resp_data = {}
 				client.resp_header = {}
 				local ok, retval = safecall(handler.fn, client, request, handler.fndata)
@@ -118,8 +123,12 @@ local function handle_request(client, method, uri, headers, next_buf)
 					else
 						response.result = "200 OK"
 						response.data = table.concat(client.resp_data)
+-- TODO: remove DEBUG
+--for i,l in ipairs(client.resp_data) do
+--	print("resp_data " .. i .. ": " .. l)
+--end
+			
 						response.header = client.resp_header
-						--response.header["Expires"] = os.date("%a, %d %b %Y %H:%M:%S GMT", os.time() + client.cache_time)
 					end
 				else
 					response.result = "500 Error"
@@ -142,13 +151,12 @@ local function handle_request(client, method, uri, headers, next_buf)
 		response.data = "<h1>Authorization required</h1>\n"
 	end
 				
-	response.header["Content-Length"] = response.header["Content-length"] or #response.data
+	response.header["Content-Length"] = response.header["Content-Length"] or #response.data
 	response.header["Content-Type"] = response.header["Content-Type"] or "text/html; charset=iso-8859-1"
 	response.header["Connection"] = response.header["Connection"] or request.header["Connection"]
 	response.header["Connection"] = response.header["Connection"] or "Close"
 	
 	-- Concatenate all headers into HTTP format
-	
 	local h = {}
 	for k, v in pairs(response.header) do
 		h[#h+1] = k .. ": " .. v .. "\n"
@@ -157,14 +165,20 @@ local function handle_request(client, method, uri, headers, next_buf)
 	local headers = table.concat(h)
 
 	-- Send result to client
-	
-	client:send("HTTP/1.1 " .. response.result .. "\n")
-	client:send(headers)
-	client:send(response.data)
 
-	if response.header["Connection"] == "Close" then
-		client:close()
-		logf(LG_DBG, lgid, "Client closed, no keepalive")
+	if		client:send("HTTP/1.1 " .. response.result .. "\n") and
+			client:send(headers) and
+			client:send(response.data) then
+		if response.header["Connection"] == "Close" then
+			client:close()
+			logf(LG_DBG, lgid, "Client closed, no keepalive")
+		end
+	else
+		logf(LG_WRN,lgid,
+[[ Buffer overflow in tcp stack while sending http data: Connection terminated.
+This is possibly caused by a (very) bad (wifi) connection. ]] )
+		client:close()	
+		next_buf = ""
 	end
 
 	return next_buf
@@ -208,11 +222,8 @@ local function on_fd_client(event, client)
 			--print("DEBUG: buf='" .. buf .. "'")
 
 			local method, uri, headers = buf:match("^(%S+) (%S+).-[\r\n]+(%S.+)")
-			--print("DEBUG: method=" .. (method or "null"))
-			--print("DEBUG: uri=" .. (uri or "null"))
-			--print("DEBUG: headers=\n" .. dump(headers or "null"))
-
-			logf(LG_DBG,lgid,"http request: '%s'", uri)
+			--logf(LG_DMP,lgid,"request headers:\n%s", dump(headers or "<nil>"))
+			logf(LG_DBG,lgid,"http %s request: '%s'", method or "<nil>", uri)
 
 			if method=="GET" then
 				next_buf = handle_request(client, method, uri, headers, next_buf)
@@ -235,7 +246,7 @@ local function on_fd_client(event, client)
 		end
 
 	end
-
+	logf(LG_DMP, lgid, "debugging - on_fd_client:ready")
 end
 
 
@@ -249,7 +260,9 @@ local function on_fd_server(event, webserver)
 		return
 	end
 
-	local fd, address = net.accept(webserver.fd)
+	-- sendbuffersize 17000 required for sending the log-page
+	local fd, address = net.accept(webserver.fd, 170000)
+	set_keepalive( fd )
 
 	logf(LG_DBG, lgid, "New connection from %s", address)
 
@@ -268,16 +281,28 @@ local function on_fd_server(event, webserver)
 		-- methods
 
 		recv = function(client, len) return net.recv(client.fd, len or 4096) end,
-		send = function(client, buf) return net.send(client.fd, buf) end,
-		close = function(client) 
+		send = function(client, buf) 
+				logf(LG_DMP, lgid, "before net.send(fd=%d,#=%d,%s)", client.fd, #buf, buf:sub(1,40) .. (#buf>40 and "..." or ""))
+				local n, errmsg = net.send(client.fd, buf)
+				if errmsg then
+					logf(LG_WRN, lgid, "Sending data to http client: %s", errmsg)
+				else
+					logf(LG_DMP, lgid, "after net.send() : sent=%d", n or -1)
+				end
+				return n == #buf
+			end,
+		close = function(client)
+			logf(LG_DMP, lgid, "client:close(fd=%d)", client.fd)
+			net.shutdown(client.fd,"RDWR") 
 			net.close(client.fd)
 			evq:unregister("fd", on_fd_client, client)
 			evq:fd_del(client.fd)
 			webserver.client_list[client] = nil
 		end,
 		add_data = function(client, data) client.resp_data[#client.resp_data+1] = tostring(data) end,
+		-- TODO:
+		flush = function(client) end,
 		set_header = function(client, key, val) client.resp_header[key] = val end,
-		set_cache = function(client, seconds) client.cache_time = seconds end
 	}
 
 	evq:fd_add(client.fd)
@@ -290,24 +315,19 @@ end
 -- Start HTTP server
 --
 
-local function start(webserver)
-	local port_list = { 80, 8000 }
+local function start(webserver, port)
 	local s = net.socket("tcp")
-	local port = 0
-	for _, try_port in ipairs(port_list) do
-		local ok, err = net.bind(s, "0.0.0.0", try_port)
-		if ok then 
-			port = try_port
-			break 
-		else
-			logf(LG_WRN, lgid, "Bind to port 80 failed: %s", err)
-		end
+	local ok, err = net.bind(s, "0.0.0.0", port)
+	if err then
+		logf(LG_WRN,lgid,"Could not bind webserver to port %d", port)
+		return false
 	end
 	net.listen(s, 5)
 	webserver.fd = s
 	evq:fd_add(webserver.fd)
 	evq:register("fd", on_fd_server, webserver)
 	logf(LG_INF, lgid, "HTTP server listening on port %q", port)
+	return true
 end
 
 
@@ -321,6 +341,10 @@ local function stop(webserver)
 	end
 	evq:unregister("fd", on_fd_server, webserver)
 	evq:fd_del(webserver.fd)
+	local r, msg = net.shutdown(webserver.fd, "RDWR")
+	if msg then
+		logf(LG_WRN,lgid,"Error shutting down webserver socket: %s", msg)
+	end
 	net.close(webserver.fd)
 	logf(LG_INF, lgid, "HTTP server stopped")
 end
@@ -356,17 +380,40 @@ function url_encode(s)
 	return s
 end
 
+-- handle a request for static data
+local function on_request(client, request, mimetype)
+	local fname = request.path:match("^(/.+%.%a+)$")
+	if fname then
+		local fpath = client.webserver.root .. fname
+		local fd = io.open(fpath)
+		if fd then
+			logf(LG_DBG,lgid,"Sending %s, with mimetype %s", fname, mimetype)
+			client:set_header("Content-Type", mimetype)
+			client:set_header("Cache-Control", "public, max-age=3600")
+
+			client:add_data(fd:read("*a"))
+			fd:close()
+			return true
+		else
+			logf(LG_WRN,lgid,"Could not find %s", fpath)
+			return false
+		end
+	else
+		logf(LG_WRN,lgid,"No match for %s", request.path)
+		return false
+	end
+end
 
 --
 -- Module registration 
 --
 
-function new()
+function new( root_dir )
 
 	local webserver = {
 		
 		-- data
-		
+		root = root_dir,
 		fd = nil,
 		client_list = {},
 		evq_handler = nil,
@@ -390,6 +437,10 @@ function new()
 			end
 		end, webserver)
 
+	webserver:register("/?favicon%.ico", on_request, "image/x-icon")
+	webserver:register("/?.+%.jpg", on_request, "image/jpeg")
+	webserver:register("/?.+%.png", on_request, "image/png")
+	webserver:register("/?.+%.css", on_request, "text/css")
 
 	return webserver
 

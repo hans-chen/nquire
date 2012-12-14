@@ -33,7 +33,6 @@ require "beepthread"
 require "sys"
 require "discovery"
 require "discovery_sg15"
-require "upgrade"
 require "versioninfo"
 require "led"
 require "watchdog"
@@ -84,17 +83,6 @@ end
 -- Main code starts here
 ---------------------------------------------------------------------------
 
--- workaround for image bug (required for gprs lock option and peers/gprs file)
-os.execute( "mkdir -p /etc/ppp/peers" )
-
--- logging dir for mifare logging and upgrade-fail-dumps
-os.execute( "mkdir -p /home/ftp/log /mnt/log; chown ftp:ftp /home/ftp/log" )
-os.execute( "mount --bind /mnt/log /home/ftp/log; chmod 777 /home/ftp/log" )
-
--- make default images available:
-os.execute( "mkdir -p /home/ftp/img/default; mount --bind /cit200/img/ftp /home/ftp/img/default;" )
-os.execute( "chmod 644 /cit200/img/ftp/*; chmod 755 /home/ftp/img/default" )
-
 -- Parse cmdline arguments
 
 opt = getopt( {...} , "Ddhl:np:v")
@@ -132,8 +120,23 @@ end
 -- Create event queue (depends on: log)
 evq = Evq.new()
 
--- Create configuration object and load config from file (depends on: log, evq)
-config = Config.new("schema/root.schema", "cit.conf")
+-- Create configuration object with default settings (depends on: log, evq)
+config = Config.new("schema/root.schema", "/mnt/cit.conf", "/home/ftp/cit.conf")
+-- than load config from file:
+-- use a cit.conf on usb when this was available during boot:
+if not config:load_db("/udisk/cit.conf") then
+	-- reading the backup configfile is only required for upgrades from lower then 1.5
+	if config:load_db("/mnt/cit.conf.bkup") then
+		os.remove("/mnt/cit.conf.bkup")
+	-- mountpoint of mmc was changed from /mnt to /mnt/mmc
+	elseif config:load_db("/mnt/mmc/cit.conf.bkup") then
+		os.remove("/mnt/mmc/cit.conf.bkup")
+	elseif not config:load_db("/mnt/cit.conf") then
+		-- otherwise try to load the work-configfile (eg when the power was unplugged):
+			logf(LG_WRN, lgid, "No config file found. Using defaults.")
+	end
+end
+config:save_db()
 
 -- and register changes in loglevel here (and not in log.lua itself),
 -- because logging can not depend on config:
@@ -156,7 +159,6 @@ versioninfo:init()
 display = Display.new()
 
 -- log hw and version info
-
 local mac_eth0 = sys.get_macaddr("eth0")
 logf(LG_INF, lgid, "Ethernet mac %s", mac_eth0)
 
@@ -214,7 +216,7 @@ evq:push("reinit_scanner",nil,2)
 
 -- Create optional devices (will become nil when device is not found)
 
--- TODO: HW detection does not always work
+-- When no rfid HW is detected, scanner_rf == nil
 scanner_rf = Scanner_rf.new()
 
 -- stdin devices:
@@ -227,8 +229,10 @@ end
 scanner_hid = Scanner_hid.new()
 scanner_hid:open()
 
-webserver = Webserver.new()
-webserver:start()
+webserver = Webserver.new("/cit200/http")
+if not webserver:start(80) then
+	webserver:start(8000)
+end
 
 -- Create web interface CGI
 webui = Webui.new( )
@@ -251,9 +255,6 @@ evq:register("network_down", function()
 	discovery:stop()
 	discovery_sg15:stop()
 end)
-
--- Start upgrade process
-Upgrade.new(nil,nil,"cit.conf")
 
 -- Configure network
 
@@ -294,6 +295,7 @@ end
 
 -- Cleanup
 
+gpio:close()
 beeper:play(config:get("/dev/beeper/tune_shutdown"))
 webserver:stop()
 if keyboard then keyboard:close() end

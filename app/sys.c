@@ -138,14 +138,17 @@ static int l_select(lua_State *L)
 		lua_getfield(L, 1, what[i]);
 		if(!lua_istable(L, -1)) return 0;
 
+		TRACE_NB("select fds=");
 		FD_ZERO(&fds[i]);
 		lua_pushnil(L);
 		while (lua_next(L, -2) != 0) {
 			fd = lua_tonumber(L, -2);
+			TRACE_PRINTF("%d ", fd);
 			FD_SET(fd, &fds[i]);
 			if(fd > fd_max) fd_max = fd;
 			lua_pop(L, 1);
 		}
+		TRACE_PRINTF("\n");
 
 		lua_pop(L, 1);
 	}
@@ -793,7 +796,7 @@ static int l_ioctl( lua_State* L )
 	int fd = luaL_checkinteger(L, 1);
 	int p1 = luaL_checkinteger(L, 2);
 	int p2 = luaL_checkinteger(L, 3);
-	ioctl(fd, p1, (void *)p2);
+	ioctl(fd, p1, p2);
 	return 0;
 }
 
@@ -805,7 +808,7 @@ static int l_ioctl_keypad( lua_State* L )
 {
 	int key_fd = luaL_checkinteger(L, 1);
 	int stopflag = luaL_checkinteger(L, 2);
-	ioctl(key_fd,EVIOCGRAB,(void *)stopflag);
+	ioctl(key_fd,EVIOCGRAB,stopflag);
 	return 0;
 }
 

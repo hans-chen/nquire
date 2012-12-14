@@ -1,0 +1,34 @@
+= Test barcodes =
+
+[cols="8^,1,1,11,1,1,1,1",options="header"]
+|===================================================
+|Name|ext prefix|nquire prefix|Testbarcode|check em1300|check em2027|ext hr100|ext hr200
+|Code128|j|#|image:img/Code128.png["i1234567890",height=50,width=140]||||
+|UCC_EAN-128|u|P|image:img/UCC_EAN-128.png["i1234567890",height=50,width=230]||||
+|EAN-8|g|FF|image:img/EAN-8.png["i1234567890",height=50,width=120]||||
+|EAN-13|d|F|image:img/EAN-13.png["i1234567890",height=50,width=220]||||
+|UPC-E|h|E|image:img/UPC-E.png["i1234567",height=50,width=120]||||
+|UPC-A|c|A|image:img/UPC-A.png["i1234567890",height=50,width=200]||||
+|Interleaved-2_of_5|e|i|image:img/Interleaved-2_of_5.png["i1234567890",height=50,width=120]||||
+|Code39|b|*|image:img/Code39.png["i1234567890",height=50,width=200]||||
+|Codabar|a|%|image:img/Codabar.png["i1234567890",height=50,width=200]||||
+|Code93|y|c|image:img/Code93.png["i1234567890",height=50,width=200]||||
+|PDF417|r|r|image:img/PDF417.png["i1234567890",height=50,width=200]|n.a.|||
+|QR_Code|S|s|image:img/QR_Code.png["i1234567890",height=50]|n.a.|||
+|Aztec|Z|z|image:img/Aztec.png["i1234567890",height=30]|n.a.|||
+|DataMatrix|U|u|image:img/DataMatrix.png["i1234567890",height=30]|n.a.|||
+|Chinese-Sensible|H|h|image:img/Chinese-Sensible.png["i1234567890",height=90]|n.a. =ean13|||
+|GS1_Databar|R|R|image:img/GS1_Databar.png["i1234567890",height=50,width=120]||||
+|ISBN|B|B|image:img/ISBN.png["i1234567890",height=50,width=200]||n.a.||
+|Code-11|z|Z|image:img/Code-11.png["1234567890",height=50,width=200]||||
+|2_5-Matrix|v|v|image:img/2_5-Matrix.png["1234567890",height=50,width=200]||n.a.||
+|ITF14|q|q|image:img/ITF14.png["1234567890123",height=50,width=250]||||
+|MSI-Plessey|m|m|image:img/MSI-Plessey.png["1234567890",height=50,width=200]||n.a.||
+|Plessey|p|n|image:img/Plessey.png["963742312",height=50,width=220]||n.a.||
+|2_5-Standard (IATA)|s|o|image:img/2_5-IATA.png["126498153",height=50,width=200]||n.a.||
+|2_5-Industrial|i|o|image:img/2_5-Industrial.png["4587232323",height=50,width=200]||n.a.||
+|===================================================
+
+
+
+

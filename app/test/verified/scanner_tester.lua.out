@@ -1,0 +1,52 @@
+# *** Running module/scanner_tester.lua
+
+
+# *** Start test 'no_duplicate_barcode_prefixes'
+WARNING: prefix_out duplicate for 2_5-Standard with 2_5-Industrial
+
+# *** Start test 'enable_disable_HR100'
+Code128 has prefix definition j
+UCC_EAN-128 has prefix definition u
+EAN-8 has prefix definition g
+EAN-13 has prefix definition d
+UPC-E has prefix definition h
+UPC-A has prefix definition c
+Interleaved-2_of_5 has prefix definition e
+2_5-Matrix has prefix definition v
+Code39 has prefix definition b
+Codabar has prefix definition a
+Code93 has prefix definition y
+ISBN has prefix definition B
+Code-11 has prefix definition z
+ITF14 has prefix definition q
+MSI-Plessey has prefix definition m
+Plessey has prefix definition p
+2_5-Standard has prefix definition s
+2_5-Industrial has prefix definition i
+
+# *** Start test 'enable_disable_HR200'
+Code128 has prefix definition j
+UCC_EAN-128 has prefix definition J
+EAN-8 has prefix definition d
+EAN-13 has prefix definition D
+UPC-E has prefix definition c
+UPC-A has prefix definition C
+Interleaved-2_of_5 has prefix definition E
+ITF14 has prefix definition e
+Code39 has prefix definition b
+Codabar has prefix definition a
+Code93 has prefix definition i
+PDF417 has prefix definition r
+QR_Code has prefix definition s
+Aztec has prefix definition z
+DataMatrix has prefix definition u
+Chinese-Sensible has prefix definition h
+GS1_Databar has prefix definition R
+Code-11 has prefix definition H
+
+# *** Start test '2d_codes'
+PDF417 = 2D
+QR_Code = 2D
+Aztec = 2D
+DataMatrix = 2D
+Chinese-Sensible = 2D

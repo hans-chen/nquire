@@ -1,0 +1,19 @@
+#!/bin/sh
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin:
+runlevel=S
+prevlevel=N
+umask 022
+export PATH runlevel prevlevel
+export LD_LIBRARY_PATH=/lib:/usr/lib:/appfs/lib
+#
+#       Trap CTRL-C &c only in this shell so we can interrupt subprocesses.
+#
+trap ":" INT QUIT TSTP
+exit 0
+
+hostname NEWLAND_Nquire
+mount -o move /old_rootfs/dev/pts /dev/pts
+mount -o move /old_rootfs/dev /dev
+mount -o move /old_rootfs/sys /sys
+mount -o move /old_rootfs/tmp /tmp
+mount -o move /old_rootfs/home/ftp /home/ftp
