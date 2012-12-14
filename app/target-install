@@ -1,0 +1,19 @@
+#!/bin/sh
+
+echo "- cleanup"
+killall lua
+sleep 2
+killall -9 main.lua
+ifconfig eth0 192.168.1.200
+echo "- mount"
+mount -o nolock 192.168.1.127:/home/maarten/workspace/cit/app /mnt
+cd /mnt
+echo "- copy"
+cp *so *lua /cit200
+cp schema/* /cit200/schema
+cd /cit200
+echo "- umount"
+umount /mnt
+echo "- restart"
+lua main.lua -l5
+

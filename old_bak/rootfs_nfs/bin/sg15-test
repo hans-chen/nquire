@@ -1,0 +1,23 @@
+#!/bin/sh
+ADDRESS=127.0.0.1
+UDP_PORT=9000
+TCP_PORT=9101
+
+name=$1
+num=$2
+price=$3
+test_1()
+{
+	echo -en "\x1b\x42\x30"				# Font size 0
+	echo -en "\x1b\x24"				# Clear screen
+	echo -en $name		# Text
+	echo -en "\x0d"					# Carriage return
+	echo -en $num"Ltr"				# Text
+	echo -en "\x1b\x42\x31"				# Font size 1
+	echo -en "\x1b\x2e\x38\x80" $price "\x03"		# Align text right bottom
+}
+
+test_1 | nc -w1 ${ADDRESS} ${TCP_PORT}
+
+
+

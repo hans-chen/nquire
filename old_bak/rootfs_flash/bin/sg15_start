@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cd /cit-0.4-5-g3559f64
+./main.lua&

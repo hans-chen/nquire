@@ -1,0 +1,217 @@
+return group {
+
+	id = "dev",
+	label = "Device settings",
+
+	object { 
+		id = "name",
+		label = "Device name",
+		type = "string",
+		default = "Newland NQuire 200",
+		range = "1:32",
+	},
+	
+	object { 
+		mode = "r",
+		id = "version",
+		label = "Application version",
+		type = "string",
+		default = "-",
+	},
+	
+	object { 
+		mode = "r",
+		id = "build",
+		label = "Application build nr",
+		type = "string",
+		default = "-",
+	},
+	
+	object { 
+		mode = "r",
+		id = "date",
+		label = "Application build date",
+		type = "string",
+		default = "-",
+	},
+	
+	object { 
+		mode = "r",
+		id = "serial",
+		label = "Serial number",
+		type = "string",
+		default = "-",
+	},
+	
+	object { 
+		mode = "r",
+		id = "rfs_version",
+		label = "Root file system version",
+		type = "string",
+		default = "-",
+	},
+
+	group {
+		id = "auth",
+		
+		object {
+			id = "enable",
+			label = "Enable authentication",
+			type = "boolean",
+			default = "false",
+		},
+
+		object {
+			id = "username",
+			label = "Username",
+			type = "string",
+			default = "admin"
+		},
+
+		object {
+			id = "password",
+			label = "Password",
+			type = "string",
+			default = "admin"
+		},
+	},
+	
+	group {
+		id = "modem",
+		label = "Modem",
+
+		object {
+			id = "device",
+			label = "Device",
+			type = "string",
+			default = "/dev/ttyACM0"
+		},
+
+		object {
+			id = "baudrate",
+			label = "Baudrate",
+			type = "enum",
+			default = "115200", 
+			range = "300,1200,2400,4800,9600,19200,38400,57600,115200"
+		}
+
+	},
+	
+	group {
+
+		label = "Scanner", 
+		id = "scanner",
+
+		object {
+			id = "device",
+			label = "Device",
+			type = "string",
+			default = "/dev/scanner"
+		},
+
+		object {
+			id = "baudrate",
+			label = "Baudrate",
+			type = "enum",
+			default = "9600", 
+			range = "300,1200,2400,4800,9600,19200,38400,57600,115200"
+		},
+
+		object {
+			id = "barcodes",
+			label = "Barcodes",
+			type = "enum",
+			default = "1D only",
+			range="1D only,1D and 2D"
+		}
+	},
+
+	group {
+
+		id = "beeper",
+		label = "Beeper", 
+
+		object {
+			id = "device",
+			label = "Device",
+			type = "string",
+			default = "/dev/beeper"
+		},
+
+		object {
+			label = "Beeper volume",
+			id = "volume",
+			type = "enum",
+			default = "4",
+			range = "0,1,2,3,4,5",
+		},
+
+		object {
+			label = "Beeper type",
+			id = "beeptype",
+			type = "enum",
+			default = "1",
+			range = "1,2,3",
+		},
+
+		object {
+			id = "tune_startup",
+			label = "Startup tune",
+			type = "string",
+			default = "o3c16g16"
+		},
+
+		object {
+			id = "tune_shutdown",
+			label = "Shutdown tune",
+			type = "string",
+			default = "o3g16c16"
+		},
+
+		object {
+			id = "tune_1",
+			label = "Scanner tune 1",
+			type = "string",
+			default = "o3c32"
+		},
+		
+		object {
+			id = "tune_2",
+			label = "Scanner tune 2",
+			type = "string",
+			default = "o4c32"
+		},
+		
+		object {
+			id = "tune_3",
+			label = "Scanner tune 3",
+			type = "string",
+			default = "o5c32"
+		},
+
+	},
+
+	group {
+
+		id = "display",
+		label = "Display", 
+		
+		object {
+			id = "mode",
+			label = "Mode",
+			type = "enum",
+			default = "240x128m",
+			range = "240x128m,320x160c",
+		},
+		
+		object {
+			id = "contrast",
+			label = "Display contrast",
+			type = "enum",
+			default = "2",
+			range = "1,2,3,4",
+		},
+	},
+} 
+	
+-- vi: ft=lua ts=3 sw=3

@@ -1,0 +1,37 @@
+#!/usr/local/bin/lua
+
+require "net"
+require "sys"
+
+local discovery_address = "239.255.255.250"
+local discovery_port = 19200
+
+local fd = net.socket("udp")
+net.setsockopt(fd, "IP_ADD_MEMBERSHIP", discovery_address)
+net.bind(fd, discovery_address, discovery_port)
+
+local ok, err = net.sendto(fd, "CIT-DISCOVER-REQUEST\nVersion: 1\n", discovery_address, discovery_port)
+if not ok then
+	print("Error sending: ", err)
+end
+
+
+while true do
+
+	local fds_in = {r={[fd]=true},w={},e={}}
+	local fds_out = sys.select(fds_in, 1)
+
+	if not fds_out then
+		os.exit(0)
+	end
+
+	local buf, saddr, sport = net.recvfrom(fd, 1024)
+	print(">>>> " .. saddr)
+	print(buf)
+	print("<<<<")
+end
+
+--net.bind(fd, "0.0.0.0", discovery_port)
+
+
+-- vi: ft=lua ts=3 sw=3

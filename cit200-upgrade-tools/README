@@ -1,0 +1,133 @@
+      cit200 image tools how to
+------------------------------------
+2009-08-13:
+1.Modify filesystem.
+	The new filesystem include cramfs partition and jffs2 partition.
+	The cramfs partition contains busybox, c library and the base library of cit200.
+	The jffs2 partition contains cit200 application, self-test and some cit200 tools.
+2.Rewrite cit200 image tools
+	Use makefile regulation to rewrite cit200 image tools.
+	enter cit/cit200-upgrade-tools.
+	run 
+		make
+	this will generate all image.
+------------------------------------
+
+1.directory tree
+
+|-- src                                 include test file: the whole image(cit200.image), kernel image, logo picture, and  root filesystem source
+    `-- rootfs_vsftp                    cit200 root filesystem 
+`-- release								include release image(the prescribed format image)
+|-- tools								cit200 image tools
+
+
+2.make the prescribed format image how to
+    # make
+        this will  generate all image(applicatition, kernel, logo, rootfs, firmware)
+
+3. host pack script how to 
+Usage:  ./host_pack_tar.sh [OPTIONS]
+
+Packing tool for cit200
+Options:
+    -s PATH             Pack the application for cit200. 
+    -k FILE             Pack a kernel_image_file.
+    -l FILE             Pack logo.bmp into logo image.(size: 32KByte)
+    -r FILE             Pack rootfs.jffs2 into rootfs image.
+    -f FILE             Pack cit200.image into firmware image. 
+                             cit200.image include kernel,logo,rootfs.
+    -e FILE             Pack the update kernel image of the usb scanner EM2027.
+    -m FILE             Pack the update application image of the usb scanner EM2027.
+    -v VERISON          the version of kernel or application.  Default vaule: 0.1
+    -n NAME             the name of component in the name of image.
+                        the default name of application  is "app".
+                        the default name of kernel image  is "kernel".
+                        the defautl name of rootfs image is "rootfs".
+                        the default name of firmware image is "firmware".
+                        the default name of logo image is "logo".
+                        the default name of em2027 kernel image is "em2027kernel".
+                        the default name of em2027 application image is "em2027app".
+    -h                  Show this usage guide.
+Note:
+    output file format:
+    <product>-<component>-<version>-<md5sum>.image
+f.e:
+    cit-kernel-0.2-7ec8feff9530018bbeb6ed47292078dd.image
+    cit-app-0.2-91900cb5733b29855f9ee61d9578f6ba.image
+    cit-rootfs-0.2-85f2e768019421ac13904de3041b4fbe.image
+    cit-firmware-0.2-ba9e7e39c8b64953bc4560b64a8e218b.image
+    cit-logo-0.1-667419a7e2f8bbd7929cfec4d2ad47a1.image
+    cit-em2027kernel-3.05.024-120133fc25763fa3d2ccc1298461ba3a.image
+    cit-em2027app-3.01.013-01cbab5177223bb4d4d71d0d6d9a7dae.image
+
+example:
+        ./host_pack_tar.sh -s ./app-binary -v 0.2
+it will create  cit-app-1.1-91900cb5733b29855f9ee61d9578f6ba.image
+
+        ./host_pack_tar.sh -k ./kernel.cit200 -v 0.2
+it will create  cit-kernel-0.2-7ec8feff9530018bbeb6ed47292078dd.image
+
+        ./host_pack_tar.sh -l ./nl_logo.bmp -v 0.2
+it will create   cit-logo-0.2-667419a7e2f8bbd7929cfec4d2ad47a1.image
+
+        ./host_pack_tar.sh -r ./rootfs.jffs2 -v 0.2
+it will create   cit-rootfs-0.2-85f2e768019421ac13904de3041b4fbe.image
+
+        ./host_pack_tar.sh -f ./cit200.image -v 0.2
+it will create   cit-firmware-0.2-ba9e7e39c8b64953bc4560b64a8e218b.image
+
+        ./host_pack_tar.sh -e ./em2027_kernel.bin -v 3.05.024
+it will create   cit-em2027kernel-3.05.024-120133fc25763fa3d2ccc1298461ba3a.image
+
+        ./host_pack_tar.sh -m ./em2027_app.bin -v 3.01.013
+it will create   cit-em2027app-3.01.013-01cbab5177223bb4d4d71d0d6d9a7dae.image
+
+
+
+4. target unpack script how to 
+Usage:  /bin/target_unpack_tar.sh [OPTIONS]
+
+Unpacking tool for cit200
+  script will not calculate md5sum of the file.It should be check in the application.
+  If any error happen, it will return 1.
+
+  After update, it will remove the update image.
+Options:
+    -s FILE         Update the application from [FILE]:cit-app-0.2-91900cb5733b29855f9ee61d9578f6ba.image
+    -k FILE         Update the kernel flash partition from [FILE]: cit-kernel-0.2-7ec8feff9530018bbeb6ed47292078dd.image
+    -l FILE         Update the logo flash paratition from [FILE]: cit-logo-0.1-667419a7e2f8bbd7929cfec4d2ad47a1.image
+    -r FILE         Update the rootfs flash paratition from [FILE]: cit-rootfs-0.2-85f2e768019421ac13904de3041b4fbe.image
+    -f FILE         Update the firmware flash paratition from [FILE]:cit-firmware-0.2-ba9e7e39c8b64953bc4560b64a8e218b.image
+                        firmware include kernel,logo,rootfs paratition.
+    -e FILE         Update the em2027 kernel from [FILE]:cit-em2027kernel-3.05.024-120133fc25763fa3d2ccc1298461ba3a.image
+    -m FILE         Update the em2027 application from [FILE]:cit-em2027app-3.01.013-01cbab5177223bb4d4d71d0d6d9a7dae.image
+                        Note: Before update,please close the usb scanner in application.
+    -h              Show this usage guide.
+Note:
+    input file format:
+    <product>-<component>-<version>-<md5sum>.image
+
+example:
+        /bin/target_unpack_tar.sh -s cit-app-0.2-91900cb5733b29855f9ee61d9578f6ba.image
+it will unpack cit-app-0.2-91900cb5733b29855f9ee61d9578f6ba.image on the /cit200
+
+        /bin/target_unpack_tar.sh -k cit-kernel-0.2-7ec8feff9530018bbeb6ed47292078dd.image
+it will update the kernel flash partition.
+
+        /bin/target_unpack_tar.sh -l cit-logo-0.1-667419a7e2f8bbd7929cfec4d2ad47a1.image
+it will update the logo flash partition.
+        
+        /bin/target_unpack_tar.sh -r cit-rootfs-0.2-85f2e768019421ac13904de3041b4fbe.image
+Before update the partition, it will umount /dev/root to change the root file system into read only mode.
+it will update the rootfs flash partition.After done,it will reboot.
+
+        /bin/target_unpack_tar.sh -f cit-firmware-0.2-ba9e7e39c8b64953bc4560b64a8e218b.image
+Before update the partition, it will umount /dev/root to change the root file system into read only mode.
+it will udpate the kernel,logo,rootfs flash partition. After done,it will reboot.
+
+        /bin/target_unpack_tar.sh -e cit-em2027kernel-3.05.024-120133fc25763fa3d2ccc1298461ba3a.image
+it will update the kernel of the usb scanner em2027.
+
+        /bin/target_unpack_tar.sh -m cit-em2027app-3.01.013-01cbab5177223bb4d4d71d0d6d9a7dae.image
+it will update the application of the usb scanner em2027.
+  

@@ -1,0 +1,14 @@
+#
+# Set rcS vars
+#
+
+[ -f /etc/default/rcS ] && . /etc/default/rcS
+
+# Accept the same 'quiet' option as the kernel
+if [ ! -e /proc/cmdline ] || egrep -qw 'quiet' /proc/cmdline ; then
+    VERBOSE="no"
+fi
+
+# But allow both rcS and the kernel options 'quiet' to be overrided
+# when INIT_VERBOSE=yes is used as well.
+[ "$INIT_VERBOSE" ] && VERBOSE="$INIT_VERBOSE"

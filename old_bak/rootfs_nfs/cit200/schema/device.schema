@@ -1,0 +1,144 @@
+return group {
+
+	id = "dev",
+	label = "Device settings",
+
+	object { 
+		id = "name",
+		label = "Device name",
+		type = "string",
+		default = "Newland CIT",
+		range = "1:32",
+	},
+	
+	object { 
+		mode = "r",
+		id = "version",
+		label = "Firmware version",
+		type = "string",
+		default = "-",
+	},
+	
+	group {
+		id = "modem",
+		label = "Modem",
+
+		object {
+			id = "device",
+			label = "Device",
+			type = "string",
+			default = "/dev/ttyACM0"
+		},
+
+		object {
+			id = "baudrate",
+			label = "Baudrate",
+			type = "enum",
+			default = "115200", 
+			range = "300,1200,2400,4800,9600,19200,38400,57600,115200"
+		}
+
+	},
+	
+	group {
+
+		label = "Scanner", 
+		id = "scanner",
+
+		object {
+			id = "device",
+			label = "Device",
+			type = "string",
+			default = "/dev/scanner"
+		},
+
+		object {
+			id = "baudrate",
+			label = "Baudrate",
+			type = "enum",
+			default = "9600", 
+			range = "300,1200,2400,4800,9600,19200,38400,57600,115200"
+		}
+	},
+
+	group {
+
+		id = "beeper",
+		label = "Beeper", 
+
+		object {
+			id = "device",
+			label = "Device",
+			type = "string",
+			default = "/dev/beeper"
+		},
+
+		object {
+			id = "tune_startup",
+			label = "Startup tune",
+			type = "string",
+			default = "o3c16g16"
+		},
+
+		object {
+			id = "tune_shutdown",
+			label = "Shutdown tune",
+			type = "string",
+			default = "o3g16c16"
+		},
+
+		object {
+			id = "tune_scan",
+			label = "Scanner tune",
+			type = "string",
+			default = "o4c32"
+		},
+
+	},
+
+	group {
+
+		id = "display",
+		label = "Display", 
+		
+		object {
+			id = "mode",
+			label = "Mode",
+			type = "enum",
+			default = "239x127m",
+			range = "239x127m,240x128m,320x160c",
+		},
+
+		object {
+			id = "zoom",
+			label = "Zoom factor",
+			type = "enum",
+			default = "1",
+			range = "1,2,3,4,5",
+		},
+
+		object {
+			id = "fullscreen",
+			label = "Full screen",
+			type = "boolean",
+			default = "false",
+		},
+
+		object {
+			id = "reverse",
+			label = "Reverse colors",
+			type = "boolean",
+			default = "true",
+		},
+
+		object {
+			id = "show_cursor",
+			label = "Show cursor",
+			type = "boolean",
+			default = "true",
+		}
+	},
+	
+} 
+	
+-- vi: ft=lua ts=3 sw=3

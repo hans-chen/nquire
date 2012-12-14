@@ -1,0 +1,50 @@
+#!/usr/local/bin/lua
+
+require "net"
+require "sys"
+
+local db = {
+	["F4002432308552"] = { name = "Leitz multomap", 		price = 2.99 },
+	["#020401"]        = { name = "Set beep",			price = 1.39 },
+	["FF87148169"]     = { name = "Bavaria, 33 cl",			price = 0.89 },
+	["F8710537703375"] = { name = "Davitamon\nVitamine D",		price = 7.95 },
+	["FF50110100"]     = { name = "Rexona\nMen Quantum",		price = 3.49 },
+	["?8590379825"]    = { name = "Programming \nin LUA",       price = 42 },
+}
+
+local s = net.socket("tcp")
+net.connect(s, arg[1] or "192.168.2.200", 9101)
+
+while true do
+	r, ok = sys.select( {r={[s]=true},w={},e={}})
+	local barcode = net.recv(s, 1024)
+	print("Recieved: " .. barcode )
+	if barcode then
+		barcode = barcode:gsub("[\r\n]", "")
+	end
+	print("Barcode: %s\n", barcode )
+		
+	out = ""
+	local info = db[barcode]
+	if info then
+		out = out .. string.char(27, 0x42, 0x31)	-- select font
+		out = out .. string.char(27, 0x24)		-- Clear screen
+		out = out .. info.name
+		out = out .. string.char(27, 0x42, 0x30)	-- Font size 1
+		out = out .. string.char(27, 0x2e, 0x38) 	-- text align
+		out = out .. string.char(0xe2, 0x82, 0xac)	-- euro sign
+		out = out .. string.format("%.2f", info.price)	-- show price
+		out = out .. string.char(0x03)
+	else
+		out = out .. string.char(27, 0x24)		-- Clear screen
+		out = out .. "Unknown product"
+	end
+
+	net.send(s, out)
+
+	local f = io.popen("hd", "w")
+	f:write(out)
+	f:close()
+end
+
+

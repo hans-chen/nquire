@@ -1,0 +1,1 @@
+tftpboot 0x20508000 cit200.image;tftpboot 0x20500000 proxy.bin;go 0x20500000;go 0;

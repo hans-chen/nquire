@@ -1,0 +1,23 @@
+#!/bin/sh
+
+DATA=""
+
+add()
+{
+	DATA="${DATA}${1};"
+}
+
+add 0001000		# Factory defaults
+add 1100020		# Set to HID keyboard mode
+add 0310000=0x0D	# Set stop suffix
+add 0309010		# Allow stop suffix
+add 0004030=0x4A	# Modify EAN-128
+add 0004050=0x44	# Modify EAN-13
+add 0004070=0x43	# Modify UPC-A
+add 0307010		# Allow code-ID prefix
+add 0001040		# Allow reading all 1D
+add 0000160		# Save
+
+echo $DATA
+qrencode -o - "$DATA" | convert -scale '100%' - batchcode.gif
+
